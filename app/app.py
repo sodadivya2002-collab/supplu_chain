@@ -1,34 +1,21 @@
 import streamlit as st
-import pandas as pd
 from datetime import datetime
-import snowflake.connector
-from snowflake.snowpark import Session
 
 
 # ============================================================
-# CONFIGURATION
-# ============================================================
-
-HOST = "XYUHKAV-XRB12650.snowflakecomputing.com"
-ACCOUNT = "XYUHKAV-XRB12650"
-DATABASE = "SUPPLY_CHAIN_DW"
-SCHEMA = "GOLD"
-WAREHOUSE = "COMPUTE_WH"
-
-
-# ============================================================
-# PAGE CONFIGURATION
+# PAGE CONFIG
 # ============================================================
 
 st.set_page_config(
     page_title="Dilytics Supply Chain AI",
     page_icon="📦",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 
 # ============================================================
-# CUSTOM UI STYLING
+# CUSTOM CSS
 # ============================================================
 
 st.markdown(
@@ -36,68 +23,754 @@ st.markdown(
     <style>
 
     /* ========================================================
+       GLOBAL
+       ======================================================== */
+
+    #MainMenu {
+        visibility: hidden;
+    }
+
+    footer {
+        visibility: hidden;
+    }
+
+    header {
+        visibility: hidden;
+    }
+
+    html, body, [class*="css"] {
+        font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .stApp {
+        background: #f4f8ff;
+    }
+
+    .block-container {
+        padding: 0 !important;
+        max-width: 100% !important;
+    }
+
+
+    /* ========================================================
+       TOP HEADER
+       ======================================================== */
+
+    .top-header {
+        height: 92px;
+
+        width: 100%;
+
+        background: linear-gradient(
+            90deg,
+            #0645c5 0%,
+            #0752d6 50%,
+            #0645c5 100%
+        );
+
+        display: flex;
+
+        align-items: center;
+
+        padding: 0 28px;
+
+        box-sizing: border-box;
+    }
+
+
+    /* ========================================================
+       DILYTICS LOGO
+       ======================================================== */
+
+    .dilytics-logo {
+        background: #d90000;
+
+        color: white;
+
+        font-size: 28px;
+
+        font-weight: 800;
+
+        letter-spacing: 1px;
+
+        padding: 9px 18px;
+
+        min-width: 170px;
+
+        text-align: center;
+
+        border-radius: 0;
+
+        box-sizing: border-box;
+    }
+
+
+    /* ========================================================
+       HEADER DIVIDER
+       ======================================================== */
+
+    .header-divider {
+        width: 2px;
+
+        height: 50px;
+
+        background: rgba(255,255,255,0.7);
+
+        margin-left: 30px;
+
+        margin-right: 30px;
+    }
+
+
+    /* ========================================================
+       HEADER TITLE
+       ======================================================== */
+
+    .header-title {
+        color: white;
+
+        font-size: 32px;
+
+        font-weight: 700;
+
+        white-space: nowrap;
+    }
+
+
+    .header-sparkle {
+        color: white;
+
+        font-size: 28px;
+
+        margin-left: 12px;
+    }
+
+
+    /* ========================================================
+       HEADER RIGHT ICONS
+       ======================================================== */
+
+    .header-right {
+        margin-left: auto;
+
+        display: flex;
+
+        align-items: center;
+
+        gap: 28px;
+    }
+
+    .header-icon {
+        color: white;
+
+        font-size: 27px;
+
+        line-height: 1;
+    }
+
+
+    /* ========================================================
+       SIDEBAR
+       ======================================================== */
+
+    section[data-testid="stSidebar"] {
+
+        background: #ffffff;
+
+        border-right: 1px solid #dce5f2;
+
+        min-width: 300px !important;
+
+        max-width: 300px !important;
+    }
+
+
+    section[data-testid="stSidebar"] > div {
+
+        padding-top: 20px;
+
+        padding-left: 22px;
+
+        padding-right: 22px;
+    }
+
+
+    /* ========================================================
        SIDEBAR STATUS
        ======================================================== */
 
-    .status-pill {
+    .semantic-status {
+
         display: inline-flex;
+
         align-items: center;
-        gap: 6px;
 
-        background-color: #ecfdf5;
-        color: #065f46;
+        gap: 7px;
 
-        border: 1px solid #a7f3d0;
-        border-radius: 20px;
+        background: #e9fbf3;
 
-        padding: 3px 10px;
+        border: 1px solid #a8efd0;
 
-        font-size: 0.75rem;
+        color: #087a55;
+
+        border-radius: 25px;
+
+        padding: 8px 15px;
+
+        font-size: 14px;
+
+        font-weight: 600;
+
+        margin-bottom: 22px;
+    }
+
+    .status-dot {
+
+        width: 9px;
+
+        height: 9px;
+
+        border-radius: 50%;
+
+        background: #24b47e;
+
+        display: inline-block;
+    }
+
+
+    /* ========================================================
+       SIDEBAR NEW CHAT
+       ======================================================== */
+
+    .new-chat-btn {
+
+        background: #0754d8;
+
+        color: white;
+
+        width: 100%;
+
+        border-radius: 9px;
+
+        padding: 13px;
+
+        text-align: center;
+
+        font-size: 16px;
+
+        font-weight: 600;
+
+        margin-bottom: 28px;
+    }
+
+
+    /* ========================================================
+       SIDEBAR SECTION TITLE
+       ======================================================== */
+
+    .sidebar-heading {
+
+        color: #132448;
+
+        font-size: 15px;
+
+        font-weight: 700;
+
+        margin-top: 20px;
+
+        margin-bottom: 12px;
+    }
+
+
+    /* ========================================================
+       RECENT CHAT
+       ======================================================== */
+
+    .recent-chat {
+
+        display: flex;
+
+        align-items: center;
+
+        gap: 10px;
+
+        color: #18284c;
+
+        font-size: 14px;
+
+        padding: 10px;
+
+        border-radius: 8px;
+
+        margin-bottom: 3px;
+    }
+
+
+    .recent-chat.active {
+
+        background: #e7f0ff;
+
+        color: #073fbd;
+
         font-weight: 600;
     }
 
 
     /* ========================================================
-       BUTTONS
+       SIDEBAR DIVIDER
        ======================================================== */
 
-    div[data-testid="stButton"] > button {
-        border-radius: 8px;
+    .sidebar-line {
+
+        height: 1px;
+
+        background: #dce3ec;
+
+        margin: 18px 0;
+    }
+
+
+    /* ========================================================
+       QUICK LINKS
+       ======================================================== */
+
+    .quick-link {
+
+        display: flex;
+
+        align-items: center;
+
+        justify-content: space-between;
+
+        padding: 9px 2px;
+
+        color: #15284e;
+
+        font-size: 14px;
+
         font-weight: 500;
     }
 
 
-    /* ========================================================
-       MAIN TITLE
-       ======================================================== */
+    .quick-left {
 
-    .supply-chain-title {
-        width: 100%;
+        display: flex;
 
-        text-align: center;
+        align-items: center;
 
-        font-size: 42px;
+        gap: 11px;
+    }
 
-        font-weight: 700;
 
-        line-height: 1.2;
+    .quick-icon {
 
-        color: #30313d;
+        color: #0754d8;
 
-        margin-top: 5px;
+        font-size: 17px;
+    }
 
-        margin-bottom: 35px;
 
-        padding: 0;
+    .quick-arrow {
+
+        color: #162849;
+
+        font-size: 20px;
     }
 
 
     /* ========================================================
-       REMOVE EXTRA TOP SPACE
+       MAIN CONTENT
        ======================================================== */
 
-    .block-container {
-        padding-top: 2rem;
+    .main-area {
+
+        min-height: calc(100vh - 92px);
+
+        background:
+
+            radial-gradient(
+                ellipse at 50% 30%,
+                #ffffff 0%,
+                #edf5ff 55%,
+                #e4efff 100%
+            );
+
+        padding: 55px 45px 35px 45px;
+
+        box-sizing: border-box;
+
+        position: relative;
+
+        overflow: hidden;
+    }
+
+
+    /* ========================================================
+       BACKGROUND WAVE
+       ======================================================== */
+
+    .wave-left {
+
+        position: absolute;
+
+        left: -100px;
+
+        top: 180px;
+
+        width: 500px;
+
+        height: 250px;
+
+        border-top: 2px solid rgba(60,125,235,0.12);
+
+        border-radius: 50%;
+
+        transform: rotate(20deg);
+    }
+
+
+    .wave-right {
+
+        position: absolute;
+
+        right: -150px;
+
+        top: 130px;
+
+        width: 550px;
+
+        height: 350px;
+
+        border-top: 2px solid rgba(60,125,235,0.12);
+
+        border-radius: 50%;
+
+        transform: rotate(-20deg);
+    }
+
+
+    /* ========================================================
+       CENTER HERO
+       ======================================================== */
+
+    .hero {
+
+        text-align: center;
+
+        position: relative;
+
+        z-index: 2;
+
+        max-width: 1100px;
+
+        margin: 0 auto;
+    }
+
+
+    .bot-circle {
+
+        width: 95px;
+
+        height: 95px;
+
+        margin: 0 auto 25px auto;
+
+        background: white;
+
+        border-radius: 50%;
+
+        display: flex;
+
+        align-items: center;
+
+        justify-content: center;
+
+        font-size: 48px;
+
+        box-shadow:
+            0 8px 25px rgba(0,50,120,0.10);
+    }
+
+
+    .hero-title {
+
+        color: #10244d;
+
+        font-size: 52px;
+
+        font-weight: 750;
+
+        margin: 0;
+
+        line-height: 1.1;
+    }
+
+
+    .title-line {
+
+        width: 165px;
+
+        height: 3px;
+
+        background: #0754d8;
+
+        margin: 28px auto 26px auto;
+
+        position: relative;
+    }
+
+
+    .title-line:after {
+
+        content: "";
+
+        position: absolute;
+
+        left: 50%;
+
+        transform: translateX(-50%);
+
+        width: 80px;
+
+        height: 5px;
+
+        background: #0754d8;
+    }
+
+
+    .hero-subtitle {
+
+        color: #172c56;
+
+        font-size: 20px;
+
+        margin-bottom: 38px;
+    }
+
+
+    /* ========================================================
+       QUICK QUESTION CARDS
+       ======================================================== */
+
+    .cards {
+
+        display: grid;
+
+        grid-template-columns:
+            repeat(6, 1fr);
+
+        gap: 14px;
+
+        max-width: 1100px;
+
+        margin: 0 auto;
+
+        position: relative;
+
+        z-index: 2;
+    }
+
+
+    .question-card {
+
+        min-height: 150px;
+
+        background: rgba(255,255,255,0.92);
+
+        border-radius: 17px;
+
+        box-shadow:
+            0 7px 22px rgba(30,75,150,0.08);
+
+        display: flex;
+
+        flex-direction: column;
+
+        align-items: center;
+
+        justify-content: center;
+
+        text-align: center;
+
+        padding: 18px;
+
+        box-sizing: border-box;
+
+        border: 1px solid rgba(220,230,245,0.8);
+    }
+
+
+    .question-icon {
+
+        font-size: 38px;
+
+        margin-bottom: 14px;
+    }
+
+
+    .question-title {
+
+        color: #10244d;
+
+        font-size: 17px;
+
+        font-weight: 650;
+
+        line-height: 1.3;
+    }
+
+
+    /* ========================================================
+       SEARCH AREA
+       ======================================================== */
+
+    .search-wrapper {
+
+        max-width: 1100px;
+
+        margin: 90px auto 0 auto;
+
+        position: relative;
+
+        z-index: 5;
+    }
+
+
+    /* ========================================================
+       STREAMLIT INPUT
+       ======================================================== */
+
+    div[data-testid="stTextInput"] {
+
+        width: 100%;
+    }
+
+
+    div[data-testid="stTextInput"] > div {
+
+        background: white;
+
+        border: 2px solid #0754d8;
+
+        border-radius: 50px;
+
+        padding: 5px 9px 5px 20px;
+
+        box-shadow:
+            0 7px 20px rgba(20,80,180,0.10);
+    }
+
+
+    div[data-testid="stTextInput"] input {
+
+        border: none !important;
+
+        outline: none !important;
+
+        background: transparent !important;
+
+        font-size: 16px !important;
+
+        color: #15284e !important;
+    }
+
+
+    div[data-testid="stTextInput"] label {
+
+        display: none;
+    }
+
+
+    /* ========================================================
+       SEARCH ICON
+       ======================================================== */
+
+    .search-icon {
+
+        font-size: 24px;
+
+        color: #52627c;
+
+        margin-right: 5px;
+    }
+
+
+    /* ========================================================
+       CHAT MESSAGES
+       ======================================================== */
+
+    .chat-message {
+
+        max-width: 1100px;
+
+        margin: 25px auto;
+
+        padding: 20px;
+
+        background: white;
+
+        border-radius: 15px;
+
+        box-shadow:
+            0 5px 20px rgba(30,70,130,0.07);
+
+        position: relative;
+
+        z-index: 5;
+    }
+
+
+    /* ========================================================
+       RESPONSIVE
+       ======================================================== */
+
+    @media (max-width: 1100px) {
+
+        .cards {
+
+            grid-template-columns:
+                repeat(3, 1fr);
+        }
+
+        .hero-title {
+
+            font-size: 42px;
+        }
+
+        .header-title {
+
+            font-size: 25px;
+        }
+    }
+
+
+    @media (max-width: 700px) {
+
+        .cards {
+
+            grid-template-columns:
+                repeat(2, 1fr);
+        }
+
+        .main-area {
+
+            padding: 35px 20px;
+        }
+
+        .hero-title {
+
+            font-size: 34px;
+        }
+
+        .header-title {
+
+            display: none;
+        }
+
+        .header-divider {
+
+            display: none;
+        }
     }
 
     </style>
@@ -107,1245 +780,55 @@ st.markdown(
 
 
 # ============================================================
-# 1. LOGIN SCREEN
+# SESSION STATE
 # ============================================================
 
-if "authenticated" not in st.session_state:
-
-    st.session_state.authenticated = False
-
-    st.session_state.username = "PBCS"
-
-    st.session_state.password = ""
-
-    st.session_state.snowpark_session = None
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
 
-if not st.session_state.authenticated:
-
-    st.title("Welcome to Dilytics Supply Chain AI")
-
-    st.markdown(
-        "Please login to connect to your Snowflake Data Warehouse."
-    )
-
-
-    st.session_state.username = st.text_input(
-        "Enter Snowflake Username:",
-        value=st.session_state.username
-    )
-
-
-    st.session_state.password = st.text_input(
-        "Enter Password:",
-        type="password"
-    )
-
-
-    if st.button("Login"):
-
-        try:
-
-            with st.spinner(
-                "Connecting to Snowflake..."
-            ):
-
-                conn = snowflake.connector.connect(
-
-                    user=st.session_state.username,
-
-                    password=st.session_state.password,
-
-                    account=ACCOUNT,
-
-                    host=HOST,
-
-                    port=443,
-
-                    warehouse=WAREHOUSE,
-
-                    role="ACCOUNTADMIN",
-
-                    database=DATABASE,
-
-                    schema=SCHEMA
-                )
-
-
-                st.session_state.snowpark_session = (
-                    Session
-                    .builder
-                    .configs(
-                        {
-                            "connection": conn
-                        }
-                    )
-                    .create()
-                )
-
-
-                st.session_state.authenticated = True
-
-
-                st.rerun()
-
-
-        except Exception as e:
-
-            st.error(
-                f"Authentication failed: {e}"
-            )
-
-
-    st.stop()
+if "recent_chats" not in st.session_state:
+    st.session_state.recent_chats = []
 
 
 # ============================================================
-# 2. GET SNOWFLAKE SESSION
-# ============================================================
-
-session = (
-    st.session_state.snowpark_session
-)
-
-
-# ============================================================
-# 3. CHAT SESSION MANAGEMENT
-# ============================================================
-
-if "chat_sessions" not in st.session_state:
-
-    st.session_state.chat_sessions = {}
-
-
-if "current_session_id" not in st.session_state:
-
-    init_id = datetime.now().strftime(
-        "%Y%m%d_%H%M%S_%f"
-    )
-
-    st.session_state.current_session_id = init_id
-
-    st.session_state.chat_sessions[init_id] = {
-
-        "title": "New Conversation",
-
-        "messages": []
-    }
-
-
-current_id = (
-    st.session_state.current_session_id
-)
-
-
-messages = (
-    st.session_state
-    .chat_sessions[current_id]["messages"]
-)
-
-
-# ============================================================
-# 4. CHART FUNCTION
-# ============================================================
-
-def display_chart_tab(
-    df: pd.DataFrame,
-    key_prefix: str = ""
-):
-
-    if df is None or df.empty:
-
-        st.info(
-            "No data available for chart."
-        )
-
-        return
-
-
-    if len(df.columns) < 2:
-
-        st.info(
-            "Need at least 2 columns to render a chart."
-        )
-
-        return
-
-
-    all_cols = list(df.columns)
-
-
-    col1, col2, col3 = st.columns(3)
-
-
-    x_col = col1.selectbox(
-        "Dimension (X-axis)",
-        all_cols,
-        index=0,
-        key=f"{key_prefix}_x"
-    )
-
-
-    remaining_cols = [
-        c
-        for c in all_cols
-        if c != x_col
-    ]
-
-
-    if not remaining_cols:
-
-        st.info(
-            "No metric column available."
-        )
-
-        return
-
-
-    y_col = col2.selectbox(
-        "Metric (Y-axis)",
-        remaining_cols,
-        index=0,
-        key=f"{key_prefix}_y"
-    )
-
-
-    chart_type = col3.selectbox(
-        "Chart Type",
-        [
-            "Bar Chart",
-            "Line Chart",
-            "Area Chart",
-            "Scatter Plot"
-        ],
-        key=f"{key_prefix}_type"
-    )
-
-
-    chart_df = df.copy()
-
-
-    if any(
-        k in x_col.lower()
-        for k in [
-            "year",
-            "quarter",
-            "month",
-            "day",
-            "date"
-        ]
-    ):
-
-        chart_df[x_col] = chart_df[x_col].apply(
-            lambda x:
-                str(int(x))
-                if pd.notnull(x)
-                and isinstance(
-                    x,
-                    (int, float)
-                )
-                else str(x)
-        )
-
-
-    if chart_type == "Bar Chart":
-
-        st.bar_chart(
-            chart_df.set_index(x_col)[y_col]
-        )
-
-
-    elif chart_type == "Line Chart":
-
-        st.line_chart(
-            chart_df.set_index(x_col)[y_col]
-        )
-
-
-    elif chart_type == "Area Chart":
-
-        st.area_chart(
-            chart_df.set_index(x_col)[y_col]
-        )
-
-
-    elif chart_type == "Scatter Plot":
-
-        st.scatter_chart(
-            chart_df,
-            x=x_col,
-            y=y_col
-        )
-
-
-# ============================================================
-# 5. QUESTION / SQL ENGINE
-# ============================================================
-
-def generate_sql_from_prompt(
-    prompt: str
-):
-
-    p = prompt.lower().strip()
-
-
-    # ========================================================
-    # GREETINGS
-    # ========================================================
-
-    if any(
-        greet in p
-        for greet in [
-            "how are you",
-            "how's it going",
-            "what's up",
-            "whats up"
-        ]
-    ):
-
-        explanation = (
-            "I'm doing well, thank you! "
-            "I am ready to help you analyze "
-            "your supply chain data. "
-            "What would you like to explore?"
-        )
-
-        return explanation, None
-
-
-    elif p in [
-        "hi",
-        "hello",
-        "hey",
-        "good morning",
-        "good evening"
-    ]:
-
-        explanation = (
-            "Hello! 👋 I am your "
-            "**Supply Chain Intelligence Assistant**. "
-            "Ask me about purchase orders, suppliers, "
-            "shipments, deliveries, warehouses, "
-            "inventory, products, or logistics."
-        )
-
-        return explanation, None
-
-
-    # ========================================================
-    # HELP
-    # ========================================================
-
-    elif any(
-        help_word in p
-        for help_word in [
-            "what can i ask",
-            "what questions",
-            "what can you do",
-            "examples",
-            "help"
-        ]
-    ):
-
-        explanation = (
-            """
-You can ask me questions about your
-**Supply Chain data**.
-
-### 📋 Purchase Orders
-
-- What is the total purchase order value?
-- What is the purchase order value by supplier?
-- What are the top 10 purchase orders by value?
-- What is the order status by supplier?
-
-### 🚚 Shipments & Deliveries
-
-- How many deliveries are pending?
-- Which shipments are delayed?
-- What are the top 10 materials by purchase value?
-
-### 🏭 Suppliers
-
-- Which suppliers have the highest number of delayed orders?
-- What is the supplier on-time delivery percentage?
-
-### 📦 Inventory
-
-- What is the total available inventory value?
-- What is the total quantity of inventory currently on hand?
-- What is the inventory value by warehouse?
-- What is the inventory value by product category?
-- What is the inventory value by brand?
-- How many products are out of stock?
-"""
-        )
-
-        return explanation, None
-
-
-    # ========================================================
-    # TOTAL AVAILABLE INVENTORY VALUE
-    # ========================================================
-
-    if (
-        "total available inventory" in p
-        or "total inventory value" in p
-    ):
-
-        explanation = (
-            "Calculating total inventory value "
-            "across all warehouses as of the "
-            "latest snapshot."
-        )
-
-
-        sql = """
-
-        SELECT
-            SUM(INVENTORY_VALUE_AMT)
-                AS TOTAL_INVENTORY_VALUE
-
-        FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-
-        WHERE SNAPSHOT_DATE_KEY = (
-
-            SELECT
-                MAX(SNAPSHOT_DATE_KEY)
-
-            FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-
-        )
-
-        """
-
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # TOTAL QUANTITY ON HAND
-    # ========================================================
-
-    elif (
-        "quantity" in p
-        and "on hand" in p
-        and "product" not in p
-    ):
-
-        explanation = (
-            "Calculating the total physical "
-            "quantity of inventory currently on hand."
-        )
-
-
-        sql = """
-
-        SELECT
-            SUM(ON_HAND_QTY)
-                AS TOTAL_ON_HAND_QTY
-
-        FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-
-        WHERE SNAPSHOT_DATE_KEY = (
-
-            SELECT
-                MAX(SNAPSHOT_DATE_KEY)
-
-            FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-
-        )
-
-        """
-
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # INVENTORY VALUE BY WAREHOUSE
-    # ========================================================
-
-    elif (
-        "inventory value by warehouse"
-        in p
-    ):
-
-        explanation = (
-            "Aggregating total inventory value "
-            "grouped by warehouse location."
-        )
-
-
-        sql = """
-
-        SELECT
-
-            w.WAREHOUSE_NAME,
-
-            SUM(
-                f.INVENTORY_VALUE_AMT
-            ) AS INVENTORY_VALUE
-
-        FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
-
-        JOIN INVENTORY_DW.GOLD.DIM_WAREHOUSE w
-
-            ON f.WAREHOUSE_KEY =
-               w.WAREHOUSE_KEY
-
-        WHERE f.SNAPSHOT_DATE_KEY = (
-
-            SELECT
-                MAX(SNAPSHOT_DATE_KEY)
-
-            FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-
-        )
-
-        GROUP BY
-            w.WAREHOUSE_NAME
-
-        ORDER BY
-            INVENTORY_VALUE DESC
-
-        """
-
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # INVENTORY VALUE BY PRODUCT CATEGORY
-    # ========================================================
-
-    elif (
-        "inventory value by product category"
-        in p
-        or "by category" in p
-    ):
-
-        explanation = (
-            "Aggregating inventory value "
-            "by product category."
-        )
-
-
-        sql = """
-
-        SELECT
-
-            p.CATEGORY_NAME,
-
-            SUM(
-                f.INVENTORY_VALUE_AMT
-            ) AS TOTAL_INVENTORY_VALUE
-
-        FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
-
-        JOIN INVENTORY_DW.GOLD.DIM_PRODUCT p
-
-            ON f.PRODUCT_KEY =
-               p.PRODUCT_KEY
-
-        WHERE f.SNAPSHOT_DATE_KEY = (
-
-            SELECT
-                MAX(SNAPSHOT_DATE_KEY)
-
-            FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-
-        )
-
-        GROUP BY
-            p.CATEGORY_NAME
-
-        ORDER BY
-            TOTAL_INVENTORY_VALUE DESC
-
-        """
-
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # INVENTORY VALUE BY SUBCATEGORY
-    # ========================================================
-
-    elif "subcategory" in p:
-
-        explanation = (
-            "Aggregating inventory value "
-            "by product subcategory."
-        )
-
-
-        sql = """
-
-        SELECT
-
-            p.SUBCATEGORY_NAME,
-
-            SUM(
-                f.INVENTORY_VALUE_AMT
-            ) AS TOTAL_INVENTORY_VALUE
-
-        FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
-
-        JOIN INVENTORY_DW.GOLD.DIM_PRODUCT p
-
-            ON f.PRODUCT_KEY =
-               p.PRODUCT_KEY
-
-        WHERE f.SNAPSHOT_DATE_KEY = (
-
-            SELECT
-                MAX(SNAPSHOT_DATE_KEY)
-
-            FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-
-        )
-
-        GROUP BY
-            p.SUBCATEGORY_NAME
-
-        ORDER BY
-            TOTAL_INVENTORY_VALUE DESC
-
-        """
-
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # INVENTORY VALUE BY BRAND
-    # ========================================================
-
-    elif (
-        "inventory value by brand" in p
-        or (
-            "inventory value" in p
-            and "brand" in p
-        )
-    ):
-
-        explanation = (
-            "Aggregating inventory value "
-            "by product brand."
-        )
-
-
-        sql = """
-
-        SELECT
-
-            p.BRAND_NAME,
-
-            SUM(
-                f.INVENTORY_VALUE_AMT
-            ) AS TOTAL_INVENTORY_VALUE
-
-        FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
-
-        JOIN INVENTORY_DW.GOLD.DIM_PRODUCT p
-
-            ON f.PRODUCT_KEY =
-               p.PRODUCT_KEY
-
-        WHERE f.SNAPSHOT_DATE_KEY = (
-
-            SELECT
-                MAX(SNAPSHOT_DATE_KEY)
-
-            FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-
-        )
-
-        GROUP BY
-            p.BRAND_NAME
-
-        ORDER BY
-            TOTAL_INVENTORY_VALUE DESC
-
-        """
-
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # STOCKOUT
-    # ========================================================
-
-    elif (
-        "stockout" in p
-        or "out of stock" in p
-    ):
-
-        if "warehouse" in p:
-
-            explanation = (
-                "Calculating the number of stockouts "
-                "organized by warehouse."
-            )
-
-
-            sql = """
-
-            SELECT
-
-                w.WAREHOUSE_NAME,
-
-                COUNT_IF(
-                    f.IS_STOCKOUT_FLAG
-                ) AS STOCKOUT_COUNT
-
-            FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
-
-            JOIN INVENTORY_DW.GOLD.DIM_WAREHOUSE w
-
-                ON f.WAREHOUSE_KEY =
-                   w.WAREHOUSE_KEY
-
-            WHERE f.SNAPSHOT_DATE_KEY = (
-
-                SELECT
-                    MAX(SNAPSHOT_DATE_KEY)
-
-                FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-
-            )
-
-            GROUP BY
-                w.WAREHOUSE_NAME
-
-            ORDER BY
-                STOCKOUT_COUNT DESC
-
-            """
-
-
-        else:
-
-            explanation = (
-                "Counting how many products "
-                "are completely out of stock."
-            )
-
-
-            sql = """
-
-            SELECT
-
-                COUNT(*) AS STOCKOUT_COUNT
-
-            FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-
-            WHERE SNAPSHOT_DATE_KEY = (
-
-                SELECT
-                    MAX(SNAPSHOT_DATE_KEY)
-
-                FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-
-            )
-
-            AND IS_STOCKOUT_FLAG = TRUE
-
-            """
-
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # EXCESS INVENTORY BY WAREHOUSE
-    # ========================================================
-
-    elif (
-        "excess" in p
-        and "warehouse" in p
-    ):
-
-        explanation = (
-            "Aggregating the financial value "
-            "of excess stock by warehouse."
-        )
-
-
-        sql = """
-
-        SELECT
-
-            w.WAREHOUSE_NAME,
-
-            SUM(
-                f.EXCESS_STOCK_VALUE_AMT
-            ) AS TOTAL_EXCESS_VALUE
-
-        FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
-
-        JOIN INVENTORY_DW.GOLD.DIM_WAREHOUSE w
-
-            ON f.WAREHOUSE_KEY =
-               w.WAREHOUSE_KEY
-
-        WHERE f.SNAPSHOT_DATE_KEY = (
-
-            SELECT
-                MAX(SNAPSHOT_DATE_KEY)
-
-            FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-
-        )
-
-        GROUP BY
-            w.WAREHOUSE_NAME
-
-        ORDER BY
-            TOTAL_EXCESS_VALUE DESC
-
-        """
-
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # TOP 10 PRODUCTS BY INVENTORY VALUE
-    # ========================================================
-
-    elif (
-        "top 10" in p
-        and "inventory value" in p
-    ):
-
-        explanation = (
-            "Ranking the top 10 products "
-            "carrying the highest inventory value."
-        )
-
-
-        sql = """
-
-        SELECT
-
-            p.PRODUCT_SKU,
-
-            p.PRODUCT_NAME,
-
-            SUM(
-                f.INVENTORY_VALUE_AMT
-            ) AS INVENTORY_VALUE
-
-        FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
-
-        JOIN INVENTORY_DW.GOLD.DIM_PRODUCT p
-
-            ON f.PRODUCT_KEY =
-               p.PRODUCT_KEY
-
-        WHERE f.SNAPSHOT_DATE_KEY = (
-
-            SELECT
-                MAX(SNAPSHOT_DATE_KEY)
-
-            FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-
-        )
-
-        GROUP BY
-            p.PRODUCT_SKU,
-            p.PRODUCT_NAME
-
-        ORDER BY
-            INVENTORY_VALUE DESC
-
-        LIMIT 10
-
-        """
-
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # REORDER NEEDED
-    # ========================================================
-
-    elif "reorder" in p:
-
-        explanation = (
-            "Counting products that have "
-            "fallen below their reorder threshold."
-        )
-
-
-        sql = """
-
-        SELECT
-
-            COUNT(*) AS REORDER_NEEDED_COUNT
-
-        FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-
-        WHERE SNAPSHOT_DATE_KEY = (
-
-            SELECT
-                MAX(SNAPSHOT_DATE_KEY)
-
-            FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-
-        )
-
-        AND IS_REORDER_NEEDED_FLAG = TRUE
-
-        """
-
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # ABC CLASSIFICATION
-    # ========================================================
-
-    elif "abc" in p:
-
-        explanation = (
-            "Evaluating inventory value "
-            "across ABC classification tiers."
-        )
-
-
-        sql = """
-
-        SELECT
-
-            p.ABC_CLASSIFICATION,
-
-            SUM(
-                f.INVENTORY_VALUE_AMT
-            ) AS TOTAL_INVENTORY_VALUE
-
-        FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
-
-        JOIN INVENTORY_DW.GOLD.DIM_PRODUCT p
-
-            ON f.PRODUCT_KEY =
-               p.PRODUCT_KEY
-
-        WHERE f.SNAPSHOT_DATE_KEY = (
-
-            SELECT
-                MAX(SNAPSHOT_DATE_KEY)
-
-            FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-
-        )
-
-        GROUP BY
-            p.ABC_CLASSIFICATION
-
-        ORDER BY
-            p.ABC_CLASSIFICATION
-
-        """
-
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # SUPPLY CHAIN DOMAIN
-    # ========================================================
-
-    domain_keywords = [
-
-        "supply",
-
-        "purchase order",
-
-        "supplier",
-
-        "shipment",
-
-        "delivery",
-
-        "warehouse",
-
-        "carrier",
-
-        "freight",
-
-        "inventory",
-
-        "product",
-
-        "stock",
-
-        "stockout",
-
-        "category",
-
-        "brand",
-
-        "quantity",
-
-        "reorder",
-
-        "abc",
-
-        "logistics"
-    ]
-
-
-    if not any(
-        word in p
-        for word in domain_keywords
-    ):
-
-        explanation = (
-            """
-I am specialized in **Supply Chain Intelligence**.
-
-Please ask a question related to:
-
-- Purchase Orders
-- Suppliers
-- Shipments
-- Deliveries
-- Warehouses
-- Carriers
-- Inventory
-- Products
-- Logistics
-"""
-        )
-
-
-        return explanation, None
-
-
-    # ========================================================
-    # FALLBACK
-    # ========================================================
-
-    explanation = (
-        "Displaying a recent inventory snapshot "
-        "by product and warehouse:"
-    )
-
-
-    sql = """
-
-    SELECT
-
-        d.FULL_DATE,
-
-        p.PRODUCT_NAME,
-
-        w.WAREHOUSE_NAME,
-
-        f.ON_HAND_QTY,
-
-        f.INVENTORY_VALUE_AMT,
-
-        f.IS_STOCKOUT_FLAG
-
-    FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
-
-    JOIN INVENTORY_DW.GOLD.DIM_DATE d
-
-        ON f.SNAPSHOT_DATE_KEY =
-           d.DATE_KEY
-
-    JOIN INVENTORY_DW.GOLD.DIM_PRODUCT p
-
-        ON f.PRODUCT_KEY =
-           p.PRODUCT_KEY
-
-    JOIN INVENTORY_DW.GOLD.DIM_WAREHOUSE w
-
-        ON f.WAREHOUSE_KEY =
-           w.WAREHOUSE_KEY
-
-    WHERE f.SNAPSHOT_DATE_KEY = (
-
-        SELECT
-            MAX(SNAPSHOT_DATE_KEY)
-
-        FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-
-    )
-
-    ORDER BY
-        f.INVENTORY_VALUE_AMT DESC
-
-    LIMIT 20
-
-    """
-
-
-    return explanation, sql.strip()
-
-
-# ============================================================
-# 6. SIDEBAR
-# ============================================================
-
-with st.sidebar:
-
-    st.markdown(
-        "### ⚡ Dilytics AI"
-    )
-
-
-    st.markdown(
-        '<span class="status-pill">'
-        '● Semantic Mart Live'
-        '</span>',
-        unsafe_allow_html=True
-    )
-
-
-    st.write("")
-
-
-    # ========================================================
-    # NEW CHAT
-    # ========================================================
-
-    if st.button(
-        "➕ New Chat",
-        use_container_width=True,
-        type="primary"
-    ):
-
-        new_id = datetime.now().strftime(
-            "%Y%m%d_%H%M%S_%f"
-        )
-
-
-        st.session_state.current_session_id = (
-            new_id
-        )
-
-
-        st.session_state.chat_sessions[
-            new_id
-        ] = {
-
-            "title": "New Conversation",
-
-            "messages": []
-        }
-
-
-        st.rerun()
-
-
-    st.markdown("---")
-
-
-    st.markdown(
-        "##### 🕒 Recent Conversations"
-    )
-
-
-    # ========================================================
-    # RECENT CONVERSATIONS
-    # ========================================================
-
-    for s_id, s_data in reversed(
-        list(
-            st.session_state
-            .chat_sessions
-            .items()
-        )
-    ):
-
-        is_active = (
-            s_id ==
-            st.session_state.current_session_id
-        )
-
-
-        session_label = (
-            s_data["title"]
-        )
-
-
-        if len(session_label) > 20:
-
-            session_label = (
-                session_label[:18]
-                + "..."
-            )
-
-
-        if st.button(
-            f"{'👉 ' if is_active else '🗨️ '}"
-            f"{session_label}",
-            key=f"sess_{s_id}",
-            use_container_width=True
-        ):
-
-            st.session_state.current_session_id = (
-                s_id
-            )
-
-            st.rerun()
-
-
-    st.markdown("---")
-
-
-    # ========================================================
-    # CLEAR ALL SESSIONS
-    # ========================================================
-
-    if st.button(
-        "🗑️ Clear All Sessions",
-        use_container_width=True
-    ):
-
-        st.session_state.chat_sessions = {}
-
-
-        init_id = datetime.now().strftime(
-            "%Y%m%d_%H%M%S_%f"
-        )
-
-
-        st.session_state.current_session_id = (
-            init_id
-        )
-
-
-        st.session_state.chat_sessions[
-            init_id
-        ] = {
-
-            "title": "New Conversation",
-
-            "messages": []
-        }
-
-
-        st.rerun()
-
-
-# ============================================================
-# 7. MAIN PAGE TITLE
+# TOP HEADER
 # ============================================================
 
 st.markdown(
     """
-    <div class="supply-chain-title">
-        💬 Dilytics Supply Chain AI
+    <div class="top-header">
+
+        <div class="dilytics-logo">
+            DILYTICS
+        </div>
+
+        <div class="header-divider"></div>
+
+        <div class="header-title">
+            Dilytics Supply Chain AI
+        </div>
+
+        <div class="header-sparkle">
+            ✦
+        </div>
+
+        <div class="header-right">
+
+            <div class="header-icon">
+                ♧
+            </div>
+
+            <div class="header-icon">
+                ?
+            </div>
+
+            <div class="header-icon">
+                ●
+            </div>
+
+        </div>
+
     </div>
     """,
     unsafe_allow_html=True
@@ -1353,382 +836,531 @@ st.markdown(
 
 
 # ============================================================
-# 8. RESET THREAD
+# SIDEBAR
 # ============================================================
 
-reset_col1, reset_col2 = st.columns(
-    [5, 1.2]
-)
+with st.sidebar:
+
+    st.markdown(
+        """
+        <div class="semantic-status">
+            <span class="status-dot"></span>
+            Semantic Mart Live
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
-with reset_col2:
+    # --------------------------------------------------------
+    # NEW CHAT
+    # --------------------------------------------------------
 
     if st.button(
-        "🔄 Reset Thread",
-        use_container_width=True,
-        help="Clear message history in this specific thread"
+        "＋  New Chat",
+        use_container_width=True
     ):
 
-        st.session_state.chat_sessions[
-            current_id
-        ]["messages"] = []
+        st.session_state.messages = []
+
+        st.rerun()
 
 
-        st.session_state.chat_sessions[
-            current_id
-        ]["title"] = "New Conversation"
+    st.markdown(
+        '<div class="sidebar-line"></div>',
+        unsafe_allow_html=True
+    )
 
+
+    # --------------------------------------------------------
+    # RECENT CONVERSATIONS
+    # --------------------------------------------------------
+
+    st.markdown(
+        """
+        <div class="sidebar-heading">
+            ◷ &nbsp; Recent Conversations
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+    if len(st.session_state.recent_chats) == 0:
+
+        st.markdown(
+            """
+            <div style="
+                color:#7a879d;
+                font-size:13px;
+                padding:8px 2px;
+            ">
+                No recent conversations
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    else:
+
+        for chat in reversed(
+            st.session_state.recent_chats[-8:]
+        ):
+
+            st.markdown(
+                f"""
+                <div class="recent-chat">
+                    💬
+                    <span>{chat}</span>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+
+    # --------------------------------------------------------
+    # QUICK LINKS
+    # --------------------------------------------------------
+
+    st.markdown(
+        '<div class="sidebar-line"></div>',
+        unsafe_allow_html=True
+    )
+
+
+    st.markdown(
+        """
+        <div class="sidebar-heading">
+            🔗 &nbsp; Quick Links
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+    quick_links = [
+
+        ("📋", "Purchase Orders"),
+
+        ("🚚", "Shipments"),
+
+        ("📦", "Inventory"),
+
+        ("👥", "Suppliers"),
+
+        ("🏭", "Warehouses"),
+
+        ("🚛", "Carriers"),
+
+        ("🛍️", "Products")
+
+    ]
+
+
+    for icon, name in quick_links:
+
+        st.markdown(
+            f"""
+            <div class="quick-link">
+
+                <div class="quick-left">
+
+                    <span class="quick-icon">
+                        {icon}
+                    </span>
+
+                    <span>
+                        {name}
+                    </span>
+
+                </div>
+
+                <span class="quick-arrow">
+                    ›
+                </span>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+
+    st.markdown(
+        '<div class="sidebar-line"></div>',
+        unsafe_allow_html=True
+    )
+
+
+    # --------------------------------------------------------
+    # CLEAR SESSIONS
+    # --------------------------------------------------------
+
+    if st.button(
+        "🗑️  Clear All Sessions",
+        use_container_width=True
+    ):
+
+        st.session_state.messages = []
+
+        st.session_state.recent_chats = []
 
         st.rerun()
 
 
 # ============================================================
-# 9. QUESTIONS EXPANDER
-# ============================================================
-
-with st.expander(
-    "💡 What exact questions can I ask this assistant?",
-    expanded=False
-):
-
-    st.markdown(
-        """
-This assistant is currently programmed to answer
-Supply Chain questions such as:
-
-### 📋 Purchase Orders
-
-* What is the total purchase order value?
-* What is the purchase order value by supplier?
-* What are the top 10 purchase orders by value?
-* What is the order status by supplier?
-
-### 🚚 Shipments & Deliveries
-
-* How many deliveries are pending?
-* Which shipments are delayed?
-* What are the top 10 materials by purchase value?
-
-### 🏭 Suppliers
-
-* Which suppliers have the highest number of delayed orders?
-* What is the supplier on-time delivery percentage?
-
-### 📦 Inventory
-
-* What is the total available inventory value?
-* What is the total quantity of inventory currently on hand?
-* What is the inventory value by warehouse?
-* What is the inventory value by product category?
-* What is the inventory value by brand?
-* How many products are out of stock?
-"""
-    )
-
-
-    st.info(
-        "💡 **Pro-Tip:** "
-        "You can copy and paste any of these questions "
-        "directly into the chat bar below!"
-    )
-
-
-# ============================================================
-# 10. VERIFIED ONBOARDING QUESTIONS
+# MAIN AREA
 # ============================================================
 
 st.markdown(
-    "##### 💡 Verified Onboarding Questions:"
+    """
+    <div class="main-area">
+
+        <div class="wave-left"></div>
+
+        <div class="wave-right"></div>
+
+        <div class="hero">
+
+            <div class="bot-circle">
+                🤖
+            </div>
+
+            <h1 class="hero-title">
+                Dilytics Supply Chain AI
+            </h1>
+
+            <div class="title-line"></div>
+
+            <div class="hero-subtitle">
+                Ask anything about your supply chain
+                data in natural language.
+            </div>
+
+        </div>
+
+    </div>
+    """,
+    unsafe_allow_html=True
 )
 
 
-q_col1, q_col2, q_col3, q_col4, q_col5 = (
-    st.columns(5)
+# ============================================================
+# QUESTION CARDS
+# ============================================================
+
+card_col1, card_col2, card_col3, card_col4, card_col5, card_col6 = (
+    st.columns(6)
 )
 
 
-quick_prompt = None
+questions = [
 
+    (
+        "📋",
+        "Purchase<br>Orders",
+        "What is the total purchase order value?"
+    ),
 
-if q_col1.button(
-    "💰 Total Inv. Value",
-    use_container_width=True
-):
+    (
+        "🚚",
+        "Shipments &<br>Deliveries",
+        "Which shipments are delayed?"
+    ),
 
-    quick_prompt = (
+    (
+        "📊",
+        "Inventory &<br>Warehouses",
         "What is the total available inventory value?"
+    ),
+
+    (
+        "👥",
+        "Suppliers",
+        "Which suppliers have the highest purchase order value?"
+    ),
+
+    (
+        "📦",
+        "Products",
+        "What are the top 10 products by inventory value?"
+    ),
+
+    (
+        "📈",
+        "Analytics<br>Reports",
+        "Give me a supply chain summary."
     )
 
+]
 
-if q_col2.button(
-    "🏭 Value by Warehouse",
-    use_container_width=True
+
+columns = [
+
+    card_col1,
+    card_col2,
+    card_col3,
+    card_col4,
+    card_col5,
+    card_col6
+]
+
+
+selected_question = None
+
+
+for column, question in zip(
+    columns,
+    questions
 ):
 
-    quick_prompt = (
-        "What is the inventory value by warehouse?"
-    )
+    icon, title, actual_question = question
 
 
-if q_col3.button(
-    "📦 Value by Category",
-    use_container_width=True
-):
-
-    quick_prompt = (
-        "What is the inventory value by product category?"
-    )
-
-
-if q_col4.button(
-    "📉 Stockout Count",
-    use_container_width=True
-):
-
-    quick_prompt = (
-        "How many products are out of stock?"
-    )
-
-
-if q_col5.button(
-    "⚠️ Excess Stock",
-    use_container_width=True
-):
-
-    quick_prompt = (
-        "What is the total excess inventory value by warehouse?"
-    )
-
-
-# ============================================================
-# 11. DISPLAY CHAT HISTORY
-# ============================================================
-
-for idx, msg in enumerate(messages):
-
-    with st.chat_message(
-        msg["role"]
-    ):
+    with column:
 
         st.markdown(
-            msg["content"]
+            f"""
+            <div class="question-card">
+
+                <div class="question-icon">
+                    {icon}
+                </div>
+
+                <div class="question-title">
+                    {title}
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
 
-        if (
-            "sql" in msg
-            and msg["sql"]
-        ):
-
-            with st.expander(
-                "Generated SQL",
-                expanded=False
-            ):
-
-                st.code(
-                    msg["sql"],
-                    language="sql"
-                )
-
-
-        if (
-            "data" in msg
-            and msg["data"] is not None
-            and not msg["data"].empty
-        ):
-
-            tab_data, tab_chart = st.tabs(
-                [
-                    "Data 📄",
-                    "Chart 📈"
-                ]
-            )
-
-
-            with tab_data:
-
-                st.dataframe(
-                    msg["data"],
-                    use_container_width=True
-                )
-
-
-            with tab_chart:
-
-                display_chart_tab(
-                    msg["data"],
-                    key_prefix=(
-                        f"hist_{current_id}_{idx}"
-                    )
-                )
-
-
 # ============================================================
-# 12. CHAT INPUT
+# SEARCH AREA
 # ============================================================
 
-user_prompt = (
-    st.chat_input(
-        "Ask a question about suppliers, "
-        "purchase orders, shipments, deliveries, "
-        "warehouses, carriers, products, or inventory..."
-    )
-    or quick_prompt
+st.markdown(
+    """
+    <div style="
+        height: 55px;
+    ">
+    </div>
+    """,
+    unsafe_allow_html=True
 )
 
 
+search_col1, search_col2 = st.columns(
+    [12, 1]
+)
+
+
+with search_col1:
+
+    user_question = st.text_input(
+        "Search",
+        placeholder=(
+            "Ask a question about suppliers, "
+            "purchase orders, shipments, deliveries, "
+            "warehouses, carriers, products, or inventory..."
+        ),
+        label_visibility="collapsed"
+    )
+
+
+with search_col2:
+
+    search_clicked = st.button(
+        "➤",
+        use_container_width=True
+    )
+
+
 # ============================================================
-# 13. PROCESS USER QUESTION
+# SEARCH PROCESSING
 # ============================================================
 
-if user_prompt:
+if search_clicked and user_question.strip():
+
+    question = user_question.strip()
 
 
-    # ========================================================
-    # SET CHAT TITLE
-    # ========================================================
+    # --------------------------------------------------------
+    # SAVE RECENT CHAT
+    # --------------------------------------------------------
 
-    if len(messages) == 0:
-
-        st.session_state.chat_sessions[
-            current_id
-        ]["title"] = (
-
-            user_prompt[:25]
-
-            +
-
-            (
-                "..."
-                if len(user_prompt) > 25
-                else ""
-            )
-        )
+    st.session_state.recent_chats.append(
+        question
+    )
 
 
-    # ========================================================
-    # SAVE USER MESSAGE
-    # ========================================================
+    # --------------------------------------------------------
+    # USER MESSAGE
+    # --------------------------------------------------------
 
-    messages.append(
+    st.session_state.messages.append(
         {
             "role": "user",
-            "content": user_prompt
+            "content": question
         }
     )
 
 
-    with st.chat_message("user"):
+    # --------------------------------------------------------
+    # BASIC RESPONSE
+    #
+    # Replace this section with your existing
+    # Snowflake / Cortex / Agent logic.
+    # --------------------------------------------------------
 
-        st.markdown(
-            user_prompt
+    question_lower = question.lower()
+
+
+    if "purchase order" in question_lower:
+
+        answer = (
+            "I can analyze your purchase order data. "
+            "Your Snowflake query logic can be connected "
+            "here to return the actual purchase order results."
         )
 
 
-    # ========================================================
-    # ASSISTANT RESPONSE
-    # ========================================================
+    elif (
+        "inventory" in question_lower
+        or "stock" in question_lower
+    ):
 
-    with st.chat_message("assistant"):
-
-        explanation, sql_query = (
-            generate_sql_from_prompt(
-                user_prompt
-            )
+        answer = (
+            "I can analyze your inventory data including "
+            "inventory value, quantity, warehouses, "
+            "categories, brands, stockouts, and excess stock."
         )
 
 
-        st.markdown(
-            explanation
+    elif (
+        "shipment" in question_lower
+        or "delivery" in question_lower
+    ):
+
+        answer = (
+            "I can analyze shipment and delivery information "
+            "including delayed shipments, delivery status, "
+            "and logistics performance."
         )
 
 
-        df = None
+    elif "supplier" in question_lower:
 
-
-        # ====================================================
-        # SQL EXECUTION
-        # ====================================================
-
-        if sql_query:
-
-            with st.expander(
-                "Generated SQL",
-                expanded=False
-            ):
-
-                st.code(
-                    sql_query,
-                    language="sql"
-                )
-
-
-            try:
-
-                df = (
-                    session
-                    .sql(sql_query)
-                    .to_pandas()
-                )
-
-
-                if df.empty:
-
-                    st.info(
-                        "The query executed successfully, "
-                        "but no records were returned."
-                    )
-
-                else:
-
-                    tab_data, tab_chart = st.tabs(
-                        [
-                            "Data 📄",
-                            "Chart 📈"
-                        ]
-                    )
-
-
-                    with tab_data:
-
-                        st.dataframe(
-                            df,
-                            use_container_width=True
-                        )
-
-
-                    with tab_chart:
-
-                        display_chart_tab(
-                            df,
-                            key_prefix=(
-                                f"live_{current_id}"
-                            )
-                        )
-
-
-            except Exception as e:
-
-                st.error(
-                    f"SQL Execution Error: {str(e)}"
-                )
-
-
-        # ====================================================
-        # SAVE ASSISTANT MESSAGE
-        # ====================================================
-
-        messages.append(
-            {
-                "role": "assistant",
-
-                "content": explanation,
-
-                "sql": sql_query,
-
-                "data": df
-            }
+        answer = (
+            "I can analyze supplier performance, "
+            "purchase order values, supplier activity, "
+            "and supply-chain performance."
         )
+
+
+    else:
+
+        answer = (
+            "I can help you analyze your Supply Chain data "
+            "including purchase orders, suppliers, shipments, "
+            "deliveries, inventory, warehouses, products, "
+            "and logistics."
+        )
+
+
+    # --------------------------------------------------------
+    # SAVE ASSISTANT MESSAGE
+    # --------------------------------------------------------
+
+    st.session_state.messages.append(
+        {
+            "role": "assistant",
+            "content": answer
+        }
+    )
 
 
     st.rerun()
+
+
+# ============================================================
+# DISPLAY CHAT MESSAGES
+# ============================================================
+
+if st.session_state.messages:
+
+    st.markdown(
+        """
+        <div style="
+            max-width:1100px;
+            margin:35px auto 0 auto;
+            position:relative;
+            z-index:5;
+        ">
+        """,
+        unsafe_allow_html=True
+    )
+
+
+    for message in st.session_state.messages:
+
+        if message["role"] == "user":
+
+            st.markdown(
+                f"""
+                <div class="chat-message">
+
+                    <div style="
+                        font-weight:600;
+                        color:#0754d8;
+                        margin-bottom:8px;
+                    ">
+                        👤 You
+                    </div>
+
+                    <div style="
+                        color:#15284e;
+                        font-size:16px;
+                    ">
+                        {message["content"]}
+                    </div>
+
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+
+        else:
+
+            st.markdown(
+                f"""
+                <div class="chat-message">
+
+                    <div style="
+                        font-weight:600;
+                        color:#0754d8;
+                        margin-bottom:8px;
+                    ">
+                        🤖 Dilytics AI
+                    </div>
+
+                    <div style="
+                        color:#15284e;
+                        font-size:16px;
+                        line-height:1.6;
+                    ">
+                        {message["content"]}
+                    </div>
+
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True
+    )
