@@ -56,22 +56,31 @@ st.markdown(
         background: #0759d9;
         display: flex;
         align-items: center;
-        padding: 0 28px 0 32px;
+        justify-content: center;
+        padding: 0 28px;
         box-sizing: border-box;
         box-shadow: 0 1px 0 rgba(0,0,0,0.04);
     }
 
     .dilytics-topbar-title {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
         color: white;
         font-size: 30px;
         line-height: 1;
         font-weight: 700;
         letter-spacing: -0.5px;
-        margin-left: 0;
+        margin: 0;
+        white-space: nowrap;
     }
 
     .dilytics-topbar-right {
-        margin-left: auto;
+        position: absolute;
+        right: 28px;
+        top: 50%;
+        transform: translateY(-50%);
         display: flex;
         align-items: center;
         gap: 25px;
@@ -1756,9 +1765,9 @@ Please ask a question about:
 
 # Main-page fixed blue header.
 st.markdown(
-    """
+    f"""
     <div class="dilytics-topbar">
-        <div class="dilytics-topbar-title">Dilytics Supply Chain AI</div>
+        <div class="dilytics-topbar-title">{hero_title}</div>
         <div class="dilytics-topbar-right">
             <span class="topbar-bell">🔔</span>
             <span class="topbar-help">?</span>
@@ -1879,6 +1888,10 @@ with st.sidebar:
 # HERO
 # ============================================================
 
+# ============================================================
+# CURRENT MODULE TITLE
+# ============================================================
+
 module_titles = {
     "Supply Chain": "Dilytics Supply Chain AI",
     "Purchase Orders": "Purchase Orders Chatbot",
@@ -1892,20 +1905,6 @@ module_titles = {
 hero_title = module_titles.get(
     st.session_state.selected_module,
     "Dilytics Supply Chain AI"
-)
-
-st.markdown(
-    f"""
-    <div class="hero-panel">
-        <div class="bot-circle">🤖</div>
-        <div class="hero-title">{hero_title}</div>
-        <div class="hero-line"></div>
-        <div class="hero-subtitle">
-            Ask anything about your supply chain data in natural language.
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True
 )
 
 
