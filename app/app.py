@@ -1,6 +1,5 @@
 import streamlit as st
 
-
 # ============================================================
 # PAGE CONFIG
 # ============================================================
@@ -11,7 +10,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
 
 # ============================================================
 # SESSION STATE
@@ -25,7 +23,7 @@ if "recent_chats" not in st.session_state:
 
 
 # ============================================================
-# COMPLETE CSS
+# CSS
 # ============================================================
 
 st.html("""
@@ -45,16 +43,10 @@ html, body {
 }
 
 .block-container {
-    padding-top: 0 !important;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-    padding-bottom: 0 !important;
-    margin-top: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
     max-width: 100% !important;
 }
-
-
-/* Hide Streamlit default elements */
 
 #MainMenu {
     visibility: hidden;
@@ -70,19 +62,19 @@ header {
 
 
 /* =========================================================
-   TOP HEADER
+   TOP BLUE HEADER
    ========================================================= */
 
 .top-header {
     width: 100%;
-    height: 70px;
+    height: 84px;
 
     background: #0754d8;
 
     display: flex;
     align-items: center;
 
-    padding: 0 28px;
+    padding: 0 34px;
 
     box-sizing: border-box;
 }
@@ -93,23 +85,25 @@ header {
    ========================================================= */
 
 .dilytics-logo {
-    background: #d90000;
+    width: 190px;
+    height: 64px;
+
+    background: #e00000;
 
     color: white;
 
-    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
+    font-family: Arial, sans-serif;
+
+    font-size: 27px;
     font-weight: 800;
 
     letter-spacing: 1px;
 
-    padding: 8px 18px;
-
-    min-width: 160px;
-
-    text-align: center;
-
-    box-sizing: border-box;
+    flex-shrink: 0;
 }
 
 
@@ -119,25 +113,25 @@ header {
 
 .header-divider {
     width: 2px;
+    height: 48px;
 
-    height: 40px;
+    background: rgba(255,255,255,0.75);
 
-    background: rgba(255,255,255,0.65);
-
-    margin-left: 25px;
-
-    margin-right: 25px;
+    margin-left: 28px;
+    margin-right: 28px;
 }
 
 
 /* =========================================================
-   HEADER TITLE
+   STATIC HEADER TITLE
    ========================================================= */
 
 .header-title {
     color: white;
 
-    font-size: 27px;
+    font-family: Arial, sans-serif;
+
+    font-size: 30px;
 
     font-weight: 700;
 
@@ -153,14 +147,13 @@ header {
     margin-left: auto;
 
     display: flex;
-
     align-items: center;
 
-    gap: 22px;
+    gap: 25px;
 
     color: white;
 
-    font-size: 21px;
+    font-size: 23px;
 }
 
 
@@ -179,9 +172,7 @@ section[data-testid="stSidebar"] {
 section[data-testid="stSidebar"] > div {
 
     padding-top: 18px;
-
     padding-left: 14px;
-
     padding-right: 14px;
 }
 
@@ -206,7 +197,7 @@ section[data-testid="stSidebar"] > div {
 
     border-radius: 20px;
 
-    padding: 7px 13px;
+    padding: 7px 14px;
 
     font-size: 13px;
 
@@ -219,7 +210,6 @@ section[data-testid="stSidebar"] > div {
 .status-dot {
 
     width: 8px;
-
     height: 8px;
 
     background: #18a974;
@@ -229,12 +219,12 @@ section[data-testid="stSidebar"] > div {
 
 
 /* =========================================================
-   SIDEBAR BUTTONS
+   SIDEBAR BUTTON
    ========================================================= */
 
 section[data-testid="stSidebar"] .stButton > button {
 
-    height: 42px;
+    height: 43px;
 
     border-radius: 8px;
 
@@ -262,10 +252,6 @@ section[data-testid="stSidebar"] .stButton > button {
 }
 
 
-/* =========================================================
-   SIDEBAR DIVIDER
-   ========================================================= */
-
 .sidebar-line {
 
     height: 1px;
@@ -275,10 +261,6 @@ section[data-testid="stSidebar"] .stButton > button {
     margin: 17px 0;
 }
 
-
-/* =========================================================
-   RECENT CHAT
-   ========================================================= */
 
 .recent-chat {
 
@@ -321,10 +303,10 @@ section[data-testid="stSidebar"] .stButton > button {
 
 
 /* =========================================================
-   MAIN AREA
+   MAIN PAGE
    ========================================================= */
 
-.main-wrapper {
+.main-area {
 
     width: 100%;
 
@@ -336,9 +318,9 @@ section[data-testid="stSidebar"] .stButton > button {
             #e4efff 100%
         );
 
-    min-height: calc(100vh - 70px);
+    min-height: calc(100vh - 84px);
 
-    padding: 28px 35px 25px 35px;
+    padding-bottom: 25px;
 
     box-sizing: border-box;
 }
@@ -350,25 +332,26 @@ section[data-testid="stSidebar"] .stButton > button {
 
 .hero {
 
+    width: 100%;
+
     text-align: center;
 
-    max-width: 1050px;
+    padding-top: 34px;
 
-    margin: 0 auto;
+    box-sizing: border-box;
 }
 
 
 /* =========================================================
-   BOT ICON
+   BOT CIRCLE
    ========================================================= */
 
 .bot-circle {
 
-    width: 60px;
+    width: 70px;
+    height: 70px;
 
-    height: 60px;
-
-    margin: 0 auto 14px auto;
+    margin: 0 auto 17px auto;
 
     background: white;
 
@@ -380,15 +363,15 @@ section[data-testid="stSidebar"] .stButton > button {
 
     justify-content: center;
 
-    font-size: 30px;
+    font-size: 34px;
 
     box-shadow:
-        0 6px 18px rgba(20,70,150,0.10);
+        0 7px 20px rgba(20,70,150,0.11);
 }
 
 
 /* =========================================================
-   HERO TITLE
+   MAIN TITLE
    ========================================================= */
 
 .hero-title {
@@ -397,13 +380,15 @@ section[data-testid="stSidebar"] .stButton > button {
 
     padding: 0;
 
-    color: #12284f;
+    color: #102a56;
 
-    font-size: 38px;
+    font-family: Arial, sans-serif;
+
+    font-size: 40px;
 
     font-weight: 750;
 
-    line-height: 1.15;
+    line-height: 1.2;
 
     white-space: nowrap;
 }
@@ -415,57 +400,61 @@ section[data-testid="stSidebar"] .stButton > button {
 
 .title-line {
 
-    width: 120px;
+    width: 140px;
 
-    height: 3px;
+    height: 4px;
 
     background: #0754d8;
 
-    margin: 15px auto 15px auto;
+    margin: 17px auto 18px auto;
 }
 
 
 /* =========================================================
-   HERO SUBTITLE
+   SUBTITLE
    ========================================================= */
 
 .hero-subtitle {
 
-    color: #31486c;
+    color: #29466f;
 
-    font-size: 16px;
+    font-family: Arial, sans-serif;
 
-    margin: 0 auto;
+    font-size: 17px;
 
     line-height: 1.4;
+
+    margin: 0;
 }
 
 
 /* =========================================================
-   QUESTION CARDS AREA
+   CARDS
    ========================================================= */
 
-.cards-area {
+.cards-wrapper {
 
-    max-width: 1050px;
+    width: calc(100% - 70px);
 
-    margin: 25px auto 0 auto;
+    max-width: 1500px;
+
+    margin: 42px auto 0 auto;
 }
 
 
 /* =========================================================
-   QUESTION CARD
+   CARD
    ========================================================= */
 
 .question-card {
 
-    background: white;
+    height: 125px;
 
-    border: 1px solid #dce5f2;
+    background: #ffffff;
 
-    border-radius: 13px;
+    border: 1px solid #d7e2f0;
 
-    height: 108px;
+    border-radius: 15px;
 
     display: flex;
 
@@ -477,85 +466,83 @@ section[data-testid="stSidebar"] .stButton > button {
 
     text-align: center;
 
-    padding: 8px;
-
     box-sizing: border-box;
 
     box-shadow:
-        0 4px 14px rgba(30,70,140,0.06);
+        0 4px 13px rgba(30,70,140,0.06);
 }
 
 
 .question-icon {
 
-    font-size: 28px;
+    font-size: 34px;
 
     line-height: 1;
 
-    margin-bottom: 8px;
+    margin-bottom: 12px;
 }
 
 
 .question-title {
 
-    color: #12284f;
+    color: #102a56;
 
-    font-size: 13px;
+    font-size: 15px;
 
-    font-weight: 650;
+    font-weight: 700;
 
     line-height: 1.25;
 }
 
 
 /* =========================================================
-   SEARCH CONTAINER
+   SEARCH AREA
    ========================================================= */
 
-.search-container {
+.search-wrapper {
 
-    max-width: 1050px;
+    width: calc(100% - 140px);
+
+    max-width: 1250px;
 
     margin: 32px auto 0 auto;
 }
 
 
 /* =========================================================
-   SEARCH BAR
+   VISUAL SEARCH BAR
    ========================================================= */
 
 .search-box {
 
     width: 100%;
 
-    height: 54px;
+    height: 62px;
 
     background: white;
 
-    border: 1px solid #d4dce8;
+    border: 1px solid #d1ddec;
 
-    border-radius: 30px;
+    border-radius: 32px;
 
     display: flex;
 
     align-items: center;
 
-    padding: 0 9px 0 20px;
+    padding: 0 12px 0 22px;
 
     box-sizing: border-box;
 
     box-shadow:
-        0 4px 15px rgba(20,70,140,0.09);
+        0 4px 16px rgba(20,70,140,0.10);
 }
 
 
 .search-icon {
 
-    font-size: 21px;
+    font-size: 27px;
 
-    color: #68778e;
-
-    margin-right: 11px;
+    margin-right: 14px;
 }
 
 
@@ -563,23 +550,16 @@ section[data-testid="stSidebar"] .stButton > button {
 
     flex: 1;
 
-    color: #8490a2;
+    color: #8290a5;
 
-    font-size: 14px;
-
-    overflow: hidden;
-
-    white-space: nowrap;
-
-    text-overflow: ellipsis;
+    font-size: 16px;
 }
 
 
 .search-button {
 
-    width: 38px;
-
-    height: 38px;
+    width: 46px;
+    height: 46px;
 
     border-radius: 50%;
 
@@ -593,21 +573,21 @@ section[data-testid="stSidebar"] .stButton > button {
 
     justify-content: center;
 
-    font-size: 17px;
+    font-size: 22px;
 }
 
 
 /* =========================================================
-   STREAMLIT CHAT INPUT
+   REAL STREAMLIT CHAT INPUT
    ========================================================= */
 
 div[data-testid="stChatInput"] {
 
-    max-width: 1050px;
+    width: calc(100% - 140px) !important;
 
-    margin-left: auto;
+    max-width: 1250px !important;
 
-    margin-right: auto;
+    margin: 12px auto 0 auto !important;
 }
 
 
@@ -618,25 +598,29 @@ div[data-testid="stChatInput"] textarea {
 
 
 /* =========================================================
-   CHAT MESSAGE
+   CHAT MESSAGES
    ========================================================= */
 
 .chat-message {
 
-    max-width: 1050px;
+    width: calc(100% - 140px);
 
-    margin: 18px auto;
+    max-width: 1250px;
 
-    padding: 16px 20px;
+    margin: 15px auto;
+
+    padding: 15px 20px;
 
     background: white;
 
-    border: 1px solid #e0e7f1;
+    border: 1px solid #dce5f2;
 
     border-radius: 13px;
 
     box-shadow:
-        0 4px 15px rgba(30,70,140,0.06);
+        0 4px 14px rgba(30,70,140,0.06);
+
+    box-sizing: border-box;
 }
 
 
@@ -646,23 +630,27 @@ div[data-testid="stChatInput"] textarea {
 
 @media (max-width: 1100px) {
 
-    .hero-title {
-        font-size: 32px;
+    .dilytics-logo {
+        width: 160px;
+        font-size: 23px;
     }
 
     .header-title {
-        font-size: 23px;
+        font-size: 24px;
+    }
+
+    .hero-title {
+        font-size: 34px;
+    }
+
+    .cards-wrapper {
+        width: calc(100% - 35px);
     }
 
 }
 
 
 @media (max-width: 800px) {
-
-    .hero-title {
-        font-size: 28px;
-        white-space: normal;
-    }
 
     .header-title {
         display: none;
@@ -672,9 +660,17 @@ div[data-testid="stChatInput"] textarea {
         display: none;
     }
 
-    .main-wrapper {
-        padding-left: 18px;
-        padding-right: 18px;
+    .hero-title {
+        font-size: 30px;
+        white-space: normal;
+    }
+
+    .search-wrapper {
+        width: calc(100% - 35px);
+    }
+
+    div[data-testid="stChatInput"] {
+        width: calc(100% - 35px) !important;
     }
 
 }
@@ -684,7 +680,7 @@ div[data-testid="stChatInput"] textarea {
 
 
 # ============================================================
-# TOP HEADER
+# HEADER
 # ============================================================
 
 st.html("""
@@ -749,14 +745,14 @@ with st.sidebar:
             st.session_state.recent_chats[-5:]
         ):
 
-            short_chat = chat
+            display_chat = chat
 
-            if len(short_chat) > 35:
-                short_chat = short_chat[:35] + "..."
+            if len(display_chat) > 35:
+                display_chat = display_chat[:35] + "..."
 
             st.html(f"""
             <div class="recent-chat">
-                💬 &nbsp; {short_chat}
+                💬 &nbsp; {display_chat}
             </div>
             """)
 
@@ -779,21 +775,13 @@ with st.sidebar:
 
 
     quick_links = [
-
         ("📋", "Purchase Orders"),
-
         ("🚚", "Shipments"),
-
         ("📦", "Inventory"),
-
         ("👥", "Suppliers"),
-
         ("🏭", "Warehouses"),
-
         ("🚛", "Carriers"),
-
         ("🛍️", "Products")
-
     ]
 
 
@@ -834,11 +822,11 @@ with st.sidebar:
 
 
 # ============================================================
-# MAIN HERO
+# MAIN AREA
 # ============================================================
 
 st.html("""
-<div class="main-wrapper">
+<div class="main-area">
 
     <div class="hero">
 
@@ -867,7 +855,7 @@ st.html("""
 # ============================================================
 
 st.html("""
-<div class="cards-area">
+<div class="cards-wrapper">
 </div>
 """)
 
@@ -896,14 +884,7 @@ cards = [
 
 
 for col, (icon, title) in zip(
-    [
-        col1,
-        col2,
-        col3,
-        col4,
-        col5,
-        col6
-    ],
+    [col1, col2, col3, col4, col5, col6],
     cards
 ):
 
@@ -925,11 +906,11 @@ for col, (icon, title) in zip(
 
 
 # ============================================================
-# SEARCH BAR VISUAL
+# SEARCH BAR
 # ============================================================
 
 st.html("""
-<div class="search-container">
+<div class="search-wrapper">
 
     <div class="search-box">
 
@@ -952,7 +933,7 @@ st.html("""
 
 
 # ============================================================
-# ACTUAL CHAT INPUT
+# YOUR ACTUAL CHAT INPUT
 # ============================================================
 
 question = st.chat_input(
@@ -960,13 +941,11 @@ question = st.chat_input(
 )
 
 
-# ============================================================
-# YOUR EXISTING AGENT LOGIC
-# ============================================================
-
 if question:
 
-    # Save question
+    # --------------------------------------------------------
+    # SAVE USER QUESTION
+    # --------------------------------------------------------
 
     st.session_state.messages.append(
         {
@@ -976,22 +955,24 @@ if question:
     )
 
 
-    # Save recent conversation
-
     st.session_state.recent_chats.append(
         question
     )
 
 
     # ========================================================
-    # PUT YOUR EXISTING WORKING AGENT CODE HERE
+    # IMPORTANT
     # ========================================================
-
-    # Example response only.
     #
-    # Replace this with your Snowflake Agent call.
+    # PUT YOUR EXISTING WORKING SNOWFLAKE AGENT FUNCTION HERE.
     #
-    # response = your_agent_function(question)
+    # For example:
+    #
+    # response = ask_agent(question)
+    #
+    # DO NOT use SNOWFLAKE.CORTEX.COMPLETE here if your
+    # account is a trial account.
+    # ========================================================
 
     response = (
         "Your Supply Chain AI received your question:\n\n"
@@ -999,9 +980,9 @@ if question:
     )
 
 
-    # ========================================================
+    # --------------------------------------------------------
     # SAVE RESPONSE
-    # ========================================================
+    # --------------------------------------------------------
 
     st.session_state.messages.append(
         {
@@ -1041,7 +1022,6 @@ if st.session_state.messages:
                 """,
                 unsafe_allow_html=True
             )
-
 
         else:
 
