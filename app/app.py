@@ -22,8 +22,8 @@ def get_snowflake_session():
         "password": st.secrets["snowflake"]["Dilytics@12345"],
         "role": st.secrets["snowflake"]["ACCOUNTADMIN"],
         "warehouse": st.secrets["snowflake"]["COMPUTE_WH"],
-        "database": st.secrets["snowflake"]["supply_chain_dw"],
-        "schema": st.secrets["snowflake"]["gold"]
+        "database": st.secrets["snowflake"]["SUPPLY_CHAIN_DW"],
+        "schema": st.secrets["snowflake"]["GOLD"]
     }
     return Session.builder.configs(connection_parameters).create()
 
