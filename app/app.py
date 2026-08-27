@@ -2,7 +2,7 @@ import streamlit as st
 import json
 
 # ============================================================
-# PAGE CONFIG
+# PAGE
 # ============================================================
 
 st.set_page_config(
@@ -14,14 +14,11 @@ st.set_page_config(
 
 
 # ============================================================
-# SESSION STATE
+# SESSION
 # ============================================================
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
-if "recent_chats" not in st.session_state:
-    st.session_state.recent_chats = []
 
 
 # ============================================================
@@ -29,7 +26,7 @@ if "recent_chats" not in st.session_state:
 # ============================================================
 
 @st.cache_resource
-def get_snowflake_session():
+def get_session():
 
     from snowflake.snowpark import Session
 
@@ -48,43 +45,32 @@ def get_snowflake_session():
 
 try:
 
-    session = get_snowflake_session()
-
-    snowflake_connected = True
+    session = get_session()
+    connected = True
 
 except Exception as e:
 
     session = None
-
-    snowflake_connected = False
-
+    connected = False
     connection_error = str(e)
 
 
 # ============================================================
-# RUN YOUR SNOWFLAKE CORTEX AGENT
+# ASK SUPPLY CHAIN AGENT
 # ============================================================
 
-def ask_agent(question):
+def ask_supply_chain(question):
 
     if session is None:
         return f"Snowflake connection failed: {connection_error}"
 
     try:
 
-        # ----------------------------------------------------
-        # AGENT NAME
-        # ----------------------------------------------------
-
         agent_name = (
             "SUPPLY_CHAIN_DW.GOLD.AGENT_SUPPLY_CHAIN"
         )
 
-        # ----------------------------------------------------
-        # REQUEST BODY
-        # ----------------------------------------------------
-
-        request_body = {
+        request = {
             "messages": [
                 {
                     "role": "user",
@@ -95,49 +81,34 @@ def ask_agent(question):
                         }
                     ]
                 }
-            ],
-            "stream": False
+            ]
         }
 
-        request_json = json.dumps(request_body)
+        request_json = json.dumps(request)
 
-        # ----------------------------------------------------
-        # CALL CORTEX AGENT
-        # ----------------------------------------------------
-
-        query = f"""
-        SELECT
-            SNOWFLAKE.CORTEX.DATA_AGENT_RUN(
-                '{agent_name}',
-                $$ {request_json} $$
-            ) AS RESPONSE
+        sql = f"""
+        SELECT SNOWFLAKE.CORTEX.DATA_AGENT_RUN(
+            '{agent_name}',
+            PARSE_JSON($${request_json}$$)
+        ) AS RESPONSE
         """
 
-        result = session.sql(query).collect()
+        result = session.sql(sql).collect()
 
         if not result:
-            return "No response was returned from the Supply Chain Agent."
+            return "No response received from the Supply Chain Agent."
 
-        raw_response = result[0]["RESPONSE"]
+        response = result[0]["RESPONSE"]
 
-        # ----------------------------------------------------
-        # PARSE RESPONSE
-        # ----------------------------------------------------
-
-        if isinstance(raw_response, str):
+        if isinstance(response, str):
 
             try:
-                response_json = json.loads(raw_response)
+                response_json = json.loads(response)
             except Exception:
-                return raw_response
+                return response
 
         else:
-
-            response_json = raw_response
-
-        # ----------------------------------------------------
-        # GET TEXT FROM RESPONSE
-        # ----------------------------------------------------
+            response_json = response
 
         if isinstance(response_json, dict):
 
@@ -147,7 +118,7 @@ def ask_agent(question):
 
                 if isinstance(content, list):
 
-                    text_parts = []
+                    texts = []
 
                     for item in content:
 
@@ -155,27 +126,24 @@ def ask_agent(question):
 
                             if item.get("type") == "text":
 
-                                text_parts.append(
+                                texts.append(
                                     item.get("text", "")
                                 )
 
-                    if text_parts:
-
-                        return "\n".join(text_parts)
+                    if texts:
+                        return "\n".join(texts)
 
             if "message" in response_json:
-
                 return str(response_json["message"])
 
             if "response" in response_json:
-
                 return str(response_json["response"])
 
         return str(response_json)
 
     except Exception as e:
 
-        return f"⚠️ Error while calling Supply Chain Agent: {str(e)}"
+        return f"⚠️ Error while calling Supply Chain Agent: {e}"
 
 
 # ============================================================
@@ -187,7 +155,7 @@ st.markdown(
 <style>
 
 /* ============================================================
-   REMOVE STREAMLIT DEFAULT UI
+   REMOVE STREAMLIT DEFAULT SPACING
    ============================================================ */
 
 #MainMenu {
@@ -209,17 +177,11 @@ header[data-testid="stHeader"] {
 .block-container {
     padding: 0 !important;
     margin: 0 !important;
-    max-width: none !important;
-}
-
-[data-testid="stAppViewContainer"] {
-    padding: 0 !important;
+    max-width: 100% !important;
 }
 
 [data-testid="stMainBlockContainer"] {
     padding: 0 !important;
-    margin: 0 !important;
-    max-width: none !important;
 }
 
 
@@ -239,11 +201,11 @@ section[data-testid="stSidebar"] {
     top: 0 !important;
     bottom: 0 !important;
 
-    background: #ffffff !important;
+    background: white !important;
 
-    border-right: 1px solid #d8e2ef;
+    border-right: 1px solid #d8e1ec;
 
-    z-index: 2000 !important;
+    z-index: 9999 !important;
 }
 
 section[data-testid="stSidebar"] > div {
@@ -256,14 +218,12 @@ section[data-testid="stSidebar"] > div {
 
 
 /* ============================================================
-   SIDEBAR CONTENT
+   SIDEBAR
    ============================================================ */
 
-.sidebar-inner {
+.sidebar-content {
 
-    padding: 18px 28px 30px 28px;
-
-    box-sizing: border-box;
+    padding: 22px 28px;
 
 }
 
@@ -275,28 +235,24 @@ section[data-testid="stSidebar"] > div {
 .dilytics-logo {
 
     width: 190px;
-
     height: 58px;
 
     background: #e50909;
 
-    color: #ffffff;
+    color: white;
 
     display: flex;
-
     align-items: center;
-
     justify-content: center;
 
     font-family: Arial, sans-serif;
 
     font-size: 26px;
-
     font-weight: 800;
 
     letter-spacing: 1px;
 
-    margin-bottom: 28px;
+    margin-bottom: 30px;
 
 }
 
@@ -315,15 +271,13 @@ section[data-testid="stSidebar"] > div {
 
     padding: 9px 15px;
 
-    border-radius: 24px;
+    border: 1px solid #9de5cb;
 
-    border: 1px solid #9ee5cb;
+    background: #f1fff9;
 
-    background: #f2fff9;
+    border-radius: 25px;
 
-    color: #08775d;
-
-    font-family: Arial, sans-serif;
+    color: #08785c;
 
     font-size: 14px;
 
@@ -336,7 +290,6 @@ section[data-testid="stSidebar"] > div {
 .semantic-dot {
 
     width: 9px;
-
     height: 9px;
 
     background: #15a979;
@@ -352,11 +305,11 @@ section[data-testid="stSidebar"] > div {
 
 .new-chat {
 
-    width: 100%;
-
     height: 50px;
 
-    border: 1px solid #cdd8e6;
+    width: 100%;
+
+    border: 1px solid #ccd6e3;
 
     border-radius: 9px;
 
@@ -366,30 +319,26 @@ section[data-testid="stSidebar"] > div {
 
     justify-content: center;
 
-    color: #092d61;
-
-    font-family: Arial, sans-serif;
+    color: #0b315f;
 
     font-size: 15px;
 
     margin-bottom: 28px;
 
-    box-sizing: border-box;
-
 }
 
 
 /* ============================================================
-   SIDEBAR DIVIDER
+   DIVIDER
    ============================================================ */
 
 .sidebar-divider {
 
     height: 1px;
 
-    width: 100%;
+    background: #d8e1ec;
 
-    background: #d9e2ed;
+    width: 100%;
 
     margin: 0 0 28px 0;
 
@@ -397,37 +346,28 @@ section[data-testid="stSidebar"] > div {
 
 
 /* ============================================================
-   SIDEBAR HEADING
+   SIDEBAR HEADINGS
    ============================================================ */
 
 .sidebar-heading {
 
     color: #092d61;
 
-    font-family: Arial, sans-serif;
-
     font-size: 15px;
 
     font-weight: 700;
 
-    margin-bottom: 26px;
+    margin-bottom: 28px;
 
 }
 
-
-/* ============================================================
-   RECENT CHAT
-   ============================================================ */
-
 .no-recent {
 
-    color: #71809a;
-
-    font-family: Arial, sans-serif;
+    color: #7c899d;
 
     font-size: 14px;
 
-    margin-bottom: 30px;
+    margin-bottom: 32px;
 
 }
 
@@ -444,9 +384,7 @@ section[data-testid="stSidebar"] > div {
 
     align-items: center;
 
-    color: #173860;
-
-    font-family: Arial, sans-serif;
+    color: #183b67;
 
     font-size: 14px;
 
@@ -464,49 +402,32 @@ section[data-testid="stSidebar"] > div {
 
     margin-left: auto;
 
-    color: #174c91;
-
     font-size: 18px;
 
-}
-
-
-/* ============================================================
-   MAIN AREA
-   ============================================================ */
-
-.main-area {
-
-    margin-left: 350px;
-
-    width: calc(100% - 350px);
-
-    min-height: 100vh;
-
-    background: #edf5ff;
+    color: #174c91;
 
 }
 
 
 /* ============================================================
-   FIXED BLUE HEADER
+   MAIN HEADER
    ============================================================ */
 
-.blue-header {
+.top-header {
 
     position: fixed;
+
+    top: 0;
 
     left: 350px;
 
     right: 0;
 
-    top: 0;
-
     height: 84px;
 
     background: #0957d9;
 
-    z-index: 1500;
+    z-index: 9000;
 
     display: flex;
 
@@ -523,17 +444,17 @@ section[data-testid="stSidebar"] > div {
    HEADER TITLE
    ============================================================ */
 
-.header-main-title {
+.top-title {
 
     color: white;
 
     font-family: Arial, sans-serif;
 
-    font-size: 31px;
+    font-size: 32px;
 
     font-weight: 700;
 
-    margin-left: 28px;
+    margin-left: 30px;
 
     white-space: nowrap;
 
@@ -544,7 +465,7 @@ section[data-testid="stSidebar"] > div {
    HEADER RIGHT
    ============================================================ */
 
-.header-right {
+.top-right {
 
     margin-left: auto;
 
@@ -558,47 +479,34 @@ section[data-testid="stSidebar"] > div {
 
 }
 
-.header-bell {
-
+.top-bell {
     font-size: 25px;
-
 }
 
-.header-question {
-
+.top-question {
     font-size: 22px;
-
 }
 
-.header-dot {
-
-    font-size: 18px;
-
+.top-user {
+    font-size: 16px;
 }
 
 
 /* ============================================================
-   HERO
+   MAIN HERO
    ============================================================ */
 
 .hero {
 
     margin-left: 350px;
 
-    margin-top: 84px;
+    padding-top: 84px;
 
-    width: calc(100% - 350px);
+    height: 430px;
 
-    height: 365px;
+    box-sizing: border-box;
 
-    background:
-
-        linear-gradient(
-            135deg,
-            #f4f8ff 0%,
-            #e8f2ff 55%,
-            #edf5ff 100%
-        );
+    background: #edf5ff;
 
     display: flex;
 
@@ -606,9 +514,7 @@ section[data-testid="stSidebar"] > div {
 
     align-items: center;
 
-    padding-top: 32px;
-
-    box-sizing: border-box;
+    justify-content: flex-start;
 
 }
 
@@ -617,15 +523,19 @@ section[data-testid="stSidebar"] > div {
    BOT
    ============================================================ */
 
-.bot-circle {
+.bot {
 
     width: 70px;
 
     height: 70px;
 
-    background: white;
+    margin-top: 32px;
+
+    margin-bottom: 18px;
 
     border-radius: 50%;
+
+    background: white;
 
     display: flex;
 
@@ -633,12 +543,10 @@ section[data-testid="stSidebar"] > div {
 
     justify-content: center;
 
-    font-size: 32px;
+    font-size: 31px;
 
     box-shadow:
-        0 7px 20px rgba(40, 80, 140, 0.10);
-
-    margin-bottom: 14px;
+        0 7px 20px rgba(0, 50, 120, 0.10);
 
 }
 
@@ -649,15 +557,11 @@ section[data-testid="stSidebar"] > div {
 
 .hero-title {
 
-    margin: 0;
-
-    padding: 0;
-
     color: #092d61;
 
     font-family: Arial, sans-serif;
 
-    font-size: 40px;
+    font-size: 42px;
 
     font-weight: 750;
 
@@ -665,11 +569,13 @@ section[data-testid="stSidebar"] > div {
 
     text-align: center;
 
+    margin: 0;
+
 }
 
 
 /* ============================================================
-   TITLE LINE
+   BLUE LINE
    ============================================================ */
 
 .hero-line {
@@ -678,11 +584,11 @@ section[data-testid="stSidebar"] > div {
 
     height: 4px;
 
-    background: #0b58d8;
+    background: #0957d9;
 
-    margin-top: 14px;
+    margin-top: 15px;
 
-    margin-bottom: 14px;
+    margin-bottom: 15px;
 
 }
 
@@ -710,33 +616,33 @@ section[data-testid="stSidebar"] > div {
    CARDS
    ============================================================ */
 
-.cards-container {
+.cards {
 
     margin-left: 350px;
 
-    width: calc(100% - 350px);
-
     background: #edf5ff;
 
-    padding: 18px 18px 20px 18px;
-
-    box-sizing: border-box;
+    padding: 0 0 20px 0;
 
     display: grid;
 
     grid-template-columns:
-        repeat(6, minmax(0, 1fr));
+        repeat(6, 1fr);
 
-    gap: 16px;
+    gap: 18px;
 
 }
 
+
+/* ============================================================
+   CARD
+   ============================================================ */
 
 .card {
 
     height: 145px;
 
-    background: #ffffff;
+    background: white;
 
     border: 1px solid #d4e1ef;
 
@@ -757,16 +663,22 @@ section[data-testid="stSidebar"] > div {
 }
 
 
+/* ============================================================
+   CARD ICON
+   ============================================================ */
+
 .card-icon {
 
     font-size: 42px;
-
-    line-height: 1;
 
     margin-bottom: 12px;
 
 }
 
+
+/* ============================================================
+   CARD TEXT
+   ============================================================ */
 
 .card-text {
 
@@ -784,102 +696,64 @@ section[data-testid="stSidebar"] > div {
 
 
 /* ============================================================
-   SEARCH AREA
+   CHAT HISTORY
    ============================================================ */
 
-.search-area {
+.chat-area {
 
     margin-left: 350px;
 
-    width: calc(100% - 350px);
-
     background: #edf5ff;
 
-    padding: 8px 8% 35px 8%;
-
-    box-sizing: border-box;
+    padding: 10px 8% 120px 8%;
 
 }
 
 
 /* ============================================================
-   SEARCH BAR
+   USER MESSAGE
    ============================================================ */
 
-.search-decoration {
-
-    height: 68px;
-
-    width: 100%;
-
-    border-radius: 40px;
+.user-message {
 
     background: white;
 
-    border: 1px solid #cbdced;
+    border: 1px solid #d5e0ed;
 
-    box-shadow:
+    border-radius: 12px;
 
-        0 4px 16px rgba(40, 80, 140, 0.08);
+    padding: 14px 18px;
 
-    display: flex;
+    margin-bottom: 12px;
 
-    align-items: center;
-
-    padding: 0 16px 0 25px;
-
-    box-sizing: border-box;
-
-}
-
-
-.search-symbol {
-
-    font-size: 29px;
-
-    margin-right: 16px;
-
-}
-
-
-.search-text {
-
-    flex: 1;
-
-    color: #7b8da5;
-
-    font-family: Arial, sans-serif;
-
-    font-size: 16px;
-
-}
-
-
-.search-circle {
-
-    width: 48px;
-
-    height: 48px;
-
-    border-radius: 50%;
-
-    background: #0957d9;
-
-    color: white;
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    font-size: 23px;
+    color: #173860;
 
 }
 
 
 /* ============================================================
-   ACTUAL STREAMLIT CHAT INPUT
+   ASSISTANT MESSAGE
+   ============================================================ */
+
+.assistant-message {
+
+    background: #f7fbff;
+
+    border: 1px solid #d5e0ed;
+
+    border-radius: 12px;
+
+    padding: 14px 18px;
+
+    margin-bottom: 15px;
+
+    color: #173860;
+
+}
+
+
+/* ============================================================
+   STREAMLIT CHAT INPUT
    ============================================================ */
 
 [data-testid="stChatInput"] {
@@ -894,10 +768,9 @@ section[data-testid="stSidebar"] > div {
 
     width: auto !important;
 
-    z-index: 1800 !important;
+    z-index: 9998 !important;
 
 }
-
 
 [data-testid="stChatInput"] > div {
 
@@ -914,64 +787,7 @@ section[data-testid="stSidebar"] > div {
 
 
 /* ============================================================
-   CHAT HISTORY
-   ============================================================ */
-
-.chat-history {
-
-    margin-left: 350px;
-
-    width: calc(100% - 350px);
-
-    padding: 15px 8% 120px 8%;
-
-    box-sizing: border-box;
-
-    background: #edf5ff;
-
-}
-
-
-.chat-user {
-
-    background: white;
-
-    border: 1px solid #d8e2ef;
-
-    border-radius: 12px;
-
-    padding: 13px 18px;
-
-    margin-bottom: 10px;
-
-    color: #173860;
-
-    font-family: Arial, sans-serif;
-
-}
-
-
-.chat-assistant {
-
-    background: #f7fbff;
-
-    border: 1px solid #d8e2ef;
-
-    border-radius: 12px;
-
-    padding: 13px 18px;
-
-    margin-bottom: 15px;
-
-    color: #173860;
-
-    font-family: Arial, sans-serif;
-
-}
-
-
-/* ============================================================
-   RESPONSIVE
+   SMALLER SCREEN
    ============================================================ */
 
 @media (max-width: 1200px) {
@@ -979,9 +795,7 @@ section[data-testid="stSidebar"] > div {
     section[data-testid="stSidebar"] {
 
         width: 300px !important;
-
         min-width: 300px !important;
-
         max-width: 300px !important;
 
     }
@@ -992,15 +806,7 @@ section[data-testid="stSidebar"] > div {
 
     }
 
-    .main-area {
-
-        margin-left: 300px;
-
-        width: calc(100% - 300px);
-
-    }
-
-    .blue-header {
+    .top-header {
 
         left: 300px;
 
@@ -1010,19 +816,17 @@ section[data-testid="stSidebar"] > div {
 
         margin-left: 300px;
 
-        width: calc(100% - 300px);
-
     }
 
-    .cards-container,
-
-    .search-area,
-
-    .chat-history {
+    .cards {
 
         margin-left: 300px;
 
-        width: calc(100% - 300px);
+    }
+
+    .chat-area {
+
+        margin-left: 300px;
 
     }
 
@@ -1037,16 +841,6 @@ section[data-testid="stSidebar"] > div {
     .hero-title {
 
         font-size: 34px;
-
-    }
-
-    .cards-container {
-
-        gap: 10px;
-
-        padding-left: 12px;
-
-        padding-right: 12px;
 
     }
 
@@ -1066,7 +860,7 @@ with st.sidebar:
 
     st.markdown(
         """
-        <div class="sidebar-inner">
+        <div class="sidebar-content">
 
             <div class="dilytics-logo">
                 DILYTICS
@@ -1146,30 +940,24 @@ with st.sidebar:
 
 
 # ============================================================
-# BLUE HEADER
+# FIXED TOP HEADER
 # ============================================================
 
 st.markdown(
     """
-    <div class="blue-header">
+    <div class="top-header">
 
-        <div class="header-main-title">
+        <div class="top-title">
             Dilytics Supply Chain AI
         </div>
 
-        <div class="header-right">
+        <div class="top-right">
 
-            <span class="header-bell">
-                🔔
-            </span>
+            <span class="top-bell">🔔</span>
 
-            <span class="header-question">
-                ?
-            </span>
+            <span class="top-question">?</span>
 
-            <span class="header-dot">
-                ●
-            </span>
+            <span class="top-user">●</span>
 
         </div>
 
@@ -1187,7 +975,7 @@ st.markdown(
     """
     <div class="hero">
 
-        <div class="bot-circle">
+        <div class="bot">
             🤖
         </div>
 
@@ -1208,12 +996,12 @@ st.markdown(
 
 
 # ============================================================
-# SIX CARDS
+# CARDS
 # ============================================================
 
 st.markdown(
     """
-    <div class="cards-container">
+    <div class="cards">
 
         <div class="card">
 
@@ -1303,43 +1091,13 @@ st.markdown(
 
 
 # ============================================================
-# DECORATIVE SEARCH BAR
-# ============================================================
-
-st.markdown(
-    """
-    <div class="search-area">
-
-        <div class="search-decoration">
-
-            <div class="search-symbol">
-                🔍
-            </div>
-
-            <div class="search-text">
-                Ask your supply chain question...
-            </div>
-
-            <div class="search-circle">
-                ➤
-            </div>
-
-        </div>
-
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-
-# ============================================================
 # CHAT HISTORY
 # ============================================================
 
 if st.session_state.messages:
 
     st.markdown(
-        '<div class="chat-history">',
+        '<div class="chat-area">',
         unsafe_allow_html=True
     )
 
@@ -1349,8 +1107,8 @@ if st.session_state.messages:
 
             st.markdown(
                 f"""
-                <div class="chat-user">
-                    <b>👤 You</b><br><br>
+                <div class="user-message">
+                    👤 <b>You</b><br><br>
                     {message["content"]}
                 </div>
                 """,
@@ -1361,8 +1119,8 @@ if st.session_state.messages:
 
             st.markdown(
                 f"""
-                <div class="chat-assistant">
-                    <b>🤖 Dilytics AI</b><br><br>
+                <div class="assistant-message">
+                    🤖 <b>Dilytics AI</b><br><br>
                     {message["content"]}
                 </div>
                 """,
@@ -1370,7 +1128,7 @@ if st.session_state.messages:
             )
 
     st.markdown(
-        '</div>',
+        "</div>",
         unsafe_allow_html=True
     )
 
@@ -1397,11 +1155,9 @@ if question:
         }
     )
 
-    st.session_state.recent_chats.append(question)
-
     with st.spinner("Thinking..."):
 
-        answer = ask_agent(question)
+        answer = ask_supply_chain(question)
 
     st.session_state.messages.append(
         {
