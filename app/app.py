@@ -9,10 +9,35 @@ from snowflake.snowpark import Session
 # PAGE CONFIGURATION
 # ===================================================================
 
-st.set_page_config(
-    page_title="Dilytics Supply Chain AI",
-    page_icon="📦",
-    layout="wide"
+st.markdown(
+    """
+    <div style="
+        position: sticky;
+        top: 0;
+        z-index: 999;
+        background-color: white;
+        padding: 10px 0 15px 0;
+        border-bottom: 1px solid #eeeeee;
+    ">
+        <h1 style="
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+        ">
+            💬 Dilytics Supply Chain AI
+        </h1>
+
+        <p style="
+            margin: 5px 0 0 0;
+            color: #777777;
+            font-size: 1rem;
+        ">
+            Ask questions in natural language to explore inventory,
+            suppliers, orders, shipments, warehouses, and products.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True
 )
 
 
