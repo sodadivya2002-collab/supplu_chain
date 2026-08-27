@@ -4,32 +4,29 @@ from datetime import datetime
 import snowflake.connector
 from snowflake.snowpark import Session
 
-# ============================================================
-# CONFIGURATION
-# ============================================================
-
-HOST = "XYUHKAV-XRB12650.snowflakecomputing.com"
-ACCOUNT = "XYUHKAV-XRB12650"
-DATABASE = "SUPPLY_CHAIN_DW"
-SCHEMA = "GOLD"
-WAREHOUSE = "COMPUTE_WH"
 
 # ============================================================
-# PAGE CONFIGURATION
+# PAGE CONFIG
 # ============================================================
 
 st.set_page_config(
-    page_title="Supply Chain Chatbot",
+    page_title="Dilytics Supply Chain AI",
     page_icon="📦",
     layout="wide"
 )
 
+
 # ============================================================
-# CUSTOM UI STYLING
+# CUSTOM CSS
 # ============================================================
 
-st.markdown("""
-<style>
+st.markdown(
+    """
+    <style>
+
+    /* ========================================================
+       GENERAL
+       ======================================================== */
 
     .status-pill {
         display: inline-flex;
@@ -39,7 +36,7 @@ st.markdown("""
         color: #065f46;
         border: 1px solid #a7f3d0;
         border-radius: 20px;
-        padding: 2px 10px;
+        padding: 3px 10px;
         font-size: 0.75rem;
         font-weight: 600;
     }
@@ -51,125 +48,171 @@ st.markdown("""
     }
 
 
-    /* =====================================================
-       FIXED STATIC MAIN HEADER
-       ===================================================== */
+    /* ========================================================
+       FIXED MAIN HEADER
+       ======================================================== */
 
     .fixed-main-header {
         position: fixed !important;
+
         top: 0 !important;
-        left: 90px !important;
+
+        /*
+        IMPORTANT:
+        Streamlit sidebar is approximately 343px wide.
+        This prevents the title from going underneath
+        the sidebar.
+        */
+
+        left: 343px !important;
+
         right: 20px !important;
+
         z-index: 99999 !important;
+
         background-color: white !important;
+
         padding: 20px 20px 15px 20px !important;
+
         margin: 0 !important;
-        border-bottom: 1px solid #eeeeee;
+
+        border-bottom: 1px solid #eeeeee !important;
+
+        box-sizing: border-box !important;
     }
+
 
     .fixed-main-title {
-        font-size: 2.4rem;
-        font-weight: 700;
-        line-height: 1.2;
-        color: #30313d;
+        font-size: 2.4rem !important;
+
+        font-weight: 700 !important;
+
+        line-height: 1.2 !important;
+
+        color: #30313d !important;
+
+        margin: 0 !important;
     }
+
 
     .fixed-main-subtitle {
-        margin-top: 8px;
-        font-size: 1rem;
-        color: #8b8d98;
+        margin-top: 8px !important;
+
+        font-size: 1rem !important;
+
+        color: #8b8d98 !important;
     }
+
 
     /*
-       Empty space below fixed header.
-       This prevents the content from going underneath it.
+    Reserve space for fixed header.
     */
+
     .header-space {
-        height: 115px;
+        height: 125px !important;
     }
 
-</style>
-""", unsafe_allow_html=True)
+
+    /* ========================================================
+       CHAT
+       ======================================================== */
+
+    [data-testid="stChatMessage"] {
+        margin-bottom: 10px;
+    }
+
+
+    /* ========================================================
+       EXPANDER
+       ======================================================== */
+
+    div[data-testid="stExpander"] {
+        border-radius: 10px;
+    }
+
+
+    /* ========================================================
+       DATAFRAME
+       ======================================================== */
+
+    [data-testid="stDataFrame"] {
+        width: 100%;
+    }
+
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 
 # ============================================================
-# 1. STREAMLIT CLOUD LOGIN SCREEN
+# SNOWFLAKE CONNECTION
 # ============================================================
 
-if "authenticated" not in st.session_state:
+@st.cache_resource
+def get_snowflake_session():
 
-    st.session_state.authenticated = False
-    st.session_state.username = "PBCS"
-    st.session_state.password = ""
-    st.session_state.snowpark_session = None
+    connection_parameters = {
 
+        "account": st.secrets["snowflake"]["account"],
 
-if not st.session_state.authenticated:
+        "user": st.secrets["snowflake"]["user"],
 
-    st.title("Welcome to Dilytics Inventory AI")
+        "password": st.secrets["snowflake"]["password"],
 
-    st.markdown(
-        "Please login to connect to your Snowflake Data Warehouse."
+        "role": st.secrets["snowflake"].get(
+            "role",
+            "ACCOUNTADMIN"
+        ),
+
+        "warehouse": st.secrets["snowflake"].get(
+            "warehouse",
+            "COMPUTE_WH"
+        ),
+
+        "database": st.secrets["snowflake"].get(
+            "database",
+            "SUPPLY_CHAIN_DW"
+        ),
+
+        "schema": st.secrets["snowflake"].get(
+            "schema",
+            "GOLD"
+        )
+    }
+
+    return (
+        Session
+        .builder
+        .configs(connection_parameters)
+        .create()
     )
 
-    st.session_state.username = st.text_input(
-        "Enter Snowflake Username:",
-        value=st.session_state.username
+
+# ============================================================
+# CREATE SNOWFLAKE SESSION
+# ============================================================
+
+try:
+
+    session = get_snowflake_session()
+
+    st.sidebar.success(
+        "✅ Connected to Snowflake"
     )
 
-    st.session_state.password = st.text_input(
-        "Enter Password:",
-        type="password"
+except Exception as e:
+
+    st.sidebar.error(
+        f"❌ Snowflake connection failed: {e}"
     )
 
-    if st.button("Login"):
-
-        try:
-
-            with st.spinner("Connecting to Snowflake..."):
-
-                conn = snowflake.connector.connect(
-                    user=st.session_state.username,
-                    password=st.session_state.password,
-                    account=ACCOUNT,
-                    host=HOST,
-                    port=443,
-                    warehouse=WAREHOUSE,
-                    role="ACCOUNTADMIN",
-                    database=DATABASE,
-                    schema=SCHEMA
-                )
-
-                # Create Snowpark session
-                st.session_state.snowpark_session = (
-                    Session.builder
-                    .configs({"connection": conn})
-                    .create()
-                )
-
-                st.session_state.authenticated = True
-
-                st.rerun()
-
-        except Exception as e:
-
-            st.error(
-                f"Authentication failed: {e}"
-            )
-
-    # Stop execution until login
     st.stop()
 
 
 # ============================================================
-# 2. MAIN APP LOGIC
-# ============================================================
-
-session = st.session_state.snowpark_session
-
-
-# ============================================================
-# SESSION STATE MANAGEMENT
+# CHAT SESSION MANAGEMENT
 # ============================================================
 
 if "chat_sessions" not in st.session_state:
@@ -179,90 +222,93 @@ if "chat_sessions" not in st.session_state:
 
 if "current_session_id" not in st.session_state:
 
-    init_id = datetime.now().strftime(
+    new_id = datetime.now().strftime(
         "%Y%m%d_%H%M%S"
     )
 
-    st.session_state.current_session_id = init_id
+    st.session_state.current_session_id = new_id
 
-    st.session_state.chat_sessions[init_id] = {
+    st.session_state.chat_sessions[new_id] = {
+
         "title": "New Conversation",
+
         "messages": []
+
     }
 
 
+current_id = (
+    st.session_state.current_session_id
+)
+
+
+messages = (
+    st.session_state
+    .chat_sessions[current_id]["messages"]
+)
+
+
 # ============================================================
-# ACTIVE SESSION
-# ============================================================
-
-current_id = st.session_state.current_session_id
-
-messages = st.session_state.chat_sessions[
-    current_id
-]["messages"]
-
-
-# ============================================================
-# HELPER: INTERACTIVE CHART RENDERER
+# CHART FUNCTION
 # ============================================================
 
 def display_chart_tab(
-    df: pd.DataFrame,
-    key_prefix: str = ""
+    df,
+    key_prefix=""
 ):
 
-    if len(df.columns) < 2:
+    if df is None or df.empty:
 
         st.info(
-            "Need at least 2 columns to render a chart."
+            "No data available for chart."
         )
 
         return
 
 
-    all_cols = list(df.columns)
+    if len(df.columns) < 2:
+
+        st.info(
+            "At least two columns are required "
+            "to create a chart."
+        )
+
+        return
+
+
+    columns = list(df.columns)
+
 
     col1, col2, col3 = st.columns(3)
 
 
-    x_key = (
-        f"{key_prefix}_x"
-        if key_prefix
-        else "x_axis"
-    )
-
-    y_key = (
-        f"{key_prefix}_y"
-        if key_prefix
-        else "y_axis"
-    )
-
-    t_key = (
-        f"{key_prefix}_type"
-        if key_prefix
-        else "chart_type"
-    )
-
-
     x_col = col1.selectbox(
-        "Dimension (X-axis)",
-        all_cols,
-        index=0,
-        key=x_key
+        "Dimension",
+        columns,
+        key=f"{key_prefix}_x"
     )
 
 
-    remaining_cols = [
-        c for c in all_cols
+    remaining = [
+        c
+        for c in columns
         if c != x_col
     ]
 
 
+    if not remaining:
+
+        st.info(
+            "No metric column available."
+        )
+
+        return
+
+
     y_col = col2.selectbox(
-        "Metric (Y-axis)",
-        remaining_cols,
-        index=0 if remaining_cols else 0,
-        key=y_key
+        "Metric",
+        remaining,
+        key=f"{key_prefix}_y"
     )
 
 
@@ -274,31 +320,11 @@ def display_chart_tab(
             "Area Chart",
             "Scatter Plot"
         ],
-        key=t_key
+        key=f"{key_prefix}_type"
     )
 
 
     chart_df = df.copy()
-
-
-    if any(
-        k in x_col.lower()
-        for k in [
-            "year",
-            "quarter",
-            "month",
-            "day",
-            "date"
-        ]
-    ):
-
-        chart_df[x_col] = chart_df[x_col].apply(
-            lambda x:
-                str(int(x))
-                if pd.notnull(x)
-                and isinstance(x, (int, float))
-                else str(x)
-        )
 
 
     if chart_type == "Bar Chart":
@@ -307,17 +333,20 @@ def display_chart_tab(
             chart_df.set_index(x_col)[y_col]
         )
 
+
     elif chart_type == "Line Chart":
 
         st.line_chart(
             chart_df.set_index(x_col)[y_col]
         )
 
+
     elif chart_type == "Area Chart":
 
         st.area_chart(
             chart_df.set_index(x_col)[y_col]
         )
+
 
     elif chart_type == "Scatter Plot":
 
@@ -329,116 +358,120 @@ def display_chart_tab(
 
 
 # ============================================================
-# YAML VERIFIED QUERY MATCHER
+# SQL GENERATOR
 # ============================================================
 
-def generate_sql_from_prompt(prompt: str):
+def generate_sql_from_prompt(prompt):
 
     p = prompt.lower().strip()
 
 
     # ========================================================
-    # 0. GREETINGS & STATUS QUESTIONS
+    # GREETINGS
     # ========================================================
 
-    if any(
-        greet in p
-        for greet in [
-            "how are you",
-            "how's it going",
-            "what's up",
-            "whats up"
-        ]
-    ):
-
-        explanation = (
-            "I'm doing well, thank you! "
-            "I am ready to help you analyze "
-            "inventory levels, stockouts, warehouses, "
-            "and product categories. "
-            "What metric would you like to explore?"
-        )
-
-        return explanation, None
-
-
-    # ========================================================
-    # 1. HELP & EXAMPLES
-    # ========================================================
-
-    elif any(
-        help_word in p
-        for help_word in [
-            "what can i ask",
-            "what questions",
-            "what can you do",
-            "examples",
-            "help"
-        ]
-    ):
-
-        explanation = (
-            "You can ask me questions about your "
-            "inventory data! Here are some exact "
-            "questions you can try:\n\n"
-
-            "**Inventory Value:**\n"
-            "- What is the total available inventory value?\n"
-            "- What is the inventory value by warehouse?\n"
-            "- What is the inventory value by product category?\n\n"
-
-            "**Stock & Reordering:**\n"
-            "- How many products are out of stock?\n"
-            "- What is the total excess inventory value by warehouse?\n"
-            "- How many products need to be reordered?\n\n"
-
-            "*(You can also open the Lightbulb drop-down "
-            "menu above for the full list!)*"
-        )
-
-        return explanation, None
-
-
-    elif p in [
+    if p in [
         "hi",
         "hello",
         "hey",
         "good morning",
+        "good afternoon",
         "good evening"
     ]:
 
-        explanation = (
-            "Hello! I am your Inventory Intelligence "
-            "Assistant powered by your semantic data model. "
-            "Ask any question about stock, warehouses, "
-            "products, or supply!"
-        )
+        return (
+            """
+Hello! 👋 I'm your **Supply Chain Assistant**.
 
-        return explanation, None
+I can help you analyze purchase orders,
+suppliers, shipments, deliveries, warehouses,
+products, inventory and logistics.
+""",
+            None
+        )
 
 
     # ========================================================
-    # 2. TOTAL AVAILABLE INVENTORY VALUE
+    # HELP
+    # ========================================================
+
+    if (
+        "what can i ask" in p
+        or "what questions" in p
+        or "what can you do" in p
+        or "examples" in p
+        or p == "help"
+    ):
+
+        return (
+            """
+You can ask me questions about your
+**Supply Chain data**.
+
+### 📋 Purchase Orders
+
+* What is the total purchase order count?
+* What is the total ordered quantity?
+* What is the total ordered value?
+* What is the total open commitment?
+* What is the total rejected value?
+* What is the purchase order value by supplier?
+* What is the purchase order value by warehouse?
+
+### 🚚 Shipments & Deliveries
+
+* What is the total number of shipments?
+* How many shipments are currently in transit?
+* How many shipments have been delivered?
+* How many shipments are delayed?
+* What is the average delivery delay?
+* What are the top delay reasons?
+
+### 🏭 Suppliers
+
+* What is the supplier on-time delivery percentage?
+* Which suppliers have the highest purchase order value?
+* Which suppliers are high risk?
+* Which suppliers are single source?
+* Which suppliers have active contracts?
+
+### 🚢 Logistics
+
+* What is the total freight cost?
+* What is the total landed cost?
+* What is freight cost by carrier?
+* What is the shipment count by shipping mode?
+
+### 📦 Products
+
+* What are the top products by ordered value?
+* What is the ordered value by product category?
+* What is the ordered quantity by product category?
+* What is the ordered value by brand?
+""",
+            None
+        )
+
+
+    # ========================================================
+    # TOTAL INVENTORY VALUE
     # ========================================================
 
     if (
         "total available inventory" in p
-        or (
-            "inventory value" in p
-            and "warehouse" not in p
-            and "category" not in p
-            and "brand" not in p
-        )
+        or "total inventory value" in p
     ):
 
         explanation = (
-            "Calculating total inventory value across "
-            "all warehouses as of the latest snapshot."
+            "Calculating total inventory value "
+            "across all warehouses as of the "
+            "latest snapshot."
         )
 
         sql = """
         SELECT
-            SUM(INVENTORY_VALUE_AMT) AS TOTAL_INVENTORY_VALUE
+            SUM(INVENTORY_VALUE_AMT)
+                AS TOTAL_INVENTORY_VALUE
         FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
         WHERE SNAPSHOT_DATE_KEY = (
             SELECT MAX(SNAPSHOT_DATE_KEY)
@@ -450,23 +483,23 @@ def generate_sql_from_prompt(prompt: str):
 
 
     # ========================================================
-    # 3. TOTAL QUANTITY ON HAND
+    # TOTAL ON HAND QUANTITY
     # ========================================================
 
-    elif (
+    if (
         "quantity" in p
         and "on hand" in p
-        and "product" not in p
     ):
 
         explanation = (
-            "Calculating the total physical quantity "
-            "of inventory currently on hand."
+            "Calculating the total quantity "
+            "currently on hand."
         )
 
         sql = """
         SELECT
-            SUM(ON_HAND_QTY) AS TOTAL_ON_HAND_QTY
+            SUM(ON_HAND_QTY)
+                AS TOTAL_ON_HAND_QTY
         FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
         WHERE SNAPSHOT_DATE_KEY = (
             SELECT MAX(SNAPSHOT_DATE_KEY)
@@ -478,23 +511,25 @@ def generate_sql_from_prompt(prompt: str):
 
 
     # ========================================================
-    # 4. INVENTORY VALUE BY WAREHOUSE
+    # INVENTORY VALUE BY WAREHOUSE
     # ========================================================
 
-    elif "inventory value by warehouse" in p:
+    if "inventory value by warehouse" in p:
 
         explanation = (
-            "Aggregating total inventory value grouped "
-            "by warehouse location."
+            "Aggregating inventory value by warehouse."
         )
 
         sql = """
         SELECT
             w.WAREHOUSE_NAME,
-            SUM(f.INVENTORY_VALUE_AMT) AS INVENTORY_VALUE
+            SUM(
+                f.INVENTORY_VALUE_AMT
+            ) AS INVENTORY_VALUE
         FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
         JOIN INVENTORY_DW.GOLD.DIM_WAREHOUSE w
-            ON f.WAREHOUSE_KEY = w.WAREHOUSE_KEY
+            ON f.WAREHOUSE_KEY =
+               w.WAREHOUSE_KEY
         WHERE f.SNAPSHOT_DATE_KEY = (
             SELECT MAX(SNAPSHOT_DATE_KEY)
             FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
@@ -509,12 +544,12 @@ def generate_sql_from_prompt(prompt: str):
 
 
     # ========================================================
-    # 5. INVENTORY VALUE BY PRODUCT CATEGORY
+    # INVENTORY VALUE BY CATEGORY
     # ========================================================
 
-    elif (
+    if (
         "inventory value by product category" in p
-        or "by category" in p
+        or "inventory value by category" in p
     ):
 
         explanation = (
@@ -525,11 +560,13 @@ def generate_sql_from_prompt(prompt: str):
         sql = """
         SELECT
             p.CATEGORY_NAME,
-            SUM(f.INVENTORY_VALUE_AMT)
-                AS TOTAL_INVENTORY_VALUE
+            SUM(
+                f.INVENTORY_VALUE_AMT
+            ) AS TOTAL_INVENTORY_VALUE
         FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
         JOIN INVENTORY_DW.GOLD.DIM_PRODUCT p
-            ON f.PRODUCT_KEY = p.PRODUCT_KEY
+            ON f.PRODUCT_KEY =
+               p.PRODUCT_KEY
         WHERE f.SNAPSHOT_DATE_KEY = (
             SELECT MAX(SNAPSHOT_DATE_KEY)
             FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
@@ -544,10 +581,10 @@ def generate_sql_from_prompt(prompt: str):
 
 
     # ========================================================
-    # 6. INVENTORY VALUE BY SUBCATEGORY
+    # INVENTORY VALUE BY SUBCATEGORY
     # ========================================================
 
-    elif "subcategory" in p:
+    if "subcategory" in p:
 
         explanation = (
             "Aggregating inventory value by "
@@ -557,11 +594,13 @@ def generate_sql_from_prompt(prompt: str):
         sql = """
         SELECT
             p.SUBCATEGORY_NAME,
-            SUM(f.INVENTORY_VALUE_AMT)
-                AS TOTAL_INVENTORY_VALUE
+            SUM(
+                f.INVENTORY_VALUE_AMT
+            ) AS TOTAL_INVENTORY_VALUE
         FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
         JOIN INVENTORY_DW.GOLD.DIM_PRODUCT p
-            ON f.PRODUCT_KEY = p.PRODUCT_KEY
+            ON f.PRODUCT_KEY =
+               p.PRODUCT_KEY
         WHERE f.SNAPSHOT_DATE_KEY = (
             SELECT MAX(SNAPSHOT_DATE_KEY)
             FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
@@ -576,24 +615,31 @@ def generate_sql_from_prompt(prompt: str):
 
 
     # ========================================================
-    # 7. INVENTORY VALUE BY BRAND
+    # INVENTORY VALUE BY BRAND
     # ========================================================
 
-    elif "brand" in p:
+    if (
+        "inventory value by brand" in p
+        or (
+            "inventory value" in p
+            and "brand" in p
+        )
+    ):
 
         explanation = (
-            "Aggregating inventory value by "
-            "product brand."
+            "Aggregating inventory value by brand."
         )
 
         sql = """
         SELECT
             p.BRAND_NAME,
-            SUM(f.INVENTORY_VALUE_AMT)
-                AS TOTAL_INVENTORY_VALUE
+            SUM(
+                f.INVENTORY_VALUE_AMT
+            ) AS TOTAL_INVENTORY_VALUE
         FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
         JOIN INVENTORY_DW.GOLD.DIM_PRODUCT p
-            ON f.PRODUCT_KEY = p.PRODUCT_KEY
+            ON f.PRODUCT_KEY =
+               p.PRODUCT_KEY
         WHERE f.SNAPSHOT_DATE_KEY = (
             SELECT MAX(SNAPSHOT_DATE_KEY)
             FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
@@ -608,82 +654,57 @@ def generate_sql_from_prompt(prompt: str):
 
 
     # ========================================================
-    # 8. PRODUCTS OUT OF STOCK
+    # STOCKOUT
     # ========================================================
 
-    elif (
+    if (
         "stockout" in p
         or "out of stock" in p
     ):
 
-        if "warehouse" in p:
+        explanation = (
+            "Calculating products that are "
+            "currently out of stock."
+        )
 
-            explanation = (
-                "Calculating the number of stockouts "
-                "organized by warehouse."
-            )
-
-            sql = """
-            SELECT
-                w.WAREHOUSE_NAME,
-                COUNT_IF(f.IS_STOCKOUT_FLAG)
-                    AS STOCKOUT_COUNT
-            FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
-            JOIN INVENTORY_DW.GOLD.DIM_WAREHOUSE w
-                ON f.WAREHOUSE_KEY = w.WAREHOUSE_KEY
-            WHERE f.SNAPSHOT_DATE_KEY = (
-                SELECT MAX(SNAPSHOT_DATE_KEY)
-                FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-            )
-            GROUP BY
-                w.WAREHOUSE_NAME
-            ORDER BY
-                STOCKOUT_COUNT DESC
-            """
-
-        else:
-
-            explanation = (
-                "Counting how many products are "
-                "completely out of stock."
-            )
-
-            sql = """
-            SELECT
-                COUNT(*) AS STOCKOUT_COUNT
+        sql = """
+        SELECT
+            COUNT(*) AS STOCKOUT_COUNT
+        FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
+        WHERE SNAPSHOT_DATE_KEY = (
+            SELECT MAX(SNAPSHOT_DATE_KEY)
             FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-            WHERE SNAPSHOT_DATE_KEY = (
-                SELECT MAX(SNAPSHOT_DATE_KEY)
-                FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-            )
-            AND IS_STOCKOUT_FLAG = TRUE
-            """
+        )
+        AND IS_STOCKOUT_FLAG = TRUE
+        """
 
         return explanation, sql.strip()
 
 
     # ========================================================
-    # 9. EXCESS INVENTORY VALUE BY WAREHOUSE
+    # EXCESS INVENTORY
     # ========================================================
 
-    elif (
+    if (
         "excess" in p
         and "warehouse" in p
     ):
 
         explanation = (
-            "Aggregating the financial value of excess "
-            "stock held above safety buffers by warehouse."
+            "Calculating excess inventory value "
+            "by warehouse."
         )
 
         sql = """
         SELECT
             w.WAREHOUSE_NAME,
-            SUM(f.EXCESS_STOCK_VALUE_AMT)
-                AS TOTAL_EXCESS_VALUE
+            SUM(
+                f.EXCESS_STOCK_VALUE_AMT
+            ) AS TOTAL_EXCESS_VALUE
         FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
         JOIN INVENTORY_DW.GOLD.DIM_WAREHOUSE w
-            ON f.WAREHOUSE_KEY = w.WAREHOUSE_KEY
+            ON f.WAREHOUSE_KEY =
+               w.WAREHOUSE_KEY
         WHERE f.SNAPSHOT_DATE_KEY = (
             SELECT MAX(SNAPSHOT_DATE_KEY)
             FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
@@ -698,28 +719,30 @@ def generate_sql_from_prompt(prompt: str):
 
 
     # ========================================================
-    # 10. TOP 10 PRODUCTS BY INVENTORY VALUE
+    # TOP 10 PRODUCTS
     # ========================================================
 
-    elif (
+    if (
         "top 10" in p
         and "inventory value" in p
     ):
 
         explanation = (
-            "Ranking the top 10 products carrying "
-            "the highest inventory value."
+            "Ranking the top 10 products "
+            "by inventory value."
         )
 
         sql = """
         SELECT
             p.PRODUCT_SKU,
             p.PRODUCT_NAME,
-            SUM(f.INVENTORY_VALUE_AMT)
-                AS INVENTORY_VALUE
+            SUM(
+                f.INVENTORY_VALUE_AMT
+            ) AS INVENTORY_VALUE
         FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
         JOIN INVENTORY_DW.GOLD.DIM_PRODUCT p
-            ON f.PRODUCT_KEY = p.PRODUCT_KEY
+            ON f.PRODUCT_KEY =
+               p.PRODUCT_KEY
         WHERE f.SNAPSHOT_DATE_KEY = (
             SELECT MAX(SNAPSHOT_DATE_KEY)
             FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
@@ -736,14 +759,14 @@ def generate_sql_from_prompt(prompt: str):
 
 
     # ========================================================
-    # 11. REORDER NEEDED
+    # REORDER
     # ========================================================
 
-    elif "reorder" in p:
+    if "reorder" in p:
 
         explanation = (
-            "Counting products that have fallen "
-            "below their reorder threshold."
+            "Calculating the number of products "
+            "that need to be reordered."
         )
 
         sql = """
@@ -761,24 +784,26 @@ def generate_sql_from_prompt(prompt: str):
 
 
     # ========================================================
-    # 12. ABC CLASSIFICATION
+    # ABC CLASSIFICATION
     # ========================================================
 
-    elif "abc" in p:
+    if "abc" in p:
 
         explanation = (
-            "Evaluating inventory value across "
-            "ABC classification tiers."
+            "Calculating inventory value "
+            "by ABC classification."
         )
 
         sql = """
         SELECT
             p.ABC_CLASSIFICATION,
-            SUM(f.INVENTORY_VALUE_AMT)
-                AS TOTAL_INVENTORY_VALUE
+            SUM(
+                f.INVENTORY_VALUE_AMT
+            ) AS TOTAL_INVENTORY_VALUE
         FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
         JOIN INVENTORY_DW.GOLD.DIM_PRODUCT p
-            ON f.PRODUCT_KEY = p.PRODUCT_KEY
+            ON f.PRODUCT_KEY =
+               p.PRODUCT_KEY
         WHERE f.SNAPSHOT_DATE_KEY = (
             SELECT MAX(SNAPSHOT_DATE_KEY)
             FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
@@ -793,95 +818,73 @@ def generate_sql_from_prompt(prompt: str):
 
 
     # ========================================================
-    # 13. OUT-OF-DOMAIN GUARDRAIL
+    # SUPPLY CHAIN GENERAL QUESTIONS
     # ========================================================
 
-    domain_keywords = [
-        "inventory",
-        "warehouse",
-        "product",
-        "stock",
-        "stockout",
-        "excess",
-        "quarantine",
-        "reorder",
-        "category",
-        "subcategory",
-        "brand",
-        "abc",
-        "hazardous",
-        "perishable",
-        "cold-chain",
-        "sku",
-        "supply",
-        "quantity"
-    ]
-
-
-    if not any(
-        word in p
-        for word in domain_keywords
+    if (
+        "purchase order" in p
+        or "supplier" in p
+        or "shipment" in p
+        or "delivery" in p
+        or "carrier" in p
+        or "warehouse" in p
+        or "freight" in p
     ):
 
-        explanation = (
-            "I am specialized strictly as an "
-            "**Inventory Domain Intelligence**.\n\n"
+        return (
+            """
+I can help with Supply Chain questions about:
 
-            "I don't have external web data to answer "
-            "general knowledge or non-inventory queries. "
+- Purchase Orders
+- Suppliers
+- Shipments
+- Deliveries
+- Warehouses
+- Carriers
+- Freight
+- Products
+- Inventory
 
-            "Please ask a question related to stock, "
-            "warehouses, products, or supply!"
+Please ask a specific Supply Chain question.
+""",
+            None
         )
-
-        return explanation, None
 
 
     # ========================================================
-    # 14. FALLBACK OVERVIEW
+    # OUT OF DOMAIN
     # ========================================================
 
-    else:
-
-        explanation = (
-            "Displaying a recent snapshot overview "
-            "of inventory by product and warehouse:"
-        )
-
-        sql = """
-        SELECT
-            d.FULL_DATE,
-            p.PRODUCT_NAME,
-            w.WAREHOUSE_NAME,
-            f.ON_HAND_QTY,
-            f.INVENTORY_VALUE_AMT,
-            f.IS_STOCKOUT_FLAG
-        FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT f
-        JOIN INVENTORY_DW.GOLD.DIM_DATE d
-            ON f.SNAPSHOT_DATE_KEY = d.DATE_KEY
-        JOIN INVENTORY_DW.GOLD.DIM_PRODUCT p
-            ON f.PRODUCT_KEY = p.PRODUCT_KEY
-        JOIN INVENTORY_DW.GOLD.DIM_WAREHOUSE w
-            ON f.WAREHOUSE_KEY = w.WAREHOUSE_KEY
-        WHERE f.SNAPSHOT_DATE_KEY = (
-            SELECT MAX(SNAPSHOT_DATE_KEY)
-            FROM INVENTORY_DW.GOLD.FACT_INVENTORY_DAILY_SNAPSHOT
-        )
-        ORDER BY
-            f.INVENTORY_VALUE_AMT DESC
-        LIMIT 20
+    return (
         """
+I am specialized in **Supply Chain Intelligence**.
 
-        return explanation, sql.strip()
+Please ask a question related to:
+
+- Purchase Orders
+- Suppliers
+- Shipments
+- Deliveries
+- Warehouses
+- Carriers
+- Products
+- Inventory
+- Logistics
+""",
+        None
+    )
 
 
 # ============================================================
-# LEFT NATIVE SIDEBAR PANEL
+# SIDEBAR
 # ============================================================
 
 with st.sidebar:
 
-    st.markdown("### ⚡Dilytics AI")
+    st.markdown(
+        "### ⚡ Dilytics AI"
+    )
+
 
     st.markdown(
         '<span class="status-pill">'
@@ -889,6 +892,7 @@ with st.sidebar:
         '</span>',
         unsafe_allow_html=True
     )
+
 
     st.write("")
 
@@ -904,17 +908,17 @@ with st.sidebar:
     ):
 
         new_id = datetime.now().strftime(
-            "%Y%m%d_%H%M%S"
+            "%Y%m%d_%H%M%S_%f"
         )
 
         st.session_state.current_session_id = new_id
 
         st.session_state.chat_sessions[new_id] = {
-            "title": (
-                f"Chat "
-                f"{len(st.session_state.chat_sessions) + 1}"
-            ),
+
+            "title": "New Conversation",
+
             "messages": []
+
         }
 
         st.rerun()
@@ -922,41 +926,41 @@ with st.sidebar:
 
     st.markdown("---")
 
+
     st.markdown(
         "##### 🕒 Recent Conversations"
     )
 
 
-    # ========================================================
-    # CHAT SESSION LIST
-    # ========================================================
-
     for s_id, s_data in reversed(
         list(
-            st.session_state.chat_sessions.items()
+            st.session_state
+            .chat_sessions
+            .items()
         )
     ):
 
         is_active = (
-            s_id
-            == st.session_state.current_session_id
+            s_id ==
+            st.session_state.current_session_id
         )
 
-        session_label = s_data["title"]
+
+        session_title = s_data["title"]
 
 
-        if len(session_label) > 20:
+        if len(session_title) > 22:
 
-            session_label = (
-                session_label[:18]
+            session_title = (
+                session_title[:20]
                 + "..."
             )
 
 
         if st.button(
             f"{'👉 ' if is_active else '🗨️ '}"
-            f"{session_label}",
-            key=f"sess_{s_id}",
+            f"{session_title}",
+            key=f"session_{s_id}",
             use_container_width=True
         ):
 
@@ -969,7 +973,7 @@ with st.sidebar:
 
 
     # ========================================================
-    # CLEAR ALL SESSIONS
+    # CLEAR ALL
     # ========================================================
 
     if st.button(
@@ -979,26 +983,29 @@ with st.sidebar:
 
         st.session_state.chat_sessions = {}
 
-        init_id = datetime.now().strftime(
-            "%Y%m%d_%H%M%S"
+
+        new_id = datetime.now().strftime(
+            "%Y%m%d_%H%M%S_%f"
         )
 
-        st.session_state.current_session_id = init_id
 
-        st.session_state.chat_sessions[init_id] = {
+        st.session_state.current_session_id = new_id
+
+
+        st.session_state.chat_sessions[new_id] = {
+
             "title": "New Conversation",
+
             "messages": []
+
         }
+
 
         st.rerun()
 
 
 # ============================================================
-# MAIN CHAT & ANALYTICS AREA
-# ============================================================
-
-# ============================================================
-# FIXED STATIC MAIN HEADER
+# MAIN FIXED HEADER
 # ============================================================
 
 st.markdown(
@@ -1031,27 +1038,29 @@ reset_col1, reset_col2 = st.columns(
     [5, 1.2]
 )
 
+
 with reset_col2:
 
     if st.button(
         "🔄 Reset Thread",
-        use_container_width=True,
-        help="Clear message history in this specific thread"
+        use_container_width=True
     ):
 
         st.session_state.chat_sessions[
             current_id
         ]["messages"] = []
 
+
         st.session_state.chat_sessions[
             current_id
         ]["title"] = "New Conversation"
+
 
         st.rerun()
 
 
 # ============================================================
-# QUESTIONS EXPANDER
+# SUGGESTED QUESTIONS
 # ============================================================
 
 with st.expander(
@@ -1060,42 +1069,50 @@ with st.expander(
 ):
 
     st.markdown(
-        "This assistant is currently programmed "
-        "to perfectly answer the following specific questions:"
-    )
+        """
+### 💰 Inventory Value & Quantity
+
+* What is the total available inventory value?
+
+* What is the total quantity of inventory currently on hand?
+
+* What is the inventory value by warehouse?
 
 
-    col_a, col_b = st.columns(2)
+### 📦 Products & Categories
+
+* What is the inventory value by product category?
+
+* What is the inventory value by product subcategory?
+
+* What is the inventory value by brand?
+
+* What are the top 10 products by inventory value?
+
+* What is the inventory value by ABC classification?
 
 
-    with col_a:
+### 📋 Purchase Orders
 
-        st.markdown("""
-        * "What is the total purchase order value?"
-        * "What is the purchase order value by supplier?"
-        * "What are the top 10 purchase orders by value?"
-        * "How many deliveries are pending?"
-        * "Which shipments are delayed?"
-        * "What are the top 10 materials by purchase value?"
-        """)
+* What is the total purchase order value?
+
+* What is the purchase order value by supplier?
+
+* What is the purchase order value by warehouse?
 
 
-    with col_b:
+### 🚚 Supply Chain
 
-        st.markdown("""
-        * "What is the order status by supplier?"
-        * "Which suppliers have the highest number of delayed orders?"
-        * "What is the total available inventory?"
-        * "What is the inventory value by warehouse?"
-        * "What is the inventory value by product category?"
-        * "How many products are out of stock?"
-        """)
+* How many shipments are currently in transit?
 
+* How many shipments are delayed?
 
-    st.info(
-        "💡 **Pro-Tip:** You can copy and paste "
-        "any of these exact questions directly "
-        "into the chat bar below!"
+* What is the average delivery delay?
+
+* What is the supplier on-time delivery percentage?
+
+* What is the total freight cost?
+"""
     )
 
 
@@ -1104,26 +1121,27 @@ with st.expander(
 # ============================================================
 
 st.markdown(
-    "##### 💡 Verified Onboarding Questions:"
+    "### 💡 Verified Onboarding Questions:"
 )
 
 
-q_col1, q_col2, q_col3, q_col4, q_col5 = st.columns(5)
+q1, q2, q3, q4, q5 = st.columns(5)
+
 
 quick_prompt = None
 
 
-if q_col1.button(
+if q1.button(
     "💰 Total Inv. Value",
     use_container_width=True
 ):
 
     quick_prompt = (
-        "What is the total available inventory?"
+        "What is the total available inventory value?"
     )
 
 
-if q_col2.button(
+if q2.button(
     "🏭 Value by Warehouse",
     use_container_width=True
 ):
@@ -1133,7 +1151,7 @@ if q_col2.button(
     )
 
 
-if q_col3.button(
+if q3.button(
     "📦 Value by Category",
     use_container_width=True
 ):
@@ -1143,7 +1161,7 @@ if q_col3.button(
     )
 
 
-if q_col4.button(
+if q4.button(
     "📉 Stockout Count",
     use_container_width=True
 ):
@@ -1153,7 +1171,7 @@ if q_col4.button(
     )
 
 
-if q_col5.button(
+if q5.button(
     "⚠️ Excess Stock",
     use_container_width=True
 ):
@@ -1164,19 +1182,23 @@ if q_col5.button(
 
 
 # ============================================================
-# DISPLAY CURRENT THREAD HISTORY
+# DISPLAY CHAT HISTORY
 # ============================================================
 
-for idx, msg in enumerate(messages):
+for idx, message in enumerate(messages):
 
-    with st.chat_message(msg["role"]):
+    with st.chat_message(
+        message["role"]
+    ):
 
-        st.markdown(msg["content"])
+        st.markdown(
+            message["content"]
+        )
 
 
         if (
-            "sql" in msg
-            and msg["sql"]
+            "sql" in message
+            and message["sql"]
         ):
 
             with st.expander(
@@ -1185,17 +1207,18 @@ for idx, msg in enumerate(messages):
             ):
 
                 st.code(
-                    msg["sql"],
+                    message["sql"],
                     language="sql"
                 )
 
 
         if (
-            "data" in msg
-            and msg["data"] is not None
+            "data" in message
+            and message["data"] is not None
+            and not message["data"].empty
         ):
 
-            tab_data, tab_chart = st.tabs(
+            tab1, tab2 = st.tabs(
                 [
                     "Data 📄",
                     "Chart 📈"
@@ -1203,42 +1226,53 @@ for idx, msg in enumerate(messages):
             )
 
 
-            with tab_data:
+            with tab1:
 
                 st.dataframe(
-                    msg["data"]
+                    message["data"],
+                    use_container_width=True
                 )
 
 
-            with tab_chart:
+            with tab2:
 
                 display_chart_tab(
-                    msg["data"],
+                    message["data"],
                     key_prefix=(
-                        f"hist_{current_id}_{idx}"
+                        f"history_{current_id}_{idx}"
                     )
                 )
 
 
 # ============================================================
-# HANDLE INPUTS
+# CHAT INPUT
 # ============================================================
 
-user_prompt = (
-    st.chat_input(
-        "Ask a question about suppliers, "
-        "purchase orders, shipments, deliveries, "
-        "warehouses, carriers, or products..."
-    )
-    or quick_prompt
+user_prompt = st.chat_input(
+    "Ask a question about suppliers, purchase orders, "
+    "shipments, deliveries, warehouses, carriers, "
+    "products, or inventory..."
 )
 
+
+# ============================================================
+# QUICK QUESTION
+# ============================================================
+
+if quick_prompt:
+
+    user_prompt = quick_prompt
+
+
+# ============================================================
+# PROCESS USER QUESTION
+# ============================================================
 
 if user_prompt:
 
 
     # ========================================================
-    # UPDATE CHAT TITLE
+    # UPDATE CONVERSATION TITLE
     # ========================================================
 
     if len(messages) == 0:
@@ -1246,14 +1280,22 @@ if user_prompt:
         st.session_state.chat_sessions[
             current_id
         ]["title"] = (
+
             user_prompt[:25]
-            + (
+
+            +
+
+            (
                 "..."
                 if len(user_prompt) > 25
                 else ""
             )
         )
 
+
+    # ========================================================
+    # SAVE USER MESSAGE
+    # ========================================================
 
     messages.append(
         {
@@ -1269,6 +1311,10 @@ if user_prompt:
             user_prompt
         )
 
+
+    # ========================================================
+    # GENERATE SQL
+    # ========================================================
 
     with st.chat_message("assistant"):
 
@@ -1286,6 +1332,10 @@ if user_prompt:
 
         df = None
 
+
+        # ====================================================
+        # EXECUTE SQL
+        # ====================================================
 
         if sql_query:
 
@@ -1309,29 +1359,39 @@ if user_prompt:
                 )
 
 
-                tab_data, tab_chart = st.tabs(
-                    [
-                        "Data 📄",
-                        "Chart 📈"
-                    ]
-                )
+                if df.empty:
 
+                    st.info(
+                        "The query executed successfully, "
+                        "but no records were returned."
+                    )
 
-                with tab_data:
+                else:
 
-                    st.dataframe(
-                        df
+                    tab1, tab2 = st.tabs(
+                        [
+                            "Data 📄",
+                            "Chart 📈"
+                        ]
                     )
 
 
-                with tab_chart:
+                    with tab1:
 
-                    display_chart_tab(
-                        df,
-                        key_prefix=(
-                            f"live_{current_id}"
+                        st.dataframe(
+                            df,
+                            use_container_width=True
                         )
-                    )
+
+
+                    with tab2:
+
+                        display_chart_tab(
+                            df,
+                            key_prefix=(
+                                f"live_{current_id}"
+                            )
+                        )
 
 
             except Exception as e:
@@ -1340,6 +1400,10 @@ if user_prompt:
                     f"SQL Execution Error: {str(e)}"
                 )
 
+
+        # ====================================================
+        # SAVE ASSISTANT RESPONSE
+        # ====================================================
 
         messages.append(
             {
@@ -1351,4 +1415,4 @@ if user_prompt:
         )
 
 
-        st.rerun()
+    st.rerun()
