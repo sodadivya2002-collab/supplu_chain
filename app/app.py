@@ -3,44 +3,100 @@ import pandas as pd
 from datetime import datetime
 import snowflake.connector
 from snowflake.snowpark import Session
+import yaml
+import os
+import re
 
 
-# ============================================================
-# PAGE CONFIG
-# ============================================================
+# ===================================================================
+# 1. CONFIGURATION
+# ===================================================================
+
+HOST = "XYUHKAV-XRB12650.snowflakecomputing.com"
+ACCOUNT = "XYUHKAV-XRB12650"
+
+DATABASE = "SUPPLY_CHAIN_DW"
+SCHEMA = "GOLD"
+WAREHOUSE = "COMPUTE_WH"
+ROLE = "ACCOUNTADMIN"
+
+YAML_FILE = "SUPPLY_CHAIN_SEMANTIC.yaml"
+
+
+# ===================================================================
+# 2. LOAD SUPPLY CHAIN YAML
+# ===================================================================
+
+def load_semantic_yaml():
+
+    if not os.path.exists(YAML_FILE):
+        return {
+            "name": "SUPPLY_CHAIN_SEMANTIC",
+            "tables": [],
+            "relationships": [],
+            "verified_queries": []
+        }
+
+    try:
+        with open(YAML_FILE, "r", encoding="utf-8") as file:
+            model = yaml.safe_load(file)
+
+        if model is None:
+            model = {}
+
+        return model
+
+    except Exception as e:
+        st.error(f"Unable to load semantic YAML: {e}")
+
+        return {
+            "name": "SUPPLY_CHAIN_SEMANTIC",
+            "tables": [],
+            "relationships": [],
+            "verified_queries": []
+        }
+
+
+SEMANTIC_MODEL = load_semantic_yaml()
+
+
+# ===================================================================
+# 3. PAGE CONFIGURATION
+# ===================================================================
 
 st.set_page_config(
     page_title="Dilytics Supply Chain AI",
-    page_icon="📦",
+    page_icon="🚚",
     layout="wide"
 )
 
 
-# ============================================================
-# CUSTOM CSS
-# ============================================================
+# ===================================================================
+# 4. CUSTOM UI STYLING
+# ===================================================================
 
 st.markdown(
     """
     <style>
 
-    .status-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        background-color: #ecfdf5;
-        color: #065f46;
-        border: 1px solid #a7f3d0;
-        border-radius: 20px;
-        padding: 3px 10px;
-        font-size: 0.75rem;
-        font-weight: 600;
-    }
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background-color: #ecfdf5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+            border-radius: 20px;
+            padding: 2px 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
 
-    div[data-testid="stButton"] > button {
-        border-radius: 8px;
-        font-weight: 500;
-    }
+        div[data-testid="stButton"] > button {
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s ease-in-out;
+        }
 
     </style>
     """,
@@ -48,51 +104,24 @@ st.markdown(
 )
 
 
-# ============================================================
-# SNOWFLAKE CONFIGURATION
-# ============================================================
-
-def get_snowflake_config():
-
-    return {
-        "account": st.secrets["snowflake"]["account"],
-        "role": st.secrets["snowflake"]["role"],
-        "warehouse": st.secrets["snowflake"]["warehouse"],
-        "database": st.secrets["snowflake"]["database"],
-        "schema": st.secrets["snowflake"]["schema"]
-    }
-
-
-# ============================================================
-# SESSION STATE
-# ============================================================
+# ===================================================================
+# 5. LOGIN / SNOWFLAKE CONNECTION
+# ===================================================================
 
 if "authenticated" not in st.session_state:
+
     st.session_state.authenticated = False
-
-if "username" not in st.session_state:
-    st.session_state.username = st.secrets["snowflake"].get(
-        "user",
-        ""
-    )
-
-if "password" not in st.session_state:
+    st.session_state.username = "PBCS"
     st.session_state.password = ""
-
-if "snowpark_session" not in st.session_state:
     st.session_state.snowpark_session = None
 
-
-# ============================================================
-# LOGIN
-# ============================================================
 
 if not st.session_state.authenticated:
 
     st.title("Welcome to Dilytics Supply Chain AI")
 
     st.markdown(
-        "Please login to connect to your Snowflake Data Warehouse."
+        "Please login to connect to your Supply Chain Snowflake Data Warehouse."
     )
 
     st.session_state.username = st.text_input(
@@ -107,43 +136,26 @@ if not st.session_state.authenticated:
 
     if st.button("Login"):
 
-        if not st.session_state.username:
-
-            st.error("Please enter your Snowflake username.")
-            st.stop()
-
-        if not st.session_state.password:
-
-            st.error("Please enter your Snowflake password.")
-            st.stop()
-
         try:
 
             with st.spinner("Connecting to Snowflake..."):
 
-                config = get_snowflake_config()
-
-                connection_parameters = {
-                    "account": config["account"],
-                    "user": st.session_state.username,
-                    "password": st.session_state.password,
-                    "role": config["role"],
-                    "warehouse": config["warehouse"],
-                    "database": config["database"],
-                    "schema": config["schema"]
-                }
-
-                # Test connection
                 conn = snowflake.connector.connect(
-                    **connection_parameters
+                    user=st.session_state.username,
+                    password=st.session_state.password,
+                    account=ACCOUNT,
+                    host=HOST,
+                    port=443,
+                    warehouse=WAREHOUSE,
+                    role=ROLE,
+                    database=DATABASE,
+                    schema=SCHEMA
                 )
 
-                conn.close()
-
-                # Create Snowpark session
                 st.session_state.snowpark_session = (
-                    Session.builder
-                    .configs(connection_parameters)
+                    Session
+                    .builder
+                    .configs({"connection": conn})
                     .create()
                 )
 
@@ -153,23 +165,21 @@ if not st.session_state.authenticated:
 
         except Exception as e:
 
-            st.error(
-                f"Authentication failed: {str(e)}"
-            )
+            st.error(f"Authentication failed: {e}")
 
     st.stop()
 
 
-# ============================================================
-# SNOWPARK SESSION
-# ============================================================
+# ===================================================================
+# 6. GET SNOWPARK SESSION
+# ===================================================================
 
 session = st.session_state.snowpark_session
 
 
-# ============================================================
-# CHAT SESSIONS
-# ============================================================
+# ===================================================================
+# 7. SESSION STATE - MULTI CHAT
+# ===================================================================
 
 if "chat_sessions" not in st.session_state:
 
@@ -178,13 +188,11 @@ if "chat_sessions" not in st.session_state:
 
 if "current_session_id" not in st.session_state:
 
-    session_id = datetime.now().strftime(
-        "%Y%m%d_%H%M%S"
-    )
+    init_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    st.session_state.current_session_id = session_id
+    st.session_state.current_session_id = init_id
 
-    st.session_state.chat_sessions[session_id] = {
+    st.session_state.chat_sessions[init_id] = {
         "title": "New Conversation",
         "messages": []
     }
@@ -192,56 +200,56 @@ if "current_session_id" not in st.session_state:
 
 current_id = st.session_state.current_session_id
 
-messages = (
-    st.session_state
-    .chat_sessions[current_id]["messages"]
-)
+messages = st.session_state.chat_sessions[current_id]["messages"]
 
 
-# ============================================================
-# CHART FUNCTION
-# ============================================================
+# ===================================================================
+# 8. CHART RENDERER
+# ===================================================================
 
-def display_chart_tab(
-    df,
-    key_prefix=""
-):
+def display_chart_tab(df: pd.DataFrame, key_prefix: str = ""):
 
     if df is None or df.empty:
 
-        st.info(
-            "No data available to create a chart."
-        )
+        st.info("No data available for chart.")
 
         return
 
     if len(df.columns) < 2:
 
-        st.info(
-            "At least two columns are required for a chart."
-        )
+        st.info("Need at least 2 columns to render a chart.")
 
         return
 
-    columns = list(df.columns)
+    all_cols = list(df.columns)
 
     col1, col2, col3 = st.columns(3)
 
+    x_key = f"{key_prefix}_x"
+    y_key = f"{key_prefix}_y"
+    t_key = f"{key_prefix}_type"
+
     x_col = col1.selectbox(
-        "Dimension",
-        columns,
-        key=f"{key_prefix}_x"
+        "Dimension (X-axis)",
+        all_cols,
+        index=0,
+        key=x_key
     )
 
-    remaining = [
-        c for c in columns
+    remaining_cols = [
+        c for c in all_cols
         if c != x_col
     ]
 
+    if not remaining_cols:
+        st.info("No metric column available.")
+        return
+
     y_col = col2.selectbox(
-        "Metric",
-        remaining,
-        key=f"{key_prefix}_y"
+        "Metric (Y-axis)",
+        remaining_cols,
+        index=0,
+        key=y_key
     )
 
     chart_type = col3.selectbox(
@@ -252,10 +260,29 @@ def display_chart_tab(
             "Area Chart",
             "Scatter Plot"
         ],
-        key=f"{key_prefix}_type"
+        key=t_key
     )
 
     chart_df = df.copy()
+
+    if any(
+        keyword in x_col.lower()
+        for keyword in [
+            "year",
+            "quarter",
+            "month",
+            "day",
+            "date"
+        ]
+    ):
+
+        chart_df[x_col] = chart_df[x_col].apply(
+            lambda x:
+            str(int(x))
+            if pd.notnull(x)
+            and isinstance(x, (int, float))
+            else str(x)
+        )
 
     if chart_type == "Bar Chart":
 
@@ -284,242 +311,327 @@ def display_chart_tab(
         )
 
 
-# ============================================================
-# SUPPLY CHAIN SQL GENERATOR
-# ============================================================
+# ===================================================================
+# 9. GET VERIFIED QUESTIONS FROM YAML
+# ===================================================================
+
+def get_verified_queries():
+
+    verified = SEMANTIC_MODEL.get(
+        "verified_queries",
+        []
+    )
+
+    result = []
+
+    if not isinstance(verified, list):
+        return result
+
+    for item in verified:
+
+        if not isinstance(item, dict):
+            continue
+
+        question = item.get("question")
+        sql = item.get("sql")
+
+        if question and sql:
+
+            result.append(
+                {
+                    "question": str(question).strip(),
+                    "sql": str(sql).strip(),
+                    "onboarding": item.get(
+                        "use_as_onboarding_question",
+                        False
+                    )
+                }
+            )
+
+    return result
+
+
+VERIFIED_QUERIES = get_verified_queries()
+
+
+# ===================================================================
+# 10. NORMALIZE TEXT
+# ===================================================================
+
+def normalize_text(text):
+
+    text = text.lower().strip()
+
+    text = re.sub(
+        r"[^a-z0-9% ]",
+        " ",
+        text
+    )
+
+    text = re.sub(
+        r"\s+",
+        " ",
+        text
+    )
+
+    return text
+
+
+# ===================================================================
+# 11. MATCH VERIFIED YAML QUERY
+# ===================================================================
+
+def match_verified_query(prompt):
+
+    p = normalize_text(prompt)
+
+    if not VERIFIED_QUERIES:
+        return None
+
+    # Exact / near exact matching first
+
+    for item in VERIFIED_QUERIES:
+
+        q = normalize_text(
+            item["question"]
+        )
+
+        if p == q:
+            return item["sql"]
+
+    # Keyword based matching
+
+    keyword_rules = [
+
+        (
+            [
+                "total purchase order",
+                "total purchase orders",
+                "how many purchase orders"
+            ],
+            "purchase order"
+        ),
+
+        (
+            [
+                "total ordered quantity",
+                "ordered quantity"
+            ],
+            "ordered quantity"
+        ),
+
+        (
+            [
+                "supplier on time",
+                "supplier on-time",
+                "on time delivery",
+                "on-time delivery"
+            ],
+            "supplier on time"
+        ),
+
+        (
+            [
+                "rejected value",
+                "total rejected value"
+            ],
+            "rejected value"
+        ),
+
+        (
+            [
+                "total shipment",
+                "total shipments",
+                "how many shipments"
+            ],
+            "total shipments"
+        ),
+
+        (
+            [
+                "average delivery delay by supplier",
+                "average delivery delay supplier",
+                "delivery delay by supplier"
+            ],
+            "average delivery delay by supplier"
+        ),
+
+        (
+            [
+                "city wise supplier",
+                "suppliers by city",
+                "supplier count by city",
+                "supplier city"
+            ],
+            "city wise suppliers count"
+        ),
+
+        (
+            [
+                "products in each category",
+                "products by category",
+                "how many products are there in each category"
+            ],
+            "products are there in each category"
+        ),
+
+        (
+            [
+                "total received quantity",
+                "received quantity"
+            ],
+            "total received quantity"
+        ),
+
+        (
+            [
+                "warehouses by city",
+                "warehouses are there by city",
+                "warehouse count by city"
+            ],
+            "warehouses are there by city"
+        )
+    ]
+
+    for keywords, query_identifier in keyword_rules:
+
+        if any(
+            keyword in p
+            for keyword in keywords
+        ):
+
+            for item in VERIFIED_QUERIES:
+
+                q = normalize_text(
+                    item["question"]
+                )
+
+                if query_identifier in q:
+
+                    return item["sql"]
+
+    return None
+
+
+# ===================================================================
+# 12. SUPPLY CHAIN RULE-BASED SQL ENGINE
+# ===================================================================
 
 def generate_sql_from_prompt(prompt):
 
-    p = prompt.lower().strip()
+    p = normalize_text(prompt)
 
+    # ---------------------------------------------------------------
+    # Greetings
+    # ---------------------------------------------------------------
 
-    # ========================================================
-    # GREETINGS
-    # ========================================================
+    if any(
+        greet in p
+        for greet in [
+            "how are you",
+            "how is it going",
+            "what is up",
+            "whats up"
+        ]
+    ):
+
+        explanation = (
+            "I'm doing well, thank you! "
+            "I am ready to help you analyze "
+            "purchase orders, suppliers, shipments, "
+            "delivery performance, logistics, products, "
+            "warehouses, carriers, and supply chain costs."
+        )
+
+        return explanation, None
+
 
     if p in [
         "hi",
         "hello",
         "hey",
         "good morning",
-        "good afternoon",
         "good evening"
     ]:
 
-        return (
-            "Hello! 👋 I am your Supply Chain Intelligence "
-            "Assistant. You can ask me about purchase orders, "
-            "suppliers, shipments, deliveries, carriers, "
-            "shipping modes, warehouses, products, delays, "
-            "and delivery performance.",
-            None
+        explanation = (
+            "Hello! I am your Supply Chain Intelligence "
+            "Assistant powered by the Supply Chain semantic model. "
+            "Ask me about purchase orders, suppliers, shipments, "
+            "delivery performance, warehouses, products, carriers, "
+            "or logistics."
         )
 
-
-    # ========================================================
-    # HELP
-    # ========================================================
-
-    if (
-        "what can i ask" in p
-        or "what questions" in p
-        or "what can you do" in p
-        or "examples" in p
-        or p == "help"
-    ):
-
-        return (
-            """
-You can ask me questions about **Supply Chain data**.
-
-### 📋 Purchase Orders
-
-- What is the total purchase order count?
-- What is the total ordered quantity?
-- What is the total ordered value?
-- What is the total open commitment?
-- What is the total rejected value?
-- What is the purchase order status breakdown?
-- What is the purchase order value by supplier?
-- What is the purchase order value by warehouse?
-- What is the ordered quantity by product category?
-
-### 🚚 Shipments & Deliveries
-
-- What is the total number of shipments?
-- How many shipments are currently in transit?
-- How many shipments have been delivered?
-- How many shipments are delayed?
-- What is the average delivery delay?
-- What is the average delivery delay by supplier?
-- What are the top delay reasons?
-- What is the shipment count by carrier?
-- What is the shipment count by shipping mode?
-
-### 🏭 Suppliers
-
-- Which suppliers have the most purchase orders?
-- What is the supplier on-time delivery percentage?
-- Which suppliers have the highest delivery delays?
-- Which suppliers have the highest rejected value?
-- Which suppliers are high risk?
-- Which suppliers have active contracts?
-- Which suppliers are single source?
-
-### 📦 Products
-
-- What are the top products by ordered value?
-- What is the ordered quantity by product category?
-- What is the ordered value by product category?
-- What is the ordered value by brand?
-
-### 🚢 Logistics
-
-- What is the total freight cost?
-- What is the total landed cost?
-- What is freight cost by carrier?
-- What is freight cost by shipping mode?
-- What is the average transit time by shipping mode?
-""",
-            None
-        )
+        return explanation, None
 
 
-    # ========================================================
-    # VERIFIED QUERY 1
-    # TOTAL PURCHASE ORDERS
-    # ========================================================
+    # ---------------------------------------------------------------
+    # Help
+    # ---------------------------------------------------------------
 
-    if (
-        "total purchase order" in p
-        or "total purchase orders" in p
-        or "purchase order count" in p
+    if any(
+        word in p
+        for word in [
+            "what can i ask",
+            "what questions",
+            "what can you do",
+            "examples",
+            "help"
+        ]
     ):
 
         explanation = (
-            "Calculating the total number of unique purchase orders."
+            "You can ask me questions about your Supply Chain data.\n\n"
+
+            "**Purchase Orders:**\n"
+            "- How many purchase orders do we have?\n"
+            "- What is the total ordered quantity?\n"
+            "- What is the total received quantity?\n"
+            "- What is the total rejected value?\n\n"
+
+            "**Supplier Performance:**\n"
+            "- What is the supplier on-time delivery percentage?\n"
+            "- What is the average delivery delay by supplier?\n"
+            "- How many suppliers are there by city?\n\n"
+
+            "**Shipments & Logistics:**\n"
+            "- How many shipments do we have?\n"
+            "- What is the average delivery delay by supplier?\n"
+            "- What are the shipment delays by reason?\n\n"
+
+            "**Products & Locations:**\n"
+            "- How many products are there in each category?\n"
+            "- What are the top 10 products by weight?\n"
+            "- How many warehouses are there by city?\n"
         )
 
-        sql = """
-        SELECT
-            COUNT(DISTINCT PURCHASE_ORDER_NUMBER)
-                AS TOTAL_PURCHASE_ORDERS
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE
-        """
-
-        return explanation, sql.strip()
+        return explanation, None
 
 
-    # ========================================================
-    # VERIFIED QUERY 2
-    # TOTAL ORDERED QUANTITY
-    # ========================================================
+    # ---------------------------------------------------------------
+    # Try YAML verified queries FIRST
+    # ---------------------------------------------------------------
 
-    if (
-        "total ordered quantity" in p
-        or "ordered quantity" in p
-        and "by" not in p
-    ):
+    verified_sql = match_verified_query(prompt)
+
+    if verified_sql:
 
         explanation = (
-            "Calculating the total quantity ordered from suppliers."
+            "I found a verified Supply Chain query "
+            "from the semantic YAML and am executing it."
         )
 
-        sql = """
-        SELECT
-            SUM(ORDERED_QUANTITY)
-                AS TOTAL_ORDERED_QUANTITY
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE
-        """
-
-        return explanation, sql.strip()
+        return explanation, verified_sql
 
 
-    # ========================================================
-    # VERIFIED QUERY 3
-    # SUPPLIER ON-TIME DELIVERY %
-    # ========================================================
-
-    if (
-        "supplier on-time delivery" in p
-        or "supplier on time delivery" in p
-        or "on-time delivery %" in p
-        or "on time delivery %" in p
-    ):
-
-        explanation = (
-            "Calculating the overall supplier on-time delivery percentage."
-        )
-
-        sql = """
-        SELECT
-            ROUND(
-                100.0 * COUNT_IF(IS_ON_TIME_FLAG = TRUE)
-                /
-                NULLIF(
-                    COUNT_IF(IS_ON_TIME_FLAG IS NOT NULL),
-                    0
-                ),
-                2
-            ) AS SUPPLIER_ON_TIME_PCT
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE
-        """
-
-        return explanation, sql.strip()
+    # =================================================================
+    # ADDITIONAL SUPPLY CHAIN QUESTIONS
+    # =================================================================
 
 
-    # ========================================================
-    # VERIFIED QUERY 4
-    # TOTAL REJECTED VALUE
-    # ========================================================
-
-    if (
-        "total rejected value" in p
-        or "rejected value" in p
-    ):
-
-        explanation = (
-            "Calculating the total value of goods rejected during inspection."
-        )
-
-        sql = """
-        SELECT
-            SUM(REJECTED_AMT)
-                AS TOTAL_REJECTED_VALUE
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE
-        """
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # VERIFIED QUERY 5
-    # TOTAL SHIPMENTS
-    # ========================================================
-
-    if (
-        "total shipments" in p
-        or "shipment count" in p
-        or "number of shipments" in p
-    ):
-
-        explanation = (
-            "Calculating the total number of shipments."
-        )
-
-        sql = """
-        SELECT
-            COUNT(SHIPMENT_KEY)
-                AS TOTAL_SHIPMENTS
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY
-        """
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # OPEN PURCHASE ORDERS
-    # ========================================================
+    # ---------------------------------------------------------------
+    # Open Purchase Orders
+    # ---------------------------------------------------------------
 
     if (
         "open purchase order" in p
@@ -528,13 +640,13 @@ You can ask me questions about **Supply Chain data**.
     ):
 
         explanation = (
-            "Calculating purchase orders that are still outstanding."
+            "Calculating the number of purchase orders "
+            "that are still open and awaiting fulfillment."
         )
 
         sql = """
         SELECT
-            COUNT(DISTINCT PURCHASE_ORDER_NUMBER)
-                AS OPEN_PURCHASE_ORDERS
+            COUNT(DISTINCT PURCHASE_ORDER_NUMBER) AS OPEN_PURCHASE_ORDERS
         FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE
         WHERE IS_OPEN_PO_FLAG = TRUE
         """
@@ -542,467 +654,189 @@ You can ask me questions about **Supply Chain data**.
         return explanation, sql.strip()
 
 
-    # ========================================================
-    # OPEN COMMITMENT
-    # ========================================================
+    # ---------------------------------------------------------------
+    # Open Quantity
+    # ---------------------------------------------------------------
 
     if (
-        "open commitment" in p
-        or "committed value" in p
-        or "outstanding commitment" in p
+        "open quantity" in p
+        or "quantity still not arrived" in p
+        or "outstanding quantity" in p
     ):
 
         explanation = (
-            "Calculating the value of goods ordered but not yet received."
+            "Calculating the quantity that has been ordered "
+            "but has not yet been received."
         )
 
         sql = """
         SELECT
-            SUM(OPEN_COMMITMENT_AMT)
-                AS TOTAL_OPEN_COMMITMENT
+            SUM(OPEN_QUANTITY) AS TOTAL_OPEN_QUANTITY
         FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE
         """
 
         return explanation, sql.strip()
 
 
-    # ========================================================
-    # ORDERED VALUE
-    # ========================================================
+    # ---------------------------------------------------------------
+    # Ordered Amount
+    # ---------------------------------------------------------------
 
     if (
-        "total ordered value" in p
+        "ordered amount" in p
+        or "value ordered" in p
         or "total order value" in p
-        or "ordered value" in p
     ):
 
         explanation = (
-            "Calculating the total value of goods ordered."
+            "Calculating the total monetary value of "
+            "purchase orders placed with suppliers."
         )
 
         sql = """
         SELECT
-            SUM(ORDERED_AMT)
-                AS TOTAL_ORDERED_VALUE
+            SUM(ORDERED_AMT) AS TOTAL_ORDERED_AMOUNT
         FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE
         """
 
         return explanation, sql.strip()
 
 
-    # ========================================================
-    # RECEIVED VALUE / SPEND
-    # ========================================================
+    # ---------------------------------------------------------------
+    # Received Amount / Spend
+    # ---------------------------------------------------------------
 
     if (
-        "received value" in p
+        "received amount" in p
+        or "received value" in p
         or "supplier spend" in p
-        or "total spend" in p
+        or "spend by supplier" in p
+    ):
+
+        if "supplier" in p:
+
+            explanation = (
+                "Calculating received spend by supplier."
+            )
+
+            sql = """
+            SELECT
+                s.SUPPLIER_NAME,
+                s.SUPPLIER_CODE,
+                SUM(f.RECEIVED_AMT) AS RECEIVED_AMOUNT
+            FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE f
+            JOIN SUPPLY_CHAIN_DW.GOLD.DIM_SUPPLIER s
+                ON f.SUPPLIER_KEY = s.SUPPLIER_KEY
+            GROUP BY
+                s.SUPPLIER_NAME,
+                s.SUPPLIER_CODE
+            ORDER BY RECEIVED_AMOUNT DESC
+            """
+
+        else:
+
+            explanation = (
+                "Calculating the total value of goods "
+                "received from suppliers."
+            )
+
+            sql = """
+            SELECT
+                SUM(RECEIVED_AMT) AS TOTAL_RECEIVED_AMOUNT
+            FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE
+            """
+
+        return explanation, sql.strip()
+
+
+    # ---------------------------------------------------------------
+    # OTIF
+    # ---------------------------------------------------------------
+
+    if (
+        "otif" in p
+        or "on time in full" in p
     ):
 
         explanation = (
-            "Calculating the value of goods actually received."
+            "Calculating the percentage of purchase order lines "
+            "that were delivered both on time and in full."
         )
 
         sql = """
         SELECT
-            SUM(RECEIVED_AMT)
-                AS TOTAL_RECEIVED_VALUE
+            ROUND(
+                100.0 * COUNT_IF(IS_OTIF_FLAG = TRUE)
+                /
+                NULLIF(
+                    COUNT_IF(IS_OTIF_FLAG IS NOT NULL),
+                    0
+                ),
+                2
+            ) AS OTIF_PERCENTAGE
         FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE
         """
 
         return explanation, sql.strip()
 
 
-    # ========================================================
-    # FREIGHT COST
-    # ========================================================
+    # ---------------------------------------------------------------
+    # Quality Issues
+    # ---------------------------------------------------------------
 
     if (
-        "total freight cost" in p
-        or "freight cost" in p
-        and "by" not in p
+        "quality issue" in p
+        or "quality issues" in p
+        or "rejected quantity" in p
+        or "rejection rate" in p
     ):
 
         explanation = (
-            "Calculating the total freight cost across shipments."
-        )
-
-        sql = """
-        SELECT
-            SUM(FREIGHT_COST_AMT)
-                AS TOTAL_FREIGHT_COST
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY
-        """
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # LANDED COST
-    # ========================================================
-
-    if (
-        "landed cost" in p
-        and "by" not in p
-    ):
-
-        explanation = (
-            "Calculating the total landed cost, including freight and customs duty."
-        )
-
-        sql = """
-        SELECT
-            SUM(TOTAL_LANDED_COST_AMT)
-                AS TOTAL_LANDED_COST
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY
-        """
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # IN TRANSIT
-    # ========================================================
-
-    if (
-        "in transit" in p
-        or "in-transit" in p
-    ):
-
-        explanation = (
-            "Counting shipments that have left the supplier "
-            "but have not yet arrived."
-        )
-
-        sql = """
-        SELECT
-            COUNT(SHIPMENT_KEY)
-                AS IN_TRANSIT_SHIPMENTS
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY
-        WHERE IS_IN_TRANSIT_FLAG = TRUE
-        """
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # DELIVERED SHIPMENTS
-    # ========================================================
-
-    if (
-        "delivered shipments" in p
-        or "shipments delivered" in p
-    ):
-
-        explanation = (
-            "Counting shipments that have successfully arrived."
-        )
-
-        sql = """
-        SELECT
-            COUNT(SHIPMENT_KEY)
-                AS DELIVERED_SHIPMENTS
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY
-        WHERE IS_DELIVERED_FLAG = TRUE
-        """
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # DELAYED SHIPMENTS
-    # ========================================================
-
-    if (
-        "delayed shipments" in p
-        or "shipments delayed" in p
-        or "how many shipments are delayed" in p
-    ):
-
-        explanation = (
-            "Counting shipments that arrived late and have a recorded delay."
-        )
-
-        sql = """
-        SELECT
-            COUNT(SHIPMENT_KEY)
-                AS DELAYED_SHIPMENTS
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY
-        WHERE IS_DELAYED_FLAG = TRUE
-        """
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # AVERAGE DELIVERY DELAY
-    # ========================================================
-
-    if (
-        "average delivery delay" in p
-        and "supplier" not in p
-    ):
-
-        explanation = (
-            "Calculating the average number of days deliveries "
-            "were late against the planned delivery date."
-        )
-
-        sql = """
-        SELECT
-            AVG(DELIVERY_DELAY_DAYS)
-                AS AVG_DELIVERY_DELAY_DAYS
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY
-        WHERE IS_DELIVERED_FLAG = TRUE
-          AND DELIVERY_DELAY_DAYS IS NOT NULL
-        """
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # VERIFIED: AVERAGE DELIVERY DELAY BY SUPPLIER
-    # ========================================================
-
-    if (
-        "average delivery delay by supplier" in p
-        or "delivery delay by supplier" in p
-    ):
-
-        explanation = (
-            "Calculating average delivery delay for each supplier."
+            "Analyzing supplier delivery quality and rejected quantities."
         )
 
         sql = """
         SELECT
             s.SUPPLIER_NAME,
             s.SUPPLIER_CODE,
-            MIN(d.FULL_DATE) AS START_DATE,
-            MAX(d.FULL_DATE) AS END_DATE,
-            AVG(f.DELIVERY_DELAY_DAYS)
-                AS AVG_DELIVERY_DELAY_DAYS
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY f
-
-        INNER JOIN SUPPLY_CHAIN_DW.GOLD.DIM_SUPPLIER s
+            SUM(f.REJECTED_QUANTITY) AS REJECTED_QUANTITY,
+            ROUND(
+                AVG(f.REJECT_RATE_PCT),
+                2
+            ) AS AVG_REJECT_RATE_PCT
+        FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE f
+        JOIN SUPPLY_CHAIN_DW.GOLD.DIM_SUPPLIER s
             ON f.SUPPLIER_KEY = s.SUPPLIER_KEY
-
-        INNER JOIN SUPPLY_CHAIN_DW.GOLD.DIM_DATE d
-            ON f.ORDER_DATE_KEY = d.DATE_KEY
-
-        WHERE f.IS_DELIVERED_FLAG = TRUE
-          AND f.DELIVERY_DELAY_DAYS IS NOT NULL
-
         GROUP BY
             s.SUPPLIER_NAME,
             s.SUPPLIER_CODE
-
-        ORDER BY
-            AVG_DELIVERY_DELAY_DAYS DESC NULLS LAST
+        ORDER BY REJECTED_QUANTITY DESC
         """
 
         return explanation, sql.strip()
 
 
-    # ========================================================
-    # DELAY REASONS
-    # ========================================================
-
-    if (
-        "delay reason" in p
-        or "reasons for delay" in p
-        or "why are shipments delayed" in p
-    ):
-
-        explanation = (
-            "Analyzing shipment delays by their recorded reason."
-        )
-
-        sql = """
-        SELECT
-            r.DELAY_REASON_NAME,
-            COUNT(f.SHIPMENT_KEY)
-                AS DELAYED_SHIPMENT_COUNT
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY f
-
-        INNER JOIN SUPPLY_CHAIN_DW.GOLD.DIM_DELAY_REASON r
-            ON f.DELAY_REASON_KEY = r.DELAY_REASON_KEY
-
-        WHERE f.IS_DELAYED_FLAG = TRUE
-
-        GROUP BY
-            r.DELAY_REASON_NAME
-
-        ORDER BY
-            DELAYED_SHIPMENT_COUNT DESC
-        """
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # PURCHASE ORDER BY SUPPLIER
-    # ========================================================
-
-    if (
-        "purchase order" in p
-        and "supplier" in p
-        and (
-            "value" in p
-            or "amount" in p
-        )
-    ):
-
-        explanation = (
-            "Calculating purchase order value by supplier."
-        )
-
-        sql = """
-        SELECT
-            s.SUPPLIER_NAME,
-            s.SUPPLIER_CODE,
-            SUM(f.ORDERED_AMT)
-                AS ORDERED_VALUE
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE f
-
-        INNER JOIN SUPPLY_CHAIN_DW.GOLD.DIM_SUPPLIER s
-            ON f.SUPPLIER_KEY = s.SUPPLIER_KEY
-
-        GROUP BY
-            s.SUPPLIER_NAME,
-            s.SUPPLIER_CODE
-
-        ORDER BY
-            ORDERED_VALUE DESC
-        """
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # PURCHASE ORDER BY WAREHOUSE
-    # ========================================================
-
-    if (
-        "purchase order" in p
-        and "warehouse" in p
-        and (
-            "value" in p
-            or "amount" in p
-        )
-    ):
-
-        explanation = (
-            "Calculating purchase order value by destination warehouse."
-        )
-
-        sql = """
-        SELECT
-            w.WAREHOUSE_NAME,
-            SUM(f.ORDERED_AMT)
-                AS ORDERED_VALUE
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE f
-
-        INNER JOIN SUPPLY_CHAIN_DW.GOLD.DIM_WAREHOUSE w
-            ON f.WAREHOUSE_KEY = w.WAREHOUSE_KEY
-
-        GROUP BY
-            w.WAREHOUSE_NAME
-
-        ORDER BY
-            ORDERED_VALUE DESC
-        """
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # ORDER STATUS
-    # ========================================================
-
-    if (
-        "purchase order status" in p
-        or "po status" in p
-        or "order status" in p
-    ):
-
-        explanation = (
-            "Showing the purchase order count by status."
-        )
-
-        sql = """
-        SELECT
-            s.PO_STATUS_NAME,
-            s.STATUS_CATEGORY,
-            COUNT(DISTINCT f.PURCHASE_ORDER_NUMBER)
-                AS PURCHASE_ORDER_COUNT
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE f
-
-        INNER JOIN SUPPLY_CHAIN_DW.GOLD.DIM_PO_STATUS s
-            ON f.PO_STATUS_KEY = s.PO_STATUS_KEY
-
-        GROUP BY
-            s.PO_STATUS_NAME,
-            s.STATUS_CATEGORY
-
-        ORDER BY
-            PURCHASE_ORDER_COUNT DESC
-        """
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # SUPPLIER QUALITY
-    # ========================================================
-
-    if (
-        "supplier quality" in p
-        or "quality rating by supplier" in p
-        or "supplier quality rating" in p
-    ):
-
-        explanation = (
-            "Showing supplier quality ratings."
-        )
-
-        sql = """
-        SELECT
-            SUPPLIER_NAME,
-            SUPPLIER_CODE,
-            QUALITY_RATING,
-            QUALITY_BAND
-        FROM SUPPLY_CHAIN_DW.GOLD.DIM_SUPPLIER
-        ORDER BY
-            QUALITY_RATING DESC
-        """
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # SUPPLIER RISK
-    # ========================================================
+    # ---------------------------------------------------------------
+    # Supplier Risk
+    # ---------------------------------------------------------------
 
     if (
         "supplier risk" in p
         or "risky supplier" in p
         or "high risk supplier" in p
+        or "critical supplier" in p
     ):
 
         explanation = (
-            "Showing suppliers according to their risk rating."
+            "Showing suppliers grouped by their supply chain risk rating."
         )
 
         sql = """
         SELECT
-            SUPPLIER_NAME,
-            SUPPLIER_CODE,
             RISK_RATING,
-            SUPPLIER_TIER,
-            COUNTRY_CODE,
-            REGION_NAME
+            COUNT(DISTINCT SUPPLIER_KEY) AS SUPPLIER_COUNT
         FROM SUPPLY_CHAIN_DW.GOLD.DIM_SUPPLIER
+        GROUP BY RISK_RATING
         ORDER BY
             CASE RISK_RATING
                 WHEN 'Critical' THEN 1
@@ -1016,473 +850,608 @@ You can ask me questions about **Supply Chain data**.
         return explanation, sql.strip()
 
 
-    # ========================================================
-    # SINGLE SOURCE SUPPLIERS
-    # ========================================================
+    # ---------------------------------------------------------------
+    # Supplier Quality
+    # ---------------------------------------------------------------
 
     if (
-        "single source" in p
-        or "single-source" in p
+        "supplier quality" in p
+        or "quality by supplier" in p
+        or "supplier quality rating" in p
     ):
 
         explanation = (
-            "Identifying suppliers that are the only approved source "
-            "for what they provide."
+            "Comparing supplier quality ratings."
         )
 
         sql = """
         SELECT
             SUPPLIER_NAME,
             SUPPLIER_CODE,
-            SUPPLIER_TYPE,
-            SUPPLIER_TIER,
-            RISK_RATING
+            QUALITY_RATING,
+            QUALITY_BAND
         FROM SUPPLY_CHAIN_DW.GOLD.DIM_SUPPLIER
-        WHERE IS_SINGLE_SOURCE_FLAG = TRUE
-        ORDER BY
-            SUPPLIER_NAME
+        ORDER BY QUALITY_RATING DESC
         """
 
         return explanation, sql.strip()
 
 
-    # ========================================================
-    # ACTIVE CONTRACTS
-    # ========================================================
+    # ---------------------------------------------------------------
+    # Supplier Lead Time
+    # ---------------------------------------------------------------
 
     if (
-        "active contract" in p
-        or "active supplier contract" in p
+        "supplier lead time" in p
+        or "lead time by supplier" in p
+        or "supplier delivery time" in p
     ):
 
         explanation = (
-            "Showing suppliers with active contracts."
+            "Comparing supplier standard lead times."
         )
 
         sql = """
         SELECT
             SUPPLIER_NAME,
             SUPPLIER_CODE,
-            CONTRACT_START_DATE,
-            CONTRACT_END_DATE,
-            SUPPLIER_TIER
+            STANDARD_LEAD_TIME_DAYS,
+            LEAD_TIME_BAND
         FROM SUPPLY_CHAIN_DW.GOLD.DIM_SUPPLIER
-        WHERE IS_CONTRACT_ACTIVE_FLAG = TRUE
-        ORDER BY
-            CONTRACT_END_DATE
+        ORDER BY STANDARD_LEAD_TIME_DAYS DESC
         """
 
         return explanation, sql.strip()
 
 
-    # ========================================================
-    # SHIPMENT BY CARRIER
-    # ========================================================
+    # ---------------------------------------------------------------
+    # Shipments by Carrier
+    # ---------------------------------------------------------------
 
     if (
-        "shipment" in p
-        and "carrier" in p
+        "shipment by carrier" in p
+        or "shipments by carrier" in p
+        or "carrier shipments" in p
     ):
 
         explanation = (
-            "Showing shipment volumes by freight carrier."
+            "Counting shipments handled by each carrier."
         )
 
         sql = """
         SELECT
             c.CARRIER_NAME,
             c.CARRIER_CODE,
-            c.CARRIER_MODE,
-            COUNT(f.SHIPMENT_KEY)
-                AS SHIPMENT_COUNT
+            COUNT(f.SHIPMENT_KEY) AS SHIPMENT_COUNT
         FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY f
-
-        INNER JOIN SUPPLY_CHAIN_DW.GOLD.DIM_CARRIER c
+        JOIN SUPPLY_CHAIN_DW.GOLD.DIM_CARRIER c
             ON f.CARRIER_KEY = c.CARRIER_KEY
-
-        GROUP BY
-            c.CARRIER_NAME,
-            c.CARRIER_CODE,
-            c.CARRIER_MODE
-
-        ORDER BY
-            SHIPMENT_COUNT DESC
-        """
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # SHIPMENT BY SHIPPING MODE
-    # ========================================================
-
-    if (
-        "shipping mode" in p
-        or "ship mode" in p
-        or "shipment by mode" in p
-    ):
-
-        explanation = (
-            "Showing shipment volumes by shipping mode."
-        )
-
-        sql = """
-        SELECT
-            m.SHIP_MODE_NAME,
-            m.TRANSPORT_MODE,
-            m.SPEED_CATEGORY,
-            COUNT(f.SHIPMENT_KEY)
-                AS SHIPMENT_COUNT
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY f
-
-        INNER JOIN SUPPLY_CHAIN_DW.GOLD.DIM_SHIP_MODE m
-            ON f.SHIP_MODE_KEY = m.SHIP_MODE_KEY
-
-        GROUP BY
-            m.SHIP_MODE_NAME,
-            m.TRANSPORT_MODE,
-            m.SPEED_CATEGORY
-
-        ORDER BY
-            SHIPMENT_COUNT DESC
-        """
-
-        return explanation, sql.strip()
-
-
-    # ========================================================
-    # FREIGHT BY CARRIER
-    # ========================================================
-
-    if (
-        "freight" in p
-        and "carrier" in p
-    ):
-
-        explanation = (
-            "Calculating freight cost by carrier."
-        )
-
-        sql = """
-        SELECT
-            c.CARRIER_NAME,
-            c.CARRIER_CODE,
-            SUM(f.FREIGHT_COST_AMT)
-                AS TOTAL_FREIGHT_COST
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY f
-
-        INNER JOIN SUPPLY_CHAIN_DW.GOLD.DIM_CARRIER c
-            ON f.CARRIER_KEY = c.CARRIER_KEY
-
         GROUP BY
             c.CARRIER_NAME,
             c.CARRIER_CODE
-
-        ORDER BY
-            TOTAL_FREIGHT_COST DESC
+        ORDER BY SHIPMENT_COUNT DESC
         """
 
         return explanation, sql.strip()
 
 
-    # ========================================================
-    # TOP PRODUCTS BY ORDERED VALUE
-    # ========================================================
+    # ---------------------------------------------------------------
+    # Carrier On-Time Performance
+    # ---------------------------------------------------------------
 
     if (
-        "top" in p
-        and "product" in p
-        and (
-            "ordered value" in p
-            or "order value" in p
-        )
+        "carrier on time" in p
+        or "carrier performance" in p
+        or "carrier on-time" in p
     ):
 
         explanation = (
-            "Ranking products by total ordered value."
+            "Calculating shipment on-time delivery performance by carrier."
         )
 
         sql = """
         SELECT
-            p.PRODUCT_SKU,
-            p.PRODUCT_NAME,
-            p.CATEGORY_NAME,
-            p.SUBCATEGORY_NAME,
-            SUM(f.ORDERED_AMT)
-                AS ORDERED_VALUE
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE f
-
-        INNER JOIN SUPPLY_CHAIN_DW.GOLD.DIM_PRODUCT p
-            ON f.PRODUCT_KEY = p.PRODUCT_KEY
-
+            c.CARRIER_NAME,
+            c.CARRIER_CODE,
+            ROUND(
+                100.0 *
+                COUNT_IF(
+                    f.IS_ON_TIME_DELIVERY_FLAG = TRUE
+                )
+                /
+                NULLIF(
+                    COUNT_IF(
+                        f.IS_ON_TIME_DELIVERY_FLAG IS NOT NULL
+                    ),
+                    0
+                ),
+                2
+            ) AS ON_TIME_DELIVERY_PCT
+        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY f
+        JOIN SUPPLY_CHAIN_DW.GOLD.DIM_CARRIER c
+            ON f.CARRIER_KEY = c.CARRIER_KEY
         GROUP BY
-            p.PRODUCT_SKU,
-            p.PRODUCT_NAME,
-            p.CATEGORY_NAME,
-            p.SUBCATEGORY_NAME
-
-        ORDER BY
-            ORDERED_VALUE DESC
-
-        LIMIT 10
+            c.CARRIER_NAME,
+            c.CARRIER_CODE
+        ORDER BY ON_TIME_DELIVERY_PCT DESC
         """
 
         return explanation, sql.strip()
 
 
-    # ========================================================
-    # ORDERED VALUE BY CATEGORY
-    # ========================================================
+    # ---------------------------------------------------------------
+    # Shipments by Mode
+    # ---------------------------------------------------------------
 
     if (
-        "ordered value" in p
-        and "category" in p
+        "shipment by mode" in p
+        or "shipments by mode" in p
+        or "shipping mode" in p
     ):
 
         explanation = (
-            "Calculating ordered value by product category."
+            "Analyzing shipment volume by transportation mode."
         )
 
         sql = """
         SELECT
-            p.CATEGORY_NAME,
-            SUM(f.ORDERED_AMT)
-                AS ORDERED_VALUE
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE f
-
-        INNER JOIN SUPPLY_CHAIN_DW.GOLD.DIM_PRODUCT p
-            ON f.PRODUCT_KEY = p.PRODUCT_KEY
-
+            sm.SHIP_MODE_NAME,
+            sm.TRANSPORT_MODE,
+            COUNT(f.SHIPMENT_KEY) AS SHIPMENT_COUNT
+        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY f
+        JOIN SUPPLY_CHAIN_DW.GOLD.DIM_SHIP_MODE sm
+            ON f.SHIP_MODE_KEY = sm.SHIP_MODE_KEY
         GROUP BY
-            p.CATEGORY_NAME
-
-        ORDER BY
-            ORDERED_VALUE DESC
+            sm.SHIP_MODE_NAME,
+            sm.TRANSPORT_MODE
+        ORDER BY SHIPMENT_COUNT DESC
         """
 
         return explanation, sql.strip()
 
 
-    # ========================================================
-    # ORDERED QUANTITY BY CATEGORY
-    # ========================================================
+    # ---------------------------------------------------------------
+    # Shipment Delay Reasons
+    # ---------------------------------------------------------------
 
     if (
-        "ordered quantity" in p
-        and "category" in p
+        "delay reason" in p
+        or "delays by reason" in p
+        or "shipment delay reasons" in p
     ):
 
         explanation = (
-            "Calculating ordered quantity by product category."
+            "Analyzing shipment delays by their recorded delay reason."
         )
 
         sql = """
         SELECT
-            p.CATEGORY_NAME,
-            SUM(f.ORDERED_QUANTITY)
-                AS ORDERED_QUANTITY
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE f
-
-        INNER JOIN SUPPLY_CHAIN_DW.GOLD.DIM_PRODUCT p
-            ON f.PRODUCT_KEY = p.PRODUCT_KEY
-
+            dr.DELAY_REASON_NAME,
+            dr.RESPONSIBLE_PARTY,
+            COUNT(f.SHIPMENT_KEY) AS DELAYED_SHIPMENTS,
+            AVG(f.DELIVERY_DELAY_DAYS) AS AVG_DELAY_DAYS
+        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY f
+        JOIN SUPPLY_CHAIN_DW.GOLD.DIM_DELAY_REASON dr
+            ON f.DELAY_REASON_KEY = dr.DELAY_REASON_KEY
+        WHERE f.IS_DELAYED_FLAG = TRUE
         GROUP BY
-            p.CATEGORY_NAME
-
-        ORDER BY
-            ORDERED_QUANTITY DESC
+            dr.DELAY_REASON_NAME,
+            dr.RESPONSIBLE_PARTY
+        ORDER BY DELAYED_SHIPMENTS DESC
         """
 
         return explanation, sql.strip()
 
 
-    # ========================================================
-    # ORDERED VALUE BY BRAND
-    # ========================================================
+    # ---------------------------------------------------------------
+    # Shipment Stage
+    # ---------------------------------------------------------------
 
     if (
-        "ordered value" in p
-        and "brand" in p
+        "shipment stage" in p
+        or "shipment status" in p
+        or "shipments in transit" in p
+        or "in transit shipments" in p
     ):
 
         explanation = (
-            "Calculating ordered value by product brand."
+            "Showing the current shipment distribution by lifecycle stage."
         )
 
         sql = """
         SELECT
-            p.BRAND_NAME,
-            SUM(f.ORDERED_AMT)
-                AS ORDERED_VALUE
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE f
-
-        INNER JOIN SUPPLY_CHAIN_DW.GOLD.DIM_PRODUCT p
-            ON f.PRODUCT_KEY = p.PRODUCT_KEY
-
-        GROUP BY
-            p.BRAND_NAME
-
-        ORDER BY
-            ORDERED_VALUE DESC
+            SHIPMENT_STAGE,
+            COUNT(SHIPMENT_KEY) AS SHIPMENT_COUNT
+        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY
+        GROUP BY SHIPMENT_STAGE
+        ORDER BY SHIPMENT_COUNT DESC
         """
 
         return explanation, sql.strip()
 
 
-    # ========================================================
-    # TOP SUPPLIERS BY ORDER VALUE
-    # ========================================================
+    # ---------------------------------------------------------------
+    # Freight Cost by Carrier
+    # ---------------------------------------------------------------
 
     if (
-        "top" in p
-        and "supplier" in p
+        "freight cost by carrier" in p
+        or "carrier freight cost" in p
+        or "freight cost carrier" in p
     ):
 
         explanation = (
-            "Ranking suppliers by total ordered value."
+            "Calculating total freight cost by carrier."
+        )
+
+        sql = """
+        SELECT
+            c.CARRIER_NAME,
+            c.CARRIER_CODE,
+            SUM(f.FREIGHT_COST_AMT) AS TOTAL_FREIGHT_COST
+        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY f
+        JOIN SUPPLY_CHAIN_DW.GOLD.DIM_CARRIER c
+            ON f.CARRIER_KEY = c.CARRIER_KEY
+        GROUP BY
+            c.CARRIER_NAME,
+            c.CARRIER_CODE
+        ORDER BY TOTAL_FREIGHT_COST DESC
+        """
+
+        return explanation, sql.strip()
+
+
+    # ---------------------------------------------------------------
+    # Landed Cost by Supplier
+    # ---------------------------------------------------------------
+
+    if (
+        "landed cost by supplier" in p
+        or "supplier landed cost" in p
+        or "landed cost supplier" in p
+    ):
+
+        explanation = (
+            "Calculating total landed cost by supplier."
         )
 
         sql = """
         SELECT
             s.SUPPLIER_NAME,
             s.SUPPLIER_CODE,
-            SUM(f.ORDERED_AMT)
-                AS ORDERED_VALUE
-        FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE f
-
-        INNER JOIN SUPPLY_CHAIN_DW.GOLD.DIM_SUPPLIER s
+            SUM(f.TOTAL_LANDED_COST_AMT) AS TOTAL_LANDED_COST
+        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY f
+        JOIN SUPPLY_CHAIN_DW.GOLD.DIM_SUPPLIER s
             ON f.SUPPLIER_KEY = s.SUPPLIER_KEY
-
         GROUP BY
             s.SUPPLIER_NAME,
             s.SUPPLIER_CODE
+        ORDER BY TOTAL_LANDED_COST DESC
+        """
 
-        ORDER BY
-            ORDERED_VALUE DESC
+        return explanation, sql.strip()
 
+
+    # ---------------------------------------------------------------
+    # International Shipments
+    # ---------------------------------------------------------------
+
+    if (
+        "international shipment" in p
+        or "international shipments" in p
+        or "international" in p and "shipment" in p
+    ):
+
+        explanation = (
+            "Analyzing shipments that require international customs processing."
+        )
+
+        sql = """
+        SELECT
+            COUNT(SHIPMENT_KEY) AS INTERNATIONAL_SHIPMENTS
+        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY
+        WHERE IS_INTERNATIONAL_FLAG = TRUE
+        """
+
+        return explanation, sql.strip()
+
+
+    # ---------------------------------------------------------------
+    # Damaged Shipments
+    # ---------------------------------------------------------------
+
+    if (
+        "damaged shipment" in p
+        or "damaged shipments" in p
+        or "damage" in p
+    ):
+
+        explanation = (
+            "Analyzing shipments containing damaged goods."
+        )
+
+        sql = """
+        SELECT
+            COUNT(SHIPMENT_KEY) AS DAMAGED_SHIPMENTS,
+            SUM(DAMAGED_QUANTITY) AS DAMAGED_QUANTITY
+        FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY
+        WHERE IS_DAMAGED_FLAG = TRUE
+        """
+
+        return explanation, sql.strip()
+
+
+    # ---------------------------------------------------------------
+    # Products by Category
+    # ---------------------------------------------------------------
+
+    if (
+        "product category" in p
+        or "products by category" in p
+        or "products in each category" in p
+    ):
+
+        explanation = (
+            "Counting products within each product category."
+        )
+
+        sql = """
+        SELECT
+            CATEGORY_NAME,
+            COUNT(PRODUCT_KEY) AS PRODUCT_COUNT
+        FROM SUPPLY_CHAIN_DW.GOLD.DIM_PRODUCT
+        GROUP BY CATEGORY_NAME
+        ORDER BY PRODUCT_COUNT DESC
+        """
+
+        return explanation, sql.strip()
+
+
+    # ---------------------------------------------------------------
+    # Products by Subcategory
+    # ---------------------------------------------------------------
+
+    if (
+        "product subcategory" in p
+        or "products by subcategory" in p
+        or "subcategory" in p
+    ):
+
+        explanation = (
+            "Counting products within each product subcategory."
+        )
+
+        sql = """
+        SELECT
+            SUBCATEGORY_NAME,
+            COUNT(PRODUCT_KEY) AS PRODUCT_COUNT
+        FROM SUPPLY_CHAIN_DW.GOLD.DIM_PRODUCT
+        GROUP BY SUBCATEGORY_NAME
+        ORDER BY PRODUCT_COUNT DESC
+        """
+
+        return explanation, sql.strip()
+
+
+    # ---------------------------------------------------------------
+    # Products by Brand
+    # ---------------------------------------------------------------
+
+    if (
+        "products by brand" in p
+        or "product brand" in p
+        or "brand count" in p
+    ):
+
+        explanation = (
+            "Counting products by brand."
+        )
+
+        sql = """
+        SELECT
+            BRAND_NAME,
+            COUNT(PRODUCT_KEY) AS PRODUCT_COUNT
+        FROM SUPPLY_CHAIN_DW.GOLD.DIM_PRODUCT
+        GROUP BY BRAND_NAME
+        ORDER BY PRODUCT_COUNT DESC
+        """
+
+        return explanation, sql.strip()
+
+
+    # ---------------------------------------------------------------
+    # Top Products by Weight
+    # ---------------------------------------------------------------
+
+    if (
+        "top 10 products by weight" in p
+        or "heaviest products" in p
+        or "top products by weight" in p
+    ):
+
+        explanation = (
+            "Showing the 10 products with the highest unit weight."
+        )
+
+        sql = """
+        SELECT
+            PRODUCT_KEY,
+            PRODUCT_NAME,
+            PRODUCT_SKU,
+            CATEGORY_NAME,
+            SUBCATEGORY_NAME,
+            WEIGHT_KG
+        FROM SUPPLY_CHAIN_DW.GOLD.DIM_PRODUCT
+        ORDER BY WEIGHT_KG DESC NULLS LAST
         LIMIT 10
         """
 
         return explanation, sql.strip()
 
 
-    # ========================================================
+    # ---------------------------------------------------------------
+    # Preferred Suppliers
+    # ---------------------------------------------------------------
+
+    if (
+        "approved supplier" in p
+        or "approved suppliers" in p
+        or "preferred supplier" in p
+        or "preferred suppliers" in p
+    ):
+
+        explanation = (
+            "Showing approved and preferred supplier information."
+        )
+
+        sql = """
+        SELECT
+            SUPPLIER_NAME,
+            SUPPLIER_CODE,
+            SUPPLIER_TIER,
+            SUPPLIER_TYPE,
+            COUNTRY_CODE,
+            CITY_NAME,
+            IS_APPROVED_FLAG,
+            IS_CONTRACT_ACTIVE_FLAG
+        FROM SUPPLY_CHAIN_DW.GOLD.DIM_SUPPLIER
+        WHERE IS_APPROVED_FLAG = TRUE
+        ORDER BY SUPPLIER_NAME
+        """
+
+        return explanation, sql.strip()
+
+
+    # ---------------------------------------------------------------
+    # Warehouse by City
+    # ---------------------------------------------------------------
+
+    if (
+        "warehouse by city" in p
+        or "warehouses by city" in p
+        or "warehouse count by city" in p
+    ):
+
+        explanation = (
+            "Counting warehouses by city."
+        )
+
+        sql = """
+        SELECT
+            CITY_NAME,
+            COUNT(WAREHOUSE_KEY) AS WAREHOUSE_COUNT
+        FROM SUPPLY_CHAIN_DW.GOLD.DIM_WAREHOUSE
+        GROUP BY CITY_NAME
+        ORDER BY WAREHOUSE_COUNT DESC
+        """
+
+        return explanation, sql.strip()
+
+
+    # =================================================================
     # DOMAIN GUARDRAIL
-    # ========================================================
+    # =================================================================
 
-    supply_chain_keywords = [
+    domain_keywords = [
 
+        "supply",
         "supply chain",
+        "purchase",
         "purchase order",
-        "purchase orders",
         "po",
         "supplier",
-        "suppliers",
+        "vendor",
         "shipment",
-        "shipments",
+        "shipping",
         "delivery",
-        "deliveries",
         "carrier",
-        "carriers",
+        "freight",
+        "logistics",
         "warehouse",
-        "warehouses",
         "product",
-        "products",
-        "material",
+        "category",
+        "subcategory",
+        "brand",
         "quantity",
         "ordered",
         "received",
         "rejected",
-        "freight",
-        "landed cost",
-        "transit",
         "delay",
-        "delayed",
-        "shipping",
-        "ship mode",
-        "shipping mode",
-        "customs",
-        "contract",
+        "late",
+        "on time",
+        "otif",
+        "lead time",
         "risk",
-        "quality"
+        "quality",
+        "customs",
+        "transit",
+        "landed cost",
+        "transport",
+        "ship mode"
     ]
 
 
     if not any(
-        keyword in p
-        for keyword in supply_chain_keywords
+        word in p
+        for word in domain_keywords
     ):
 
-        return (
-            """
-I am specialized in **Supply Chain Intelligence**.
+        explanation = (
+            "I am specialized strictly as a "
+            "**Supply Chain Domain Intelligence Assistant**.\n\n"
 
-Please ask a question about:
-
-- Purchase Orders
-- Suppliers
-- Shipments
-- Deliveries
-- Carriers
-- Shipping Modes
-- Warehouses
-- Products
-- Delivery Delays
-- Freight
-- Customs
-- Supplier Performance
-- Purchase Order Status
-""",
-            None
+            "I can answer questions about purchase orders, "
+            "suppliers, shipments, delivery performance, "
+            "carriers, logistics, products, warehouses, "
+            "shipping modes, delays, quality, and supply chain costs."
         )
 
+        return explanation, None
 
-    # ========================================================
-    # GENERAL SUPPLY CHAIN FALLBACK
-    # ========================================================
+
+    # =================================================================
+    # FALLBACK OVERVIEW
+    # =================================================================
 
     explanation = (
         "Here is a recent Supply Chain overview showing "
-        "purchase orders and shipment activity."
+        "purchase order and shipment activity."
     )
 
     sql = """
     SELECT
-        f.PURCHASE_ORDER_NUMBER,
-        f.PO_LINE_NUMBER,
-        p.PRODUCT_SKU,
-        p.PRODUCT_NAME,
-        s.SUPPLIER_NAME,
-        w.WAREHOUSE_NAME,
-        f.ORDERED_QUANTITY,
-        f.ORDERED_AMT,
-        f.RECEIVED_QUANTITY,
-        f.RECEIVED_AMT,
-        f.OPEN_QUANTITY,
-        f.IS_OPEN_PO_FLAG
-    FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE f
+        'PURCHASE_ORDERS' AS METRIC,
+        COUNT(DISTINCT PURCHASE_ORDER_NUMBER) AS VALUE
+    FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE
 
-    LEFT JOIN SUPPLY_CHAIN_DW.GOLD.DIM_PRODUCT p
-        ON f.PRODUCT_KEY = p.PRODUCT_KEY
+    UNION ALL
 
-    LEFT JOIN SUPPLY_CHAIN_DW.GOLD.DIM_SUPPLIER s
-        ON f.SUPPLIER_KEY = s.SUPPLIER_KEY
+    SELECT
+        'SHIPMENTS' AS METRIC,
+        COUNT(SHIPMENT_KEY) AS VALUE
+    FROM SUPPLY_CHAIN_DW.GOLD.FACT_SHIPMENT_DELIVERY
 
-    LEFT JOIN SUPPLY_CHAIN_DW.GOLD.DIM_WAREHOUSE w
-        ON f.WAREHOUSE_KEY = w.WAREHOUSE_KEY
+    UNION ALL
 
-    ORDER BY
-        f.ORDERED_AMT DESC
+    SELECT
+        'ORDERED_QUANTITY' AS METRIC,
+        SUM(ORDERED_QUANTITY) AS VALUE
+    FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE
 
-    LIMIT 20
+    UNION ALL
+
+    SELECT
+        'RECEIVED_QUANTITY' AS METRIC,
+        SUM(RECEIVED_QUANTITY) AS VALUE
+    FROM SUPPLY_CHAIN_DW.GOLD.FACT_PURCHASE_ORDER_LINE
     """
 
     return explanation, sql.strip()
 
 
-# ============================================================
-# SIDEBAR
-# ============================================================
+# ===================================================================
+# 13. SIDEBAR
+# ===================================================================
 
 with st.sidebar:
 
@@ -1496,9 +1465,7 @@ with st.sidebar:
     st.write("")
 
 
-    # --------------------------------------------------------
-    # NEW CHAT
-    # --------------------------------------------------------
+    # New Chat
 
     if st.button(
         "➕ New Chat",
@@ -1513,7 +1480,7 @@ with st.sidebar:
         st.session_state.current_session_id = new_id
 
         st.session_state.chat_sessions[new_id] = {
-            "title": "New Conversation",
+            "title": f"Chat {len(st.session_state.chat_sessions) + 1}",
             "messages": []
         }
 
@@ -1522,9 +1489,10 @@ with st.sidebar:
 
     st.markdown("---")
 
-    st.markdown(
-        "##### 🕒 Recent Conversations"
-    )
+
+    # Recent conversations
+
+    st.markdown("##### 🕒 Recent Conversations")
 
 
     for s_id, s_data in reversed(
@@ -1538,15 +1506,18 @@ with st.sidebar:
             st.session_state.current_session_id
         )
 
-        label = s_data["title"]
+        session_label = s_data["title"]
 
-        if len(label) > 20:
+        if len(session_label) > 20:
 
-            label = label[:18] + "..."
+            session_label = (
+                session_label[:18] +
+                "..."
+            )
 
 
         if st.button(
-            f"{'👉 ' if is_active else '🗨️ '}{label}",
+            f"{'👉 ' if is_active else '🗨️ '}{session_label}",
             key=f"sess_{s_id}",
             use_container_width=True
         ):
@@ -1559,6 +1530,8 @@ with st.sidebar:
     st.markdown("---")
 
 
+    # Clear all sessions
+
     if st.button(
         "🗑️ Clear All Sessions",
         use_container_width=True
@@ -1566,13 +1539,13 @@ with st.sidebar:
 
         st.session_state.chat_sessions = {}
 
-        new_id = datetime.now().strftime(
+        init_id = datetime.now().strftime(
             "%Y%m%d_%H%M%S"
         )
 
-        st.session_state.current_session_id = new_id
+        st.session_state.current_session_id = init_id
 
-        st.session_state.chat_sessions[new_id] = {
+        st.session_state.chat_sessions[init_id] = {
             "title": "New Conversation",
             "messages": []
         }
@@ -1580,9 +1553,9 @@ with st.sidebar:
         st.rerun()
 
 
-# ============================================================
-# STATIC MAIN TITLE
-# ============================================================
+# ===================================================================
+# 14. MAIN HEADER
+# ===================================================================
 
 head_col1, head_col2 = st.columns(
     [4.5, 1.2]
@@ -1591,15 +1564,14 @@ head_col1, head_col2 = st.columns(
 
 with head_col1:
 
-    # THIS IS STATIC
     st.title(
         "💬 Dilytics Supply Chain AI"
     )
 
     st.caption(
         "Ask questions in natural language to explore "
-        "suppliers, purchase orders, shipments, "
-        "deliveries, warehouses, carriers, and products."
+        "purchase orders, suppliers, shipments, delivery "
+        "performance, logistics, products, and warehouses."
     )
 
 
@@ -1609,7 +1581,8 @@ with head_col2:
 
     if st.button(
         "🔄 Reset Thread",
-        use_container_width=True
+        use_container_width=True,
+        help="Clear message history in this specific thread"
     ):
 
         st.session_state.chat_sessions[
@@ -1623,9 +1596,9 @@ with head_col2:
         st.rerun()
 
 
-# ============================================================
-# SUGGESTED QUESTIONS
-# ============================================================
+# ===================================================================
+# 15. WHAT CAN I ASK?
+# ===================================================================
 
 with st.expander(
     "💡 What exact questions can I ask this assistant?",
@@ -1633,114 +1606,101 @@ with st.expander(
 ):
 
     st.markdown(
-        "Here are some Supply Chain questions you can try:"
+        "This assistant is connected to the Supply Chain semantic model "
+        "and is programmed to answer the following questions."
     )
 
-    col1, col2 = st.columns(2)
+
+    col_a, col_b = st.columns(2)
 
 
-    with col1:
+    with col_a:
 
         st.markdown(
             """
-            ### 📋 Purchase Orders
+            **📋 Purchase Orders**
 
-            * "What is the total purchase order count?"
-
+            * "How many purchase orders do we have?"
             * "What is the total ordered quantity?"
-
-            * "What is the total ordered value?"
-
-            * "What is the total open commitment?"
-
+            * "What is the total received quantity?"
+            * "How many purchase orders are open?"
+            * "What is the total order value?"
             * "What is the total rejected value?"
+            * "What is the open quantity?"
 
-            * "What is the purchase order status breakdown?"
-
-            * "What is the purchase order value by supplier?"
-
-            * "What is the purchase order value by warehouse?"
-            """
-        )
-
-
-    with col2:
-
-        st.markdown(
-            """
-            ### 🚚 Shipments & Suppliers
-
-            * "What is the total number of shipments?"
-
-            * "How many shipments are currently in transit?"
-
-            * "How many shipments are delayed?"
-
-            * "What is the average delivery delay?"
-
-            * "What is the average delivery delay by supplier?"
-
-            * "What are the top delay reasons?"
+            **🏭 Suppliers**
 
             * "What is the supplier on-time delivery percentage?"
-
-            * "Which suppliers are high risk?"
+            * "What is the average delivery delay by supplier?"
+            * "How many suppliers are there by city?"
+            * "What are the high risk suppliers?"
+            * "What is the supplier quality?"
+            * "What is the supplier lead time?"
+            * "Show approved suppliers."
             """
         )
 
 
-    st.markdown("---")
+    with col_b:
 
-    st.markdown(
-        """
-        ### 🚢 Logistics & Products
+        st.markdown(
+            """
+            **🚚 Shipments & Logistics**
 
-        * "What is the total freight cost?"
+            * "How many shipments do we have?"
+            * "What is the shipment stage distribution?"
+            * "What are the shipment delays by reason?"
+            * "What is carrier performance?"
+            * "What are shipments by carrier?"
+            * "What are shipments by shipping mode?"
+            * "What is the freight cost by carrier?"
+            * "What is the landed cost by supplier?"
+            * "How many international shipments are there?"
+            * "How many damaged shipments are there?"
 
-        * "What is the total landed cost?"
+            **📦 Products & Warehouses**
 
-        * "What is freight cost by carrier?"
+            * "How many products are there in each category?"
+            * "How many products are there by subcategory?"
+            * "What are the top 10 products by weight?"
+            * "How many warehouses are there by city?"
+            """
+        )
 
-        * "What is the shipment count by shipping mode?"
 
-        * "What are the top products by ordered value?"
-
-        * "What is the ordered value by product category?"
-
-        * "What is the ordered quantity by product category?"
-
-        * "What is the ordered value by brand?"
-        """
+    st.info(
+        "💡 Pro-Tip: You can copy and paste any of these "
+        "questions directly into the chat bar."
     )
 
 
-# ============================================================
-# VERIFIED ONBOARDING QUESTIONS
-# ============================================================
+# ===================================================================
+# 16. VERIFIED ONBOARDING QUESTIONS
+# ===================================================================
 
 st.markdown(
     "##### 💡 Verified Onboarding Questions:"
 )
 
 
-q1, q2, q3, q4, q5 = st.columns(5)
+q_col1, q_col2, q_col3, q_col4, q_col5 = st.columns(5)
 
 
 quick_prompt = None
 
 
-if q1.button(
-    "📋 Total Purchase Orders",
+if q_col1.button(
+    "📋 Purchase Orders",
     use_container_width=True
 ):
 
     quick_prompt = (
-        "What is the total purchase order count?"
+        "How many purchase orders do we have?"
     )
 
 
-if q2.button(
-    "📦 Total Ordered Quantity",
+if q_col2.button(
+    "📦 Ordered Quantity",
     use_container_width=True
 ):
 
@@ -1749,8 +1709,8 @@ if q2.button(
     )
 
 
-if q3.button(
-    "⏱️ Supplier On-Time %",
+if q_col3.button(
+    "⏱️ Supplier On-Time",
     use_container_width=True
 ):
 
@@ -1759,8 +1719,18 @@ if q3.button(
     )
 
 
-if q4.button(
-    "❌ Total Rejected Value",
+if q_col4.button(
+    "🚚 Total Shipments",
+    use_container_width=True
+):
+
+    quick_prompt = (
+        "How many shipments do we have?"
+    )
+
+
+if q_col5.button(
+    "❌ Rejected Value",
     use_container_width=True
 ):
 
@@ -1769,19 +1739,9 @@ if q4.button(
     )
 
 
-if q5.button(
-    "🚚 Total Shipments",
-    use_container_width=True
-):
-
-    quick_prompt = (
-        "What is the total number of shipments?"
-    )
-
-
-# ============================================================
-# DISPLAY CHAT HISTORY
-# ============================================================
+# ===================================================================
+# 17. DISPLAY CHAT HISTORY
+# ===================================================================
 
 for idx, msg in enumerate(messages):
 
@@ -1811,10 +1771,9 @@ for idx, msg in enumerate(messages):
         if (
             "data" in msg
             and msg["data"] is not None
-            and not msg["data"].empty
         ):
 
-            tab1, tab2 = st.tabs(
+            tab_data, tab_chart = st.tabs(
                 [
                     "Data 📄",
                     "Chart 📈"
@@ -1822,7 +1781,7 @@ for idx, msg in enumerate(messages):
             )
 
 
-            with tab1:
+            with tab_data:
 
                 st.dataframe(
                     msg["data"],
@@ -1830,37 +1789,31 @@ for idx, msg in enumerate(messages):
                 )
 
 
-            with tab2:
+            with tab_chart:
 
                 display_chart_tab(
                     msg["data"],
-                    key_prefix=f"history_{current_id}_{idx}"
+                    key_prefix=f"hist_{current_id}_{idx}"
                 )
 
 
-# ============================================================
-# CHAT INPUT
-# ============================================================
+# ===================================================================
+# 18. USER INPUT
+# ===================================================================
 
 user_prompt = (
     st.chat_input(
-        "Ask about suppliers, purchase orders, "
-        "shipments, deliveries, warehouses, "
-        "carriers, or products..."
+        "Ask a question about purchase orders, suppliers, shipments, carriers, logistics, or products..."
     )
     or quick_prompt
 )
 
 
-# ============================================================
-# PROCESS QUESTION
-# ============================================================
+# ===================================================================
+# 19. PROCESS USER QUESTION
+# ===================================================================
 
 if user_prompt:
-
-    # --------------------------------------------------------
-    # CONVERSATION TITLE
-    # --------------------------------------------------------
 
     if len(messages) == 0:
 
@@ -1868,7 +1821,8 @@ if user_prompt:
             current_id
         ]["title"] = (
             user_prompt[:25]
-            + (
+            +
+            (
                 "..."
                 if len(user_prompt) > 25
                 else ""
@@ -1876,9 +1830,9 @@ if user_prompt:
         )
 
 
-    # --------------------------------------------------------
-    # SAVE USER MESSAGE
-    # --------------------------------------------------------
+    # ---------------------------------------------------------------
+    # User message
+    # ---------------------------------------------------------------
 
     messages.append(
         {
@@ -1895,9 +1849,9 @@ if user_prompt:
         )
 
 
-    # --------------------------------------------------------
-    # GENERATE SQL
-    # --------------------------------------------------------
+    # ---------------------------------------------------------------
+    # Assistant
+    # ---------------------------------------------------------------
 
     with st.chat_message("assistant"):
 
@@ -1916,10 +1870,6 @@ if user_prompt:
         df = None
 
 
-        # ----------------------------------------------------
-        # EXECUTE SQL
-        # ----------------------------------------------------
-
         if sql_query:
 
             with st.expander(
@@ -1935,23 +1885,20 @@ if user_prompt:
 
             try:
 
-                df = (
-                    session
-                    .sql(sql_query)
-                    .to_pandas()
-                )
+                with st.spinner(
+                    "Running Supply Chain analysis..."
+                ):
 
-
-                if df.empty:
-
-                    st.info(
-                        "The query executed successfully, "
-                        "but no records were returned."
+                    df = (
+                        session
+                        .sql(sql_query)
+                        .to_pandas()
                     )
 
-                else:
 
-                    tab1, tab2 = st.tabs(
+                if df is not None and not df.empty:
+
+                    tab_data, tab_chart = st.tabs(
                         [
                             "Data 📄",
                             "Chart 📈"
@@ -1959,7 +1906,7 @@ if user_prompt:
                     )
 
 
-                    with tab1:
+                    with tab_data:
 
                         st.dataframe(
                             df,
@@ -1967,12 +1914,19 @@ if user_prompt:
                         )
 
 
-                    with tab2:
+                    with tab_chart:
 
                         display_chart_tab(
                             df,
                             key_prefix=f"live_{current_id}"
                         )
+
+                else:
+
+                    st.info(
+                        "The query executed successfully "
+                        "but returned no rows."
+                    )
 
 
             except Exception as e:
@@ -1982,18 +1936,18 @@ if user_prompt:
                 )
 
 
-    # --------------------------------------------------------
-    # SAVE ASSISTANT MESSAGE
-    # --------------------------------------------------------
+        # -----------------------------------------------------------
+        # Save assistant message
+        # -----------------------------------------------------------
 
-    messages.append(
-        {
-            "role": "assistant",
-            "content": explanation,
-            "sql": sql_query,
-            "data": df
-        }
-    )
+        messages.append(
+            {
+                "role": "assistant",
+                "content": explanation,
+                "sql": sql_query,
+                "data": df
+            }
+        )
 
 
     st.rerun()
