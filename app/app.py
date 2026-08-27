@@ -24,48 +24,288 @@ st.markdown(
     """
     <style>
 
-    .status-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        background-color: #ecfdf5;
-        color: #065f46;
-        border: 1px solid #a7f3d0;
-        border-radius: 20px;
-        padding: 3px 10px;
-        font-size: 0.75rem;
-        font-weight: 600;
+    /* --------------------------------------------------------
+       GLOBAL PAGE
+       -------------------------------------------------------- */
+    html, body, [data-testid="stAppViewContainer"] {
+        background: #f4f8ff;
     }
 
-    div[data-testid="stButton"] > button {
-        border-radius: 8px;
+    section[data-testid="stMain"] {
+        background: #f4f8ff;
+    }
+
+    section[data-testid="stMain"] .block-container {
+        max-width: none !important;
+        padding-top: 92px !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        padding-bottom: 110px !important;
+    }
+
+    /* --------------------------------------------------------
+       FIXED MAIN HEADER
+       -------------------------------------------------------- */
+    .dilytics-topbar {
+        position: fixed;
+        top: 0;
+        left: 21rem;
+        right: 0;
+        height: 84px;
+        z-index: 999999;
+        background: #0759d9;
+        display: flex;
+        align-items: center;
+        padding: 0 28px 0 32px;
+        box-sizing: border-box;
+        box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+    }
+
+    .dilytics-topbar-title {
+        color: white;
+        font-size: 30px;
+        line-height: 1;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        margin-left: 0;
+    }
+
+    .dilytics-topbar-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 25px;
+        color: white;
+        font-size: 24px;
+    }
+
+    .topbar-bell {
+        font-size: 25px;
+    }
+
+    .topbar-help {
+        font-size: 22px;
         font-weight: 500;
     }
 
+    .topbar-user {
+        font-size: 22px;
+    }
 
-    /* ========================================================
-       DILYTICS LOGO - TOP LEFT OF SIDEBAR
-       ======================================================== */
+    /* --------------------------------------------------------
+       SIDEBAR
+       -------------------------------------------------------- */
+    section[data-testid="stSidebar"] {
+        width: 21rem !important;
+        min-width: 21rem !important;
+        background: #ffffff;
+        border-right: 1px solid #dbe4f0;
+    }
 
-    .dilytics-logo {
-        width: 200px;
-        height: 68px;
-        background-color: #ed0000;
+    section[data-testid="stSidebar"] > div {
+        padding-top: 0 !important;
+    }
 
+    .sidebar-logo {
+        width: 100%;
+        height: 84px;
+        display: flex;
+        align-items: center;
+        box-sizing: border-box;
+        padding: 0 28px;
+        background: #ffffff;
+    }
+
+    .sidebar-logo-box {
+        width: 170px;
+        height: 60px;
+        background: #ed0909;
         display: flex;
         align-items: center;
         justify-content: center;
-
         color: white;
-        font-size: 28px;
+        font-size: 25px;
         font-weight: 800;
-        letter-spacing: 1px;
+        letter-spacing: 0.4px;
+    }
 
-        margin-top: -8px;
-        margin-left: -10px;
-        margin-bottom: 28px;
+    .sidebar-content {
+        padding: 22px 20px 30px 20px;
+    }
 
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        background-color: #ecfdf5;
+        color: #087a59;
+        border: 1px solid #a7f3d0;
+        border-radius: 22px;
+        padding: 8px 14px;
+        font-size: 0.80rem;
+        font-weight: 650;
+    }
+
+    .status-dot {
+        font-size: 12px;
+    }
+
+    /* Sidebar separators */
+    section[data-testid="stSidebar"] hr {
+        margin: 24px 0 !important;
+        border-color: #dce4ee !important;
+    }
+
+    /* Sidebar buttons */
+    section[data-testid="stSidebar"] div[data-testid="stButton"] > button {
+        min-height: 48px;
+        border-radius: 8px;
+        border: 1px solid #d4deeb;
+        background: #ffffff;
+        color: #0b315f;
+        font-weight: 550;
+        font-size: 15px;
+    }
+
+    section[data-testid="stSidebar"] div[data-testid="stButton"] > button:hover {
+        border-color: #0b5ed7;
+        color: #0b5ed7;
+    }
+
+    /* --------------------------------------------------------
+       HERO
+       -------------------------------------------------------- */
+    .hero-panel {
+        width: 100%;
+        min-height: 350px;
         box-sizing: border-box;
+        background: linear-gradient(180deg, #edf5ff 0%, #e8f1ff 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding-top: 34px;
+        padding-bottom: 28px;
+    }
+
+    .bot-circle {
+        width: 76px;
+        height: 76px;
+        border-radius: 50%;
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 29px;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 25px rgba(40, 83, 135, 0.10);
+    }
+
+    .hero-title {
+        margin: 0;
+        color: #062c63;
+        font-size: 42px;
+        line-height: 1.15;
+        font-weight: 750;
+        letter-spacing: -0.8px;
+    }
+
+    .hero-line {
+        width: 82px;
+        height: 4px;
+        background: #0b5ed7;
+        margin: 18px 0 18px 0;
+    }
+
+    .hero-subtitle {
+        color: #153e70;
+        font-size: 17px;
+        line-height: 1.5;
+        margin: 0;
+    }
+
+    /* --------------------------------------------------------
+       MODULE CARDS
+       -------------------------------------------------------- */
+    .module-section {
+        background: #f4f8ff;
+        padding: 18px 18px 22px 18px;
+        box-sizing: border-box;
+    }
+
+    .module-card-title {
+        text-align: center;
+        color: #062c63;
+        font-weight: 700;
+        font-size: 16px;
+        line-height: 1.25;
+    }
+
+    .module-icon {
+        font-size: 39px;
+        line-height: 1;
+        margin-bottom: 10px;
+    }
+
+    div[data-testid="stHorizontalBlock"] .module-button-wrap {
+        width: 100%;
+    }
+
+    /* Module Streamlit buttons are the visible cards */
+    .module-row div[data-testid="stButton"] > button {
+        height: 126px !important;
+        min-height: 126px !important;
+        border-radius: 16px !important;
+        border: 1px solid #d5e2f3 !important;
+        background: #ffffff !important;
+        color: #062c63 !important;
+        box-shadow: 0 7px 18px rgba(45, 84, 130, 0.06) !important;
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        white-space: pre-line !important;
+        line-height: 1.3 !important;
+        padding: 12px 8px !important;
+    }
+
+    .module-row div[data-testid="stButton"] > button:hover {
+        border-color: #0b5ed7 !important;
+        color: #0b5ed7 !important;
+        transform: translateY(-1px);
+    }
+
+    /* --------------------------------------------------------
+       CHAT INPUT
+       -------------------------------------------------------- */
+    div[data-testid="stChatInput"] {
+        background: transparent !important;
+    }
+
+    div[data-testid="stChatInput"] > div {
+        border-radius: 18px !important;
+        border: 1px solid #cddbeb !important;
+        background: #ffffff !important;
+        box-shadow: 0 6px 20px rgba(39, 75, 117, 0.08) !important;
+    }
+
+    /* --------------------------------------------------------
+       RESPONSIVE
+       -------------------------------------------------------- */
+    @media (max-width: 900px) {
+        .dilytics-topbar {
+            left: 0;
+        }
+
+        .dilytics-topbar-title {
+            font-size: 22px;
+        }
+
+        .hero-title {
+            font-size: 32px;
+        }
+
+        .module-row {
+            gap: 8px;
+        }
     }
 
     </style>
@@ -223,6 +463,10 @@ messages = (
     .chat_sessions[current_id]["messages"]
 )
 
+# Selected module is UI state only. It does not change any
+# Snowflake logic or query-generation logic.
+if "selected_module" not in st.session_state:
+    st.session_state.selected_module = "Supply Chain"
 
 # ============================================================
 # CHART FUNCTION
@@ -1507,31 +1751,49 @@ Please ask a question about:
 
 
 # ============================================================
-# SIDEBAR
+# FIXED HEADER + SIDEBAR
 # ============================================================
+
+# Main-page fixed blue header.
+st.markdown(
+    """
+    <div class="dilytics-topbar">
+        <div class="dilytics-topbar-title">Dilytics Supply Chain AI</div>
+        <div class="dilytics-topbar-right">
+            <span class="topbar-bell">🔔</span>
+            <span class="topbar-help">?</span>
+            <span class="topbar-user">●</span>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# ------------------------------------------------------------
+# SIDEBAR
+# ------------------------------------------------------------
 
 with st.sidebar:
 
-    # ========================================================
-    # DILYTICS LOGO
-    # ========================================================
+    # DILYTICS logo stays at the very top of the sidebar.
+    st.markdown(
+        """
+        <div class="sidebar-logo">
+            <div class="sidebar-logo-box">DILYTICS</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    st.markdown("""
-    <div class="dilytics-logo">
-        DILYTICS
-    </div>
-    """, unsafe_allow_html=True)
-
-
-    st.markdown("### ⚡ Dilytics AI")
+    st.markdown('<div class="sidebar-content">', unsafe_allow_html=True)
 
     st.markdown(
-        '<span class="status-pill">● Supply Chain Semantic Mart Live</span>',
+        '<span class="status-pill"><span class="status-dot">●</span> Semantic Mart Live</span>',
         unsafe_allow_html=True
     )
 
     st.write("")
-
 
     # --------------------------------------------------------
     # NEW CHAT
@@ -1556,13 +1818,11 @@ with st.sidebar:
 
         st.rerun()
 
-
     st.markdown("---")
 
     st.markdown(
         "##### 🕒 Recent Conversations"
     )
-
 
     for s_id, s_data in reversed(
         list(
@@ -1578,9 +1838,7 @@ with st.sidebar:
         label = s_data["title"]
 
         if len(label) > 20:
-
             label = label[:18] + "..."
-
 
         if st.button(
             f"{'👉 ' if is_active else '🗨️ '}{label}",
@@ -1592,9 +1850,7 @@ with st.sidebar:
 
             st.rerun()
 
-
     st.markdown("---")
-
 
     if st.button(
         "🗑️ Clear All Sessions",
@@ -1616,48 +1872,112 @@ with st.sidebar:
 
         st.rerun()
 
+    st.markdown('</div>', unsafe_allow_html=True)
+
 
 # ============================================================
-# STATIC MAIN TITLE
+# HERO
 # ============================================================
 
-head_col1, head_col2 = st.columns(
-    [4.5, 1.2]
+module_titles = {
+    "Supply Chain": "Dilytics Supply Chain AI",
+    "Purchase Orders": "Purchase Orders Chatbot",
+    "Shipments & Deliveries": "Shipments & Deliveries Chatbot",
+    "Inventory & Warehouses": "Inventory & Warehouses Chatbot",
+    "Suppliers": "Suppliers Chatbot",
+    "Products": "Products Chatbot",
+    "Analytics & Reports": "Analytics & Reports Chatbot",
+}
+
+hero_title = module_titles.get(
+    st.session_state.selected_module,
+    "Dilytics Supply Chain AI"
+)
+
+st.markdown(
+    f"""
+    <div class="hero-panel">
+        <div class="bot-circle">🤖</div>
+        <div class="hero-title">{hero_title}</div>
+        <div class="hero-line"></div>
+        <div class="hero-subtitle">
+            Ask anything about your supply chain data in natural language.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
 )
 
 
-with head_col1:
+# ============================================================
+# MODULE CARDS
+# ============================================================
 
-    # THIS IS STATIC
-    st.title(
-        "💬 Dilytics Supply Chain AI"
-    )
+st.markdown('<div class="module-section">', unsafe_allow_html=True)
 
-    st.caption(
-        "Ask questions in natural language to explore "
-        "suppliers, purchase orders, shipments, "
-        "deliveries, warehouses, carriers, and products."
-    )
+st.markdown('<div class="module-row">', unsafe_allow_html=True)
 
+m1, m2, m3, m4, m5, m6 = st.columns(
+    [1, 1, 1, 1, 1, 1],
+    gap="small"
+)
 
-with head_col2:
-
-    st.write("")
-
+with m1:
     if st.button(
-        "🔄 Reset Thread",
+        "📋\nPurchase\nOrders",
+        key="module_purchase_orders",
         use_container_width=True
     ):
-
-        st.session_state.chat_sessions[
-            current_id
-        ]["messages"] = []
-
-        st.session_state.chat_sessions[
-            current_id
-        ]["title"] = "New Conversation"
-
+        st.session_state.selected_module = "Purchase Orders"
         st.rerun()
+
+with m2:
+    if st.button(
+        "🚚\nShipments\n& Deliveries",
+        key="module_shipments",
+        use_container_width=True
+    ):
+        st.session_state.selected_module = "Shipments & Deliveries"
+        st.rerun()
+
+with m3:
+    if st.button(
+        "📊\nInventory\n& Warehouses",
+        key="module_inventory",
+        use_container_width=True
+    ):
+        st.session_state.selected_module = "Inventory & Warehouses"
+        st.rerun()
+
+with m4:
+    if st.button(
+        "👥\nSuppliers",
+        key="module_suppliers",
+        use_container_width=True
+    ):
+        st.session_state.selected_module = "Suppliers"
+        st.rerun()
+
+with m5:
+    if st.button(
+        "📦\nProducts",
+        key="module_products",
+        use_container_width=True
+    ):
+        st.session_state.selected_module = "Products"
+        st.rerun()
+
+with m6:
+    if st.button(
+        "📈\nAnalytics\n& Reports",
+        key="module_analytics",
+        use_container_width=True
+    ):
+        st.session_state.selected_module = "Analytics & Reports"
+        st.rerun()
+
+st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ============================================================
@@ -1674,7 +1994,6 @@ with st.expander(
     )
 
     col1, col2 = st.columns(2)
-
 
     with col1:
 
@@ -1700,7 +2019,6 @@ with st.expander(
             """
         )
 
-
     with col2:
 
         st.markdown(
@@ -1724,7 +2042,6 @@ with st.expander(
             * "Which suppliers are high risk?"
             """
         )
-
 
     st.markdown("---")
 
@@ -1761,7 +2078,6 @@ st.markdown(
 
 
 q1, q2, q3, q4, q5 = st.columns(5)
-
 
 quick_prompt = None
 
