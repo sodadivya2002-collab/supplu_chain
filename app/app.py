@@ -79,7 +79,7 @@ if "authenticated" not in st.session_state:
 
     st.session_state.username = "PBCS"
 
-    st.session_state.password = ""
+    st.session_state.password = "Dilytics@1234"
 
     st.session_state.snowpark_session = None
  
