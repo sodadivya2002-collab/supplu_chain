@@ -14,11 +14,26 @@ st.set_page_config(
 
 
 # ============================================================
-# CSS
+# SESSION STATE
+# ============================================================
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "recent_chats" not in st.session_state:
+    st.session_state.recent_chats = []
+
+
+# ============================================================
+# COMPLETE CSS
 # ============================================================
 
 st.html("""
 <style>
+
+/* =========================================================
+   GLOBAL
+   ========================================================= */
 
 html, body {
     margin: 0;
@@ -33,7 +48,24 @@ html, body {
     padding-top: 0 !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
+    padding-bottom: 0 !important;
+    margin-top: 0 !important;
     max-width: 100% !important;
+}
+
+
+/* Hide Streamlit default elements */
+
+#MainMenu {
+    visibility: hidden;
+}
+
+footer {
+    visibility: hidden;
+}
+
+header {
+    visibility: hidden;
 }
 
 
@@ -43,58 +75,69 @@ html, body {
 
 .top-header {
     width: 100%;
-    height: 90px;
+    height: 70px;
 
     background: #0754d8;
 
     display: flex;
     align-items: center;
 
-    padding: 0 30px;
+    padding: 0 28px;
 
     box-sizing: border-box;
 }
 
 
-/* LOGO */
+/* =========================================================
+   DILYTICS LOGO
+   ========================================================= */
 
 .dilytics-logo {
     background: #d90000;
 
     color: white;
 
-    font-size: 27px;
+    font-size: 24px;
+
     font-weight: 800;
 
     letter-spacing: 1px;
 
-    padding: 9px 20px;
+    padding: 8px 18px;
 
-    min-width: 175px;
+    min-width: 160px;
 
     text-align: center;
+
+    box-sizing: border-box;
 }
 
 
-/* DIVIDER */
+/* =========================================================
+   HEADER DIVIDER
+   ========================================================= */
 
 .header-divider {
     width: 2px;
-    height: 48px;
+
+    height: 40px;
 
     background: rgba(255,255,255,0.65);
 
-    margin-left: 30px;
-    margin-right: 30px;
+    margin-left: 25px;
+
+    margin-right: 25px;
 }
 
 
-/* TITLE */
+/* =========================================================
+   HEADER TITLE
+   ========================================================= */
 
 .header-title {
     color: white;
 
-    font-size: 31px;
+    font-size: 27px;
 
     font-weight: 700;
 
@@ -102,7 +145,9 @@ html, body {
 }
 
 
-/* RIGHT SIDE */
+/* =========================================================
+   HEADER RIGHT
+   ========================================================= */
 
 .header-right {
     margin-left: auto;
@@ -111,11 +156,11 @@ html, body {
 
     align-items: center;
 
-    gap: 25px;
+    gap: 22px;
 
     color: white;
 
-    font-size: 24px;
+    font-size: 21px;
 }
 
 
@@ -133,11 +178,17 @@ section[data-testid="stSidebar"] {
 
 section[data-testid="stSidebar"] > div {
 
-    padding-top: 20px;
+    padding-top: 18px;
+
+    padding-left: 14px;
+
+    padding-right: 14px;
 }
 
 
-/* STATUS */
+/* =========================================================
+   SIDEBAR STATUS
+   ========================================================= */
 
 .semantic-status {
 
@@ -155,11 +206,13 @@ section[data-testid="stSidebar"] > div {
 
     border-radius: 20px;
 
-    padding: 7px 14px;
+    padding: 7px 13px;
 
     font-size: 13px;
 
     font-weight: 600;
+
+    margin-bottom: 18px;
 }
 
 
@@ -175,31 +228,43 @@ section[data-testid="stSidebar"] > div {
 }
 
 
-/* NEW CHAT */
+/* =========================================================
+   SIDEBAR BUTTONS
+   ========================================================= */
 
-div[data-testid="stSidebar"] button {
+section[data-testid="stSidebar"] .stButton > button {
+
+    height: 42px;
 
     border-radius: 8px;
+
+    font-size: 14px;
+
+    font-weight: 500;
 }
 
 
-/* SIDEBAR HEADINGS */
+/* =========================================================
+   SIDEBAR HEADINGS
+   ========================================================= */
 
 .sidebar-heading {
 
     color: #13284d;
 
-    font-size: 15px;
+    font-size: 14px;
 
     font-weight: 700;
 
-    margin-top: 20px;
+    margin-top: 17px;
 
-    margin-bottom: 12px;
+    margin-bottom: 10px;
 }
 
 
-/* DIVIDER */
+/* =========================================================
+   SIDEBAR DIVIDER
+   ========================================================= */
 
 .sidebar-line {
 
@@ -207,11 +272,27 @@ div[data-testid="stSidebar"] button {
 
     background: #dce4ee;
 
-    margin: 20px 0;
+    margin: 17px 0;
 }
 
 
-/* QUICK LINKS */
+/* =========================================================
+   RECENT CHAT
+   ========================================================= */
+
+.recent-chat {
+
+    color: #66738a;
+
+    font-size: 13px;
+
+    padding: 7px 2px;
+}
+
+
+/* =========================================================
+   QUICK LINKS
+   ========================================================= */
 
 .quick-link {
 
@@ -221,11 +302,11 @@ div[data-testid="stSidebar"] button {
 
     justify-content: space-between;
 
-    padding: 9px 3px;
+    padding: 8px 3px;
 
     color: #1a2b4d;
 
-    font-size: 14px;
+    font-size: 13px;
 }
 
 
@@ -235,27 +316,29 @@ div[data-testid="stSidebar"] button {
 
     align-items: center;
 
-    gap: 10px;
+    gap: 9px;
 }
 
 
 /* =========================================================
-   MAIN CONTENT
+   MAIN AREA
    ========================================================= */
 
 .main-wrapper {
 
+    width: 100%;
+
     background:
         radial-gradient(
-            circle at 50% 30%,
+            circle at 50% 25%,
             #ffffff 0%,
             #eef5ff 55%,
             #e4efff 100%
         );
 
-    min-height: calc(100vh - 90px);
+    min-height: calc(100vh - 70px);
 
-    padding: 50px 45px 40px 45px;
+    padding: 28px 35px 25px 35px;
 
     box-sizing: border-box;
 }
@@ -269,21 +352,23 @@ div[data-testid="stSidebar"] button {
 
     text-align: center;
 
-    max-width: 1100px;
+    max-width: 1050px;
 
     margin: 0 auto;
 }
 
 
-/* BOT */
+/* =========================================================
+   BOT ICON
+   ========================================================= */
 
 .bot-circle {
 
-    width: 82px;
+    width: 60px;
 
-    height: 82px;
+    height: 60px;
 
-    margin: 0 auto 22px auto;
+    margin: 0 auto 14px auto;
 
     background: white;
 
@@ -295,57 +380,81 @@ div[data-testid="stSidebar"] button {
 
     justify-content: center;
 
-    font-size: 42px;
+    font-size: 30px;
 
     box-shadow:
-        0 8px 25px rgba(20,70,150,0.12);
+        0 6px 18px rgba(20,70,150,0.10);
 }
 
 
-/* TITLE */
+/* =========================================================
+   HERO TITLE
+   ========================================================= */
 
 .hero-title {
 
     margin: 0;
 
+    padding: 0;
+
     color: #12284f;
 
-    font-size: 50px;
+    font-size: 38px;
 
     font-weight: 750;
 
     line-height: 1.15;
+
+    white-space: nowrap;
 }
 
 
-/* BLUE LINE */
+/* =========================================================
+   TITLE LINE
+   ========================================================= */
 
 .title-line {
 
-    width: 150px;
+    width: 120px;
 
-    height: 4px;
+    height: 3px;
 
     background: #0754d8;
 
-    margin: 22px auto;
+    margin: 15px auto 15px auto;
 }
 
 
-/* SUBTITLE */
+/* =========================================================
+   HERO SUBTITLE
+   ========================================================= */
 
 .hero-subtitle {
 
     color: #31486c;
 
-    font-size: 19px;
+    font-size: 16px;
 
-    margin-bottom: 35px;
+    margin: 0 auto;
+
+    line-height: 1.4;
 }
 
 
 /* =========================================================
-   QUESTION CARDS
+   QUESTION CARDS AREA
+   ========================================================= */
+
+.cards-area {
+
+    max-width: 1050px;
+
+    margin: 25px auto 0 auto;
+}
+
+
+/* =========================================================
+   QUESTION CARD
    ========================================================= */
 
 .question-card {
@@ -354,9 +463,9 @@ div[data-testid="stSidebar"] button {
 
     border: 1px solid #dce5f2;
 
-    border-radius: 16px;
+    border-radius: 13px;
 
-    min-height: 145px;
+    height: 108px;
 
     display: flex;
 
@@ -368,31 +477,22 @@ div[data-testid="stSidebar"] button {
 
     text-align: center;
 
-    padding: 15px;
+    padding: 8px;
 
     box-sizing: border-box;
 
     box-shadow:
-        0 5px 18px rgba(30,70,140,0.07);
-
-    transition: 0.2s;
-}
-
-
-.question-card:hover {
-
-    transform: translateY(-3px);
-
-    box-shadow:
-        0 10px 25px rgba(30,70,140,0.12);
+        0 4px 14px rgba(30,70,140,0.06);
 }
 
 
 .question-icon {
 
-    font-size: 36px;
+    font-size: 28px;
 
-    margin-bottom: 12px;
+    line-height: 1;
+
+    margin-bottom: 8px;
 }
 
 
@@ -400,9 +500,23 @@ div[data-testid="stSidebar"] button {
 
     color: #12284f;
 
-    font-size: 16px;
+    font-size: 13px;
 
     font-weight: 650;
+
+    line-height: 1.25;
+}
+
+
+/* =========================================================
+   SEARCH CONTAINER
+   ========================================================= */
+
+.search-container {
+
+    max-width: 1050px;
+
+    margin: 32px auto 0 auto;
 }
 
 
@@ -410,50 +524,38 @@ div[data-testid="stSidebar"] button {
    SEARCH BAR
    ========================================================= */
 
-.search-container {
-
-    max-width: 1050px;
-
-    margin: 65px auto 0 auto;
-
-    position: relative;
-}
-
-
-/* GOOGLE STYLE SEARCH */
-
 .search-box {
 
     width: 100%;
 
-    height: 62px;
+    height: 54px;
 
     background: white;
 
     border: 1px solid #d4dce8;
 
-    border-radius: 35px;
+    border-radius: 30px;
 
     display: flex;
 
     align-items: center;
 
-    padding: 0 12px 0 22px;
+    padding: 0 9px 0 20px;
 
     box-sizing: border-box;
 
     box-shadow:
-        0 4px 15px rgba(20,70,140,0.10);
+        0 4px 15px rgba(20,70,140,0.09);
 }
 
 
 .search-icon {
 
-    font-size: 23px;
+    font-size: 21px;
 
     color: #68778e;
 
-    margin-right: 13px;
+    margin-right: 11px;
 }
 
 
@@ -463,15 +565,21 @@ div[data-testid="stSidebar"] button {
 
     color: #8490a2;
 
-    font-size: 16px;
+    font-size: 14px;
+
+    overflow: hidden;
+
+    white-space: nowrap;
+
+    text-overflow: ellipsis;
 }
 
 
 .search-button {
 
-    width: 45px;
+    width: 38px;
 
-    height: 45px;
+    height: 38px;
 
     border-radius: 50%;
 
@@ -485,7 +593,50 @@ div[data-testid="stSidebar"] button {
 
     justify-content: center;
 
-    font-size: 21px;
+    font-size: 17px;
+}
+
+
+/* =========================================================
+   STREAMLIT CHAT INPUT
+   ========================================================= */
+
+div[data-testid="stChatInput"] {
+
+    max-width: 1050px;
+
+    margin-left: auto;
+
+    margin-right: auto;
+}
+
+
+div[data-testid="stChatInput"] textarea {
+
+    border-radius: 30px !important;
+}
+
+
+/* =========================================================
+   CHAT MESSAGE
+   ========================================================= */
+
+.chat-message {
+
+    max-width: 1050px;
+
+    margin: 18px auto;
+
+    padding: 16px 20px;
+
+    background: white;
+
+    border: 1px solid #e0e7f1;
+
+    border-radius: 13px;
+
+    box-shadow:
+        0 4px 15px rgba(30,70,140,0.06);
 }
 
 
@@ -496,12 +647,36 @@ div[data-testid="stSidebar"] button {
 @media (max-width: 1100px) {
 
     .hero-title {
-        font-size: 42px;
+        font-size: 32px;
     }
 
     .header-title {
-        font-size: 25px;
+        font-size: 23px;
     }
+
+}
+
+
+@media (max-width: 800px) {
+
+    .hero-title {
+        font-size: 28px;
+        white-space: normal;
+    }
+
+    .header-title {
+        display: none;
+    }
+
+    .header-divider {
+        display: none;
+    }
+
+    .main-wrapper {
+        padding-left: 18px;
+        padding-right: 18px;
+    }
+
 }
 
 </style>
@@ -549,9 +724,6 @@ with st.sidebar:
     """)
 
 
-    st.write("")
-
-
     if st.button(
         "＋  New Chat",
         use_container_width=True
@@ -571,9 +743,30 @@ with st.sidebar:
     """)
 
 
-    st.caption(
-        "No recent conversations"
-    )
+    if st.session_state.recent_chats:
+
+        for chat in reversed(
+            st.session_state.recent_chats[-5:]
+        ):
+
+            short_chat = chat
+
+            if len(short_chat) > 35:
+                short_chat = short_chat[:35] + "..."
+
+            st.html(f"""
+            <div class="recent-chat">
+                💬 &nbsp; {short_chat}
+            </div>
+            """)
+
+    else:
+
+        st.html("""
+        <div class="recent-chat">
+            No recent conversations
+        </div>
+        """)
 
 
     st.html("""
@@ -584,8 +777,6 @@ with st.sidebar:
     </div>
     """)
 
-
-    # Quick links
 
     quick_links = [
 
@@ -637,11 +828,13 @@ with st.sidebar:
 
         st.session_state.messages = []
 
+        st.session_state.recent_chats = []
+
         st.rerun()
 
 
 # ============================================================
-# MAIN AREA
+# MAIN HERO
 # ============================================================
 
 st.html("""
@@ -660,8 +853,7 @@ st.html("""
         <div class="title-line"></div>
 
         <div class="hero-subtitle">
-            Ask anything about your supply chain
-            data in natural language.
+            Ask anything about your supply chain data in natural language.
         </div>
 
     </div>
@@ -674,25 +866,31 @@ st.html("""
 # QUESTION CARDS
 # ============================================================
 
+st.html("""
+<div class="cards-area">
+</div>
+""")
+
+
 col1, col2, col3, col4, col5, col6 = st.columns(
     6,
-    gap="medium"
+    gap="small"
 )
 
 
 cards = [
 
-    ("📋", "Purchase Orders"),
+    ("📋", "Purchase<br>Orders"),
 
-    ("🚚", "Shipments & Deliveries"),
+    ("🚚", "Shipments<br>& Deliveries"),
 
-    ("📊", "Inventory & Warehouses"),
+    ("📊", "Inventory<br>& Warehouses"),
 
     ("👥", "Suppliers"),
 
     ("📦", "Products"),
 
-    ("📈", "Analytics & Reports")
+    ("📈", "Analytics<br>& Reports")
 
 ]
 
@@ -727,7 +925,7 @@ for col, (icon, title) in zip(
 
 
 # ============================================================
-# SEARCH BAR
+# SEARCH BAR VISUAL
 # ============================================================
 
 st.html("""
@@ -740,9 +938,7 @@ st.html("""
         </div>
 
         <div class="search-placeholder">
-            Ask a question about suppliers, purchase orders,
-            shipments, deliveries, warehouses, carriers,
-            products, or inventory...
+            Ask your supply chain question...
         </div>
 
         <div class="search-button">
@@ -756,22 +952,21 @@ st.html("""
 
 
 # ============================================================
-# ACTUAL STREAMLIT SEARCH INPUT
+# ACTUAL CHAT INPUT
 # ============================================================
-
-st.write("")
 
 question = st.chat_input(
     "Ask your supply chain question..."
 )
 
 
+# ============================================================
+# YOUR EXISTING AGENT LOGIC
+# ============================================================
+
 if question:
 
-    if "messages" not in st.session_state:
-
-        st.session_state.messages = []
-
+    # Save question
 
     st.session_state.messages.append(
         {
@@ -781,25 +976,32 @@ if question:
     )
 
 
-    with st.chat_message("user"):
+    # Save recent conversation
 
-        st.write(question)
+    st.session_state.recent_chats.append(
+        question
+    )
 
 
-    # --------------------------------------------------------
-    # CONNECT YOUR EXISTING AGENT / SNOWFLAKE CODE HERE
-    # --------------------------------------------------------
+    # ========================================================
+    # PUT YOUR EXISTING WORKING AGENT CODE HERE
+    # ========================================================
+
+    # Example response only.
+    #
+    # Replace this with your Snowflake Agent call.
+    #
+    # response = your_agent_function(question)
 
     response = (
-        "Your Supply Chain AI is ready to process: "
+        "Your Supply Chain AI received your question:\n\n"
         + question
     )
 
 
-    with st.chat_message("assistant"):
-
-        st.write(response)
-
+    # ========================================================
+    # SAVE RESPONSE
+    # ========================================================
 
     st.session_state.messages.append(
         {
@@ -807,3 +1009,60 @@ if question:
             "content": response
         }
     )
+
+
+# ============================================================
+# DISPLAY CHAT HISTORY
+# ============================================================
+
+if st.session_state.messages:
+
+    for message in st.session_state.messages:
+
+        if message["role"] == "user":
+
+            st.markdown(
+                f"""
+                <div class="chat-message">
+
+                    <b style="color:#0754d8;">
+                        👤 You
+                    </b>
+
+                    <div style="
+                        margin-top:7px;
+                        color:#172b50;
+                        font-size:15px;
+                    ">
+                        {message["content"]}
+                    </div>
+
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+
+        else:
+
+            st.markdown(
+                f"""
+                <div class="chat-message">
+
+                    <b style="color:#0754d8;">
+                        🤖 Dilytics AI
+                    </b>
+
+                    <div style="
+                        margin-top:7px;
+                        color:#172b50;
+                        font-size:15px;
+                        line-height:1.5;
+                    ">
+                        {message["content"]}
+                    </div>
+
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
