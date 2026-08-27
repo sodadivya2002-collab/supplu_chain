@@ -42,6 +42,32 @@ st.markdown(
         font-weight: 500;
     }
 
+
+    /* ========================================================
+       DILYTICS LOGO - TOP LEFT OF SIDEBAR
+       ======================================================== */
+
+    .dilytics-logo {
+        width: 200px;
+        height: 68px;
+        background-color: #ed0000;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        color: white;
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: 1px;
+
+        margin-top: -8px;
+        margin-left: -10px;
+        margin-bottom: 28px;
+
+        box-sizing: border-box;
+    }
+
     </style>
     """,
     unsafe_allow_html=True
@@ -1485,6 +1511,17 @@ Please ask a question about:
 # ============================================================
 
 with st.sidebar:
+
+    # ========================================================
+    # DILYTICS LOGO
+    # ========================================================
+
+    st.markdown("""
+    <div class="dilytics-logo">
+        DILYTICS
+    </div>
+    """, unsafe_allow_html=True)
+
 
     st.markdown("### ⚡ Dilytics AI")
 
