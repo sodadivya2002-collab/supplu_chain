@@ -45,14 +45,16 @@ st.markdown(
         min-height: 100vh;
     }
 
-    /* ---------- Floating white card ---------- */
+    /* ---------- Static, fixed-position white card ---------- */
     .block-container {
         background: #ffffff;
         border-radius: 28px;
         box-shadow: 0 30px 80px rgba(30,20,80,0.16);
-        padding: 34px 42px 30px 42px !important;
+        padding: 30px 42px 24px 42px !important;
         max-width: 980px;
-        margin: 36px auto 60px auto !important;
+        height: calc(100vh - 150px);
+        overflow-y: auto;
+        margin: 40px auto 110px auto !important;
         position: relative;
     }
 
@@ -127,23 +129,27 @@ st.markdown(
         color: #9494ab;
         font-size: 0.85rem;
         font-weight: 500;
+        flex: 1;
+        text-align: center;
     }
-    .nix-status {
-        background: #14162b;
+    .nix-logo {
+        background: #d6231c;
         color: #ffffff;
-        font-size: 0.78rem;
-        font-weight: 600;
+        font-weight: 800;
+        letter-spacing: 1px;
         padding: 8px 16px;
-        border-radius: 20px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        flex-shrink: 0;
+    }
+    .nix-logo img {
+        height: 26px;
+        display: block;
     }
 
     /* ---------- Hero greeting ---------- */
     .nix-hero-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
         margin-bottom: 28px;
-        gap: 20px;
     }
     .nix-hero-row h1 {
         font-size: 1.9rem;
@@ -155,55 +161,37 @@ st.markdown(
     .nix-hero-row h1 span {
         font-weight: 800;
     }
-    .nix-mascot-wrap {
-        display: flex;
-        align-items: flex-start;
-        gap: 10px;
-        flex-shrink: 0;
-    }
-    .nix-bubble {
-        background: #ffffff;
-        border: 1px solid #eee;
-        box-shadow: 0 6px 16px rgba(0,0,0,0.08);
-        border-radius: 14px;
-        padding: 9px 13px;
-        font-size: 0.72rem;
-        color: #333;
-        max-width: 140px;
-        margin-top: 6px;
-    }
-    .nix-mascot {
-        font-size: 3rem;
-        line-height: 1;
-    }
 
-    /* ---------- Feature cards ---------- */
-    .st-key-feature_cards div[data-testid="stButton"] > button {
-        height: 176px;
-        width: 100%;
+    /* ---------- Static info cards ---------- */
+    .nix-info-cards {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+    }
+    .nix-info-card {
         background: #ffffff;
         border: 1px solid #eef0f7;
         border-radius: 16px;
-        text-align: left;
-        align-items: flex-start;
-        justify-content: flex-start;
         padding: 20px 18px;
-        white-space: pre-line;
+        box-shadow: 0 6px 18px rgba(20,20,50,0.05);
+    }
+    .nix-info-card .icon {
+        font-size: 1.6rem;
+        margin-bottom: 10px;
+    }
+    .nix-info-card .desc {
         color: #23233a;
         font-weight: 500;
         font-size: 0.85rem;
         line-height: 1.55;
-        box-shadow: 0 6px 18px rgba(20,20,50,0.05);
+        margin-bottom: 14px;
     }
-    .st-key-feature_cards div[data-testid="stButton"] > button p {
-        white-space: pre-line;
-    }
-    .st-key-feature_cards div[data-testid="stButton"] > button p::first-line {
-        font-size: 1.6rem;
-    }
-    .st-key-feature_cards div[data-testid="stButton"] > button:hover {
-        border-color: #b9b3f5;
-        background: #fbfaff;
+    .nix-info-card .caption {
+        color: #9494ab;
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
     }
 
     /* ---------- Bottom links row ---------- */
@@ -215,30 +203,27 @@ st.markdown(
         margin: 26px 4px 8px 4px;
     }
 
-    /* ---------- Chat input (rounded pill) ---------- */
+    /* ---------- Chat input: compact, centered, Google-style pill ---------- */
     div[data-testid="stChatInput"] {
-        border-radius: 30px !important;
-        border: 1px solid #e6e4f5 !important;
-        box-shadow: 0 4px 16px rgba(20,20,60,0.06);
+        border-radius: 24px !important;
+        border: 1px solid #dfe1e5 !important;
+        box-shadow: 0 1px 6px rgba(32,33,36,0.12) !important;
+        max-width: 480px !important;
+        margin: 0 auto !important;
+        background: #ffffff !important;
+        transition: box-shadow 0.15s ease;
+    }
+    div[data-testid="stChatInput"]:hover,
+    div[data-testid="stChatInput"]:focus-within {
+        box-shadow: 0 2px 10px rgba(32,33,36,0.20) !important;
     }
     div[data-testid="stChatInput"] textarea {
-        font-size: 0.9rem;
+        font-size: 0.85rem;
+        min-height: 20px !important;
     }
-
-    /* ---------- Suggestion pills ---------- */
-    .st-key-suggestion_pills div[data-testid="stButton"] > button,
-    .st-key-suggestion_pills div[data-testid="stPopover"] > div > button {
-        background: #14162b;
-        color: #ffffff;
-        border-radius: 20px;
-        font-size: 0.78rem;
-        font-weight: 500;
-        padding: 9px 16px;
-        border: none;
-    }
-    .st-key-suggestion_pills div[data-testid="stButton"] > button:hover,
-    .st-key-suggestion_pills div[data-testid="stPopover"] > div > button:hover {
-        background: #2b2e52;
+    div[data-testid="stBottomBlockContainer"],
+    div[data-testid="stBottom"] {
+        background: transparent !important;
     }
 
     /* ---------- Floating logo badge ---------- */
@@ -1784,7 +1769,7 @@ with st.sidebar:
         st.rerun()
 
 
-    with st.popover("🔍", use_container_width=False):
+    with st.popover("🔍", use_container_width=False, help="Search"):
 
         st.markdown("**Quick Links**")
 
@@ -1803,7 +1788,7 @@ with st.sidebar:
                     rail_quick_prompt = q_prompt
 
 
-    with st.popover("🕒", use_container_width=False):
+    with st.popover("🕒", use_container_width=False, help="Recent Conversations"):
 
         st.markdown("**Recent Conversations**")
 
@@ -1854,7 +1839,7 @@ with st.sidebar:
             st.rerun()
 
 
-    with st.popover("❔", use_container_width=False):
+    with st.popover("❓", use_container_width=False, help="Help"):
 
         help_text, _ = generate_sql_from_prompt("help")
 
@@ -1879,9 +1864,8 @@ current_title = (
 st.markdown(
     f"""
     <div class="nix-topbar">
-        <span class="nix-pill">✨ Dilytics AI ⌄</span>
+        <span class="nix-logo">DILYTICS</span>
         <span class="nix-title">{current_title}</span>
-        <span class="nix-status">● Live</span>
     </div>
     """,
     unsafe_allow_html=True
@@ -1892,67 +1876,39 @@ st.markdown(
 # HERO SECTION  (only shown when the current chat is empty)
 # ============================================================
 
-hero_quick_prompt = None
-
 if len(messages) == 0:
 
-    display_name = st.session_state.username or "there"
-
     st.markdown(
-        f"""
+        """
         <div class="nix-hero-row">
-            <h1>Hi {display_name}, <span>Ready to Explore<br/>Your Supply Chain?</span></h1>
-            <div class="nix-mascot-wrap">
-                <div class="nix-bubble">Hey there! 👋<br/>Need a boost?</div>
-                <div class="nix-mascot">🤖</div>
-            </div>
+            <h1>Hello, <span>Ready to Explore<br/>Your Supply Chain?</span></h1>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    feature_cards = [
-        (
-            "📋",
-            "Track purchase orders, monitor suppliers, and "
-            "manage approvals — all in sync.",
-            "Fast Start",
-            "What is the total purchase order count?"
-        ),
-        (
-            "🚚",
-            "Stay on top of shipments, delays, and carriers. "
-            "Boost visibility with AI insights.",
-            "Live Tracking",
-            "What is the total number of shipments?"
-        ),
-        (
-            "📦",
-            "Analyze products and spend efficiently, and stay "
-            "ahead of supplier risk.",
-            "Analytics",
-            "What are the top products by ordered value?"
-        ),
-    ]
-
-    with st.container(key="feature_cards"):
-
-        card_cols = st.columns(3)
-
-        for col, (icon, desc, caption, q_prompt) in zip(
-            card_cols,
-            feature_cards
-        ):
-
-            with col:
-
-                if st.button(
-                    f"{icon}\n{desc}\n\n{caption}",
-                    key=f"feature_{caption}",
-                    use_container_width=True
-                ):
-
-                    hero_quick_prompt = q_prompt
+    st.markdown(
+        """
+        <div class="nix-info-cards">
+            <div class="nix-info-card">
+                <div class="icon">📋</div>
+                <div class="desc">Track purchase orders, monitor suppliers, and manage approvals — all in sync.</div>
+                <div class="caption">Fast Start</div>
+            </div>
+            <div class="nix-info-card">
+                <div class="icon">🚚</div>
+                <div class="desc">Stay on top of shipments, delays, and carriers. Boost visibility with AI insights.</div>
+                <div class="caption">Live Tracking</div>
+            </div>
+            <div class="nix-info-card">
+                <div class="icon">📦</div>
+                <div class="desc">Analyze products and spend efficiently, and stay ahead of supplier risk.</div>
+                <div class="caption">Analytics</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 # ============================================================
@@ -2029,47 +1985,8 @@ st.markdown(
 )
 
 chat_prompt = st.chat_input(
-    "Example: \"What is the total ordered value?\""
+    "Search supply chain data..."
 )
-
-pills_quick_prompt = None
-
-with st.container(key="suggestion_pills"):
-
-    pill_cols = st.columns(5)
-
-    pill_definitions = [
-        ("📋 Purchase Orders", "What is the total purchase order count?"),
-        ("🚚 Shipments", "What is the total number of shipments?"),
-        ("🏭 Suppliers", "What is the supplier on-time delivery percentage?"),
-        ("📦 Products", "What are the top products by ordered value?"),
-    ]
-
-    for col, (label, q_prompt) in zip(pill_cols[:4], pill_definitions):
-
-        with col:
-
-            if st.button(label, key=f"pill_{label}", use_container_width=True):
-
-                pills_quick_prompt = q_prompt
-
-    with pill_cols[4]:
-
-        with st.popover("⋯ More", use_container_width=True):
-
-            for category, items in QUICK_LINK_CATEGORIES.items():
-
-                st.markdown(f"###### {category}")
-
-                for label, q_prompt in items:
-
-                    if st.button(
-                        label,
-                        key=f"pillmore_{category}_{label}",
-                        use_container_width=True
-                    ):
-
-                        pills_quick_prompt = q_prompt
 
 
 # ============================================================
@@ -2078,8 +1995,6 @@ with st.container(key="suggestion_pills"):
 
 user_prompt = (
     chat_prompt
-    or hero_quick_prompt
-    or pills_quick_prompt
     or rail_quick_prompt
 )
 
