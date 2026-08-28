@@ -23,7 +23,7 @@ ROLE = "ACCOUNTADMIN"
 # YAML file should be in the same folder as this Python file
 YAML_FILE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    "SUPPLY_CHAIN_SEMANTIC.yaml"
+    "https://app.snowflake.com/xyuhkav/xrb12650/#/cortex/analyst/databases/SUPPLY_CHAIN_DW/schemas/GOLD/semanticView/SUPPLY_CHAIN_SEMANTIC/edit"
 )
 
 
