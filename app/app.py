@@ -17,7 +17,7 @@ st.set_page_config(
 
 
 # ============================================================
-# CUSTOM CSS  (navbar / sidebar / hero / cards / chat input)
+# CUSTOM CSS  (gradient backdrop / floating card / icon rail)
 # ============================================================
 
 st.markdown(
@@ -31,223 +31,242 @@ st.markdown(
         background: transparent;
         height: 0px;
     }
-    .block-container {
-        padding-top: 86px !important;
-        max-width: 1100px;
-    }
-    section[data-testid="stSidebar"] > div:first-child {
-        padding-top: 78px;
-    }
-    body, [class*="css"] {
+    html, body {
         font-family: "Inter", "Segoe UI", sans-serif;
     }
 
-    /* ---------- Top navbar ---------- */
-    .dily-navbar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 62px;
-        background: linear-gradient(90deg, #0b1a63 0%, #14237f 100%);
+    /* ---------- Diffuse gradient backdrop ---------- */
+    .stApp {
+        background:
+            radial-gradient(circle at 12% 15%, rgba(196,181,253,0.55), transparent 42%),
+            radial-gradient(circle at 88% 10%, rgba(147,197,253,0.45), transparent 45%),
+            radial-gradient(circle at 50% 95%, rgba(233,213,255,0.55), transparent 55%),
+            linear-gradient(180deg, #eef1fb 0%, #e6eafa 100%);
+        min-height: 100vh;
+    }
+
+    /* ---------- Floating white card ---------- */
+    .block-container {
+        background: #ffffff;
+        border-radius: 28px;
+        box-shadow: 0 30px 80px rgba(30,20,80,0.16);
+        padding: 34px 42px 30px 42px !important;
+        max-width: 980px;
+        margin: 36px auto 60px auto !important;
+        position: relative;
+    }
+
+    /* ---------- Icon rail (sidebar) ---------- */
+    section[data-testid="stSidebar"] {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        width: 84px !important;
+        min-width: 84px !important;
+    }
+    section[data-testid="stSidebar"] > div:first-child {
+        width: 84px !important;
+        padding-top: 56px;
+        background: transparent;
+    }
+    section[data-testid="stSidebar"] div[data-testid="stButton"] > button {
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        background: #14162b;
+        color: #ffffff;
+        font-size: 1.05rem;
+        border: none;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 14px auto;
+        box-shadow: 0 6px 14px rgba(20,22,43,0.25);
+    }
+    section[data-testid="stSidebar"] div[data-testid="stButton"] > button:hover {
+        background: #2b2e52;
+    }
+    section[data-testid="stSidebar"] div[data-testid="stPopover"] > div > button {
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        background: #f1f1f8;
+        color: #14162b;
+        font-size: 1.05rem;
+        border: none;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 14px auto;
+    }
+    section[data-testid="stSidebar"] div[data-testid="stPopover"] > div > button:hover {
+        background: #e2e2f2;
+    }
+
+    /* ---------- Top bar inside the card ---------- */
+    .nix-topbar {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 0 26px;
-        z-index: 999999;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+        margin-bottom: 30px;
     }
-    .dily-navbar-left {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-    }
-    .dily-logo-box {
-        background: #d6231c;
-        color: #ffffff;
-        font-weight: 800;
-        letter-spacing: 1px;
-        padding: 7px 14px;
-        border-radius: 4px;
-        font-size: 0.9rem;
-    }
-    .dily-navbar-divider {
-        width: 1px;
-        height: 26px;
-        background: rgba(255,255,255,0.25);
-    }
-    .dily-navbar-title {
-        color: #ffffff;
-        font-size: 1.05rem;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .dily-navbar-right {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-    }
-    .dily-nav-icon {
-        width: 34px;
-        height: 34px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(255,255,255,0.10);
-        color: #ffffff;
-        font-size: 1rem;
-    }
-
-    /* ---------- Sidebar ---------- */
-    section[data-testid="stSidebar"] {
-        background: #f6f8fc;
-        border-right: 1px solid #e6eaf3;
-    }
-    section[data-testid="stSidebar"] h5,
-    section[data-testid="stSidebar"] h4 {
-        color: #45506b;
+    .nix-pill {
+        background: #f3f2fb;
+        color: #4b4b63;
         font-size: 0.78rem;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-    }
-
-    .status-pill {
+        font-weight: 600;
+        padding: 7px 14px;
+        border-radius: 20px;
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        background-color: #ecfdf5;
-        color: #065f46;
-        border: 1px solid #a7f3d0;
-        border-radius: 20px;
-        padding: 3px 10px;
-        font-size: 0.75rem;
+        gap: 4px;
+    }
+    .nix-title {
+        color: #9494ab;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    .nix-status {
+        background: #14162b;
+        color: #ffffff;
+        font-size: 0.78rem;
         font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 20px;
     }
 
-    div[data-testid="stButton"] > button {
-        border-radius: 8px;
+    /* ---------- Hero greeting ---------- */
+    .nix-hero-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 28px;
+        gap: 20px;
+    }
+    .nix-hero-row h1 {
+        font-size: 1.9rem;
+        line-height: 1.3;
+        color: #16172c;
         font-weight: 500;
+        margin: 0;
     }
-
-    /* Sidebar plain-style nav buttons (recent chats / quick links) */
-    section[data-testid="stSidebar"] div[data-testid="stButton"] > button {
-        background: transparent;
-        border: none;
-        text-align: left;
-        justify-content: flex-start;
-        color: #33405c;
-        font-weight: 500;
-        padding: 6px 8px;
+    .nix-hero-row h1 span {
+        font-weight: 800;
     }
-    section[data-testid="stSidebar"] div[data-testid="stButton"] > button:hover {
-        background: #eef1fb;
-        color: #14237f;
+    .nix-mascot-wrap {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        flex-shrink: 0;
     }
-
-    /* New Chat primary button */
-    section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"] {
-        background: #1a2f8f;
-        color: #ffffff;
-        border-radius: 8px;
-        padding: 8px 10px;
-        text-align: center;
-        justify-content: center;
-    }
-    section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"]:hover {
-        background: #14237f;
-        color: #ffffff;
-    }
-
-    /* Quick link expanders styled like flat rows with a chevron */
-    section[data-testid="stSidebar"] div[data-testid="stExpander"] {
-        border: none;
-        background: transparent;
-    }
-    section[data-testid="stSidebar"] div[data-testid="stExpander"] summary {
-        font-weight: 500;
-        color: #33405c;
-        padding: 4px 4px;
-    }
-    section[data-testid="stSidebar"] div[data-testid="stExpander"] summary:hover {
-        color: #14237f;
-    }
-
-    /* ---------- Hero section ---------- */
-    .dily-hero {
-        text-align: center;
-        padding: 30px 0 10px 0;
-    }
-    .dily-hero-badge {
-        width: 66px;
-        height: 66px;
-        border-radius: 50%;
+    .nix-bubble {
         background: #ffffff;
-        box-shadow: 0 4px 18px rgba(20,35,127,0.18);
+        border: 1px solid #eee;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+        border-radius: 14px;
+        padding: 9px 13px;
+        font-size: 0.72rem;
+        color: #333;
+        max-width: 140px;
+        margin-top: 6px;
+    }
+    .nix-mascot {
+        font-size: 3rem;
+        line-height: 1;
+    }
+
+    /* ---------- Feature cards ---------- */
+    .st-key-feature_cards div[data-testid="stButton"] > button {
+        height: 176px;
+        width: 100%;
+        background: #ffffff;
+        border: 1px solid #eef0f7;
+        border-radius: 16px;
+        text-align: left;
+        align-items: flex-start;
+        justify-content: flex-start;
+        padding: 20px 18px;
+        white-space: pre-line;
+        color: #23233a;
+        font-weight: 500;
+        font-size: 0.85rem;
+        line-height: 1.55;
+        box-shadow: 0 6px 18px rgba(20,20,50,0.05);
+    }
+    .st-key-feature_cards div[data-testid="stButton"] > button p {
+        white-space: pre-line;
+    }
+    .st-key-feature_cards div[data-testid="stButton"] > button p::first-line {
+        font-size: 1.6rem;
+    }
+    .st-key-feature_cards div[data-testid="stButton"] > button:hover {
+        border-color: #b9b3f5;
+        background: #fbfaff;
+    }
+
+    /* ---------- Bottom links row ---------- */
+    .nix-bottom-links {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.72rem;
+        color: #9494aa;
+        margin: 26px 4px 8px 4px;
+    }
+
+    /* ---------- Chat input (rounded pill) ---------- */
+    div[data-testid="stChatInput"] {
+        border-radius: 30px !important;
+        border: 1px solid #e6e4f5 !important;
+        box-shadow: 0 4px 16px rgba(20,20,60,0.06);
+    }
+    div[data-testid="stChatInput"] textarea {
+        font-size: 0.9rem;
+    }
+
+    /* ---------- Suggestion pills ---------- */
+    .st-key-suggestion_pills div[data-testid="stButton"] > button,
+    .st-key-suggestion_pills div[data-testid="stPopover"] > div > button {
+        background: #14162b;
+        color: #ffffff;
+        border-radius: 20px;
+        font-size: 0.78rem;
+        font-weight: 500;
+        padding: 9px 16px;
+        border: none;
+    }
+    .st-key-suggestion_pills div[data-testid="stButton"] > button:hover,
+    .st-key-suggestion_pills div[data-testid="stPopover"] > div > button:hover {
+        background: #2b2e52;
+    }
+
+    /* ---------- Floating logo badge ---------- */
+    .nix-badge {
+        position: fixed;
+        left: 36px;
+        bottom: 26px;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: #14162b;
+        color: #ffffff;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 0 auto 18px auto;
-        font-size: 2rem;
-    }
-    .dily-hero h1 {
-        font-size: 2.1rem;
-        font-weight: 800;
-        color: #101a3c;
-        margin-bottom: 6px;
-    }
-    .dily-hero-rule {
-        width: 60px;
-        height: 3px;
-        background: #1a2f8f;
-        margin: 10px auto 16px auto;
-        border-radius: 2px;
-    }
-    .dily-hero p.sub {
-        color: #5b6685;
-        font-size: 1rem;
-        margin-bottom: 8px;
+        font-size: 1.3rem;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+        z-index: 1000;
     }
 
-    /* Hero icon cards */
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(button[kind="secondary"]) {
-        border-radius: 14px;
-    }
-    .st-key-hero_cards div[data-testid="stButton"] > button {
-        height: 108px;
-        width: 100%;
+    /* ---------- Login card ---------- */
+    .st-key-login_card {
         background: #ffffff;
-        border: 1px solid #e6eaf3;
-        border-radius: 14px;
-        color: #1f2a4d;
-        font-weight: 600;
-        font-size: 0.85rem;
-        white-space: pre-line;
-        line-height: 1.6;
-        box-shadow: 0 2px 6px rgba(20,35,127,0.05);
-    }
-    .st-key-hero_cards div[data-testid="stButton"] > button p {
-        white-space: pre-line;
-        font-size: 0.85rem;
-    }
-    .st-key-hero_cards div[data-testid="stButton"] > button:hover {
-        border-color: #1a2f8f;
-        background: #f5f7fd;
-        color: #14237f;
-    }
-
-    /* ---------- Chat input (rounded search-bar look) ---------- */
-    div[data-testid="stChatInput"] {
-        border-radius: 30px !important;
-        border: 1px solid #dbe1f0 !important;
-        box-shadow: 0 2px 10px rgba(20,35,127,0.08);
-        max-width: 760px;
-        margin: 6px auto 0 auto;
-    }
-    div[data-testid="stChatInput"] textarea {
-        font-size: 0.92rem;
+        border-radius: 24px;
+        padding: 40px;
+        max-width: 440px;
+        margin: 60px auto;
+        box-shadow: 0 30px 80px rgba(30,20,80,0.16);
     }
 
     </style>
@@ -298,88 +317,86 @@ if "snowpark_session" not in st.session_state:
 if not st.session_state.authenticated:
 
     st.markdown(
-        """
-        <div class="dily-navbar">
-            <div class="dily-navbar-left">
-                <div class="dily-logo-box">DILYTICS</div>
-                <div class="dily-navbar-divider"></div>
-                <div class="dily-navbar-title">Dilytics Supply Chain AI ✨</div>
-            </div>
-        </div>
-        """,
+        '<div class="nix-badge">📦</div>',
         unsafe_allow_html=True
     )
 
-    st.write("")
-    st.write("")
+    with st.container(key="login_card"):
 
-    st.title("Welcome to Dilytics Supply Chain AI")
+        st.markdown(
+            '<span class="nix-pill">✨ Dilytics AI</span>',
+            unsafe_allow_html=True
+        )
 
-    st.markdown(
-        "Please login to connect to your Snowflake Data Warehouse."
-    )
+        st.write("")
 
-    st.session_state.username = st.text_input(
-        "Enter Snowflake Username:",
-        value=st.session_state.username
-    )
+        st.title("Welcome to Dilytics Supply Chain AI")
 
-    st.session_state.password = st.text_input(
-        "Enter Password:",
-        type="password"
-    )
+        st.markdown(
+            "Please login to connect to your Snowflake Data Warehouse."
+        )
 
-    if st.button("Login"):
+        st.session_state.username = st.text_input(
+            "Enter Snowflake Username:",
+            value=st.session_state.username
+        )
 
-        if not st.session_state.username:
+        st.session_state.password = st.text_input(
+            "Enter Password:",
+            type="password"
+        )
 
-            st.error("Please enter your Snowflake username.")
-            st.stop()
+        if st.button("Login", use_container_width=True):
 
-        if not st.session_state.password:
+            if not st.session_state.username:
 
-            st.error("Please enter your Snowflake password.")
-            st.stop()
+                st.error("Please enter your Snowflake username.")
+                st.stop()
 
-        try:
+            if not st.session_state.password:
 
-            with st.spinner("Connecting to Snowflake..."):
+                st.error("Please enter your Snowflake password.")
+                st.stop()
 
-                config = get_snowflake_config()
+            try:
 
-                connection_parameters = {
-                    "account": config["account"],
-                    "user": st.session_state.username,
-                    "password": st.session_state.password,
-                    "role": config["role"],
-                    "warehouse": config["warehouse"],
-                    "database": config["database"],
-                    "schema": config["schema"]
-                }
+                with st.spinner("Connecting to Snowflake..."):
 
-                # Test connection
-                conn = snowflake.connector.connect(
-                    **connection_parameters
+                    config = get_snowflake_config()
+
+                    connection_parameters = {
+                        "account": config["account"],
+                        "user": st.session_state.username,
+                        "password": st.session_state.password,
+                        "role": config["role"],
+                        "warehouse": config["warehouse"],
+                        "database": config["database"],
+                        "schema": config["schema"]
+                    }
+
+                    # Test connection
+                    conn = snowflake.connector.connect(
+                        **connection_parameters
+                    )
+
+                    conn.close()
+
+                    # Create Snowpark session
+                    st.session_state.snowpark_session = (
+                        Session.builder
+                        .configs(connection_parameters)
+                        .create()
+                    )
+
+                    st.session_state.authenticated = True
+
+                    st.rerun()
+
+            except Exception as e:
+
+                st.error(
+                    f"Authentication failed: {str(e)}"
                 )
-
-                conn.close()
-
-                # Create Snowpark session
-                st.session_state.snowpark_session = (
-                    Session.builder
-                    .configs(connection_parameters)
-                    .create()
-                )
-
-                st.session_state.authenticated = True
-
-                st.rerun()
-
-        except Exception as e:
-
-            st.error(
-                f"Authentication failed: {str(e)}"
-            )
 
     st.stop()
 
@@ -1706,31 +1723,7 @@ Please ask a question about:
 
 
 # ============================================================
-# TOP NAVBAR  (rendered on every authenticated page)
-# ============================================================
-
-st.markdown(
-    """
-    <div class="dily-navbar">
-        <div class="dily-navbar-left">
-            <div class="dily-logo-box">DILYTICS</div>
-            <div class="dily-navbar-divider"></div>
-            <div class="dily-navbar-title">Dilytics Supply Chain AI ✨</div>
-        </div>
-        <div class="dily-navbar-right">
-            <div class="dily-nav-icon">🔔</div>
-            <div class="dily-nav-icon">❓</div>
-            <div class="dily-nav-icon">👤</div>
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-
-# ============================================================
-# SIDEBAR QUICK-LINK CATEGORIES
-# (category name -> list of (label, prompt))
+# QUICK-LINK CATEGORIES  (category -> [(label, prompt), ...])
 # ============================================================
 
 QUICK_LINK_CATEGORIES = {
@@ -1746,7 +1739,7 @@ QUICK_LINK_CATEGORIES = {
         ("Delayed shipments", "How many shipments are delayed?"),
         ("Top delay reasons", "What are the top delay reasons?"),
     ],
-    "📦 Inventory": [
+    "📦 Inventory & Warehouses": [
         ("PO value by warehouse", "What is the purchase order value by warehouse?"),
         ("Ordered qty by category", "What is the ordered quantity by product category?"),
     ],
@@ -1756,10 +1749,7 @@ QUICK_LINK_CATEGORIES = {
         ("Single source suppliers", "Which suppliers are single source?"),
         ("Active contracts", "Which suppliers have active contracts?"),
     ],
-    "🏢 Warehouses": [
-        ("PO value by warehouse", "What is the purchase order value by warehouse?"),
-    ],
-    "🚢 Carriers": [
+    "🚢 Carriers & Logistics": [
         ("Shipments by carrier", "What is the shipment count by carrier?"),
         ("Freight cost by carrier", "What is freight cost by carrier?"),
     ],
@@ -1771,28 +1761,14 @@ QUICK_LINK_CATEGORIES = {
 
 
 # ============================================================
-# SIDEBAR
+# ICON RAIL (SIDEBAR)
 # ============================================================
+
+rail_quick_prompt = None
 
 with st.sidebar:
 
-    st.markdown(
-        '<span class="status-pill">● Semantic Mart Live</span>',
-        unsafe_allow_html=True
-    )
-
-    st.write("")
-
-
-    # --------------------------------------------------------
-    # NEW CHAT
-    # --------------------------------------------------------
-
-    if st.button(
-        "➕ New Chat",
-        use_container_width=True,
-        type="primary"
-    ):
+    if st.button("➕", key="rail_new_chat", help="New Chat"):
 
         new_id = datetime.now().strftime(
             "%Y%m%d_%H%M%S"
@@ -1808,87 +1784,108 @@ with st.sidebar:
         st.rerun()
 
 
-    st.markdown("---")
+    with st.popover("🔍", use_container_width=False):
 
-    st.markdown(
-        "##### 🕒 Recent Conversations"
-    )
+        st.markdown("**Quick Links**")
 
+        for category, items in QUICK_LINK_CATEGORIES.items():
 
-    for s_id, s_data in reversed(
-        list(
-            st.session_state.chat_sessions.items()
-        )
-    ):
-
-        is_active = (
-            s_id ==
-            st.session_state.current_session_id
-        )
-
-        label = s_data["title"]
-
-        if len(label) > 20:
-
-            label = label[:18] + "..."
-
-
-        if st.button(
-            f"{'👉 ' if is_active else '🗨️ '}{label}",
-            key=f"sess_{s_id}",
-            use_container_width=True
-        ):
-
-            st.session_state.current_session_id = s_id
-
-            st.rerun()
-
-
-    st.markdown("---")
-
-    st.markdown(
-        "##### 🔗 Quick Links"
-    )
-
-    sidebar_quick_prompt = None
-
-    for category, items in QUICK_LINK_CATEGORIES.items():
-
-        with st.expander(category, expanded=False):
+            st.markdown(f"###### {category}")
 
             for label, q_prompt in items:
 
                 if st.button(
                     label,
-                    key=f"ql_{category}_{label}",
+                    key=f"rail_ql_{category}_{label}",
                     use_container_width=True
                 ):
 
-                    sidebar_quick_prompt = q_prompt
+                    rail_quick_prompt = q_prompt
 
 
-    st.markdown("---")
+    with st.popover("🕒", use_container_width=False):
+
+        st.markdown("**Recent Conversations**")
+
+        for s_id, s_data in reversed(
+            list(
+                st.session_state.chat_sessions.items()
+            )
+        ):
+
+            is_active = (
+                s_id ==
+                st.session_state.current_session_id
+            )
+
+            label = s_data["title"]
+
+            if len(label) > 26:
+
+                label = label[:24] + "..."
+
+            if st.button(
+                f"{'👉 ' if is_active else '🗨️ '}{label}",
+                key=f"rail_sess_{s_id}",
+                use_container_width=True
+            ):
+
+                st.session_state.current_session_id = s_id
+
+                st.rerun()
+
+        st.markdown("---")
+
+        if st.button("🗑️ Clear All Sessions", use_container_width=True):
+
+            st.session_state.chat_sessions = {}
+
+            new_id = datetime.now().strftime(
+                "%Y%m%d_%H%M%S"
+            )
+
+            st.session_state.current_session_id = new_id
+
+            st.session_state.chat_sessions[new_id] = {
+                "title": "New Conversation",
+                "messages": []
+            }
+
+            st.rerun()
 
 
-    if st.button(
-        "🗑️ Clear All Sessions",
-        use_container_width=True
-    ):
+    with st.popover("❔", use_container_width=False):
 
-        st.session_state.chat_sessions = {}
+        help_text, _ = generate_sql_from_prompt("help")
 
-        new_id = datetime.now().strftime(
-            "%Y%m%d_%H%M%S"
-        )
+        st.markdown(help_text)
 
-        st.session_state.current_session_id = new_id
 
-        st.session_state.chat_sessions[new_id] = {
-            "title": "New Conversation",
-            "messages": []
-        }
+st.markdown(
+    '<div class="nix-badge">📦</div>',
+    unsafe_allow_html=True
+)
 
-        st.rerun()
+
+# ============================================================
+# TOP BAR  (inside the floating card)
+# ============================================================
+
+current_title = (
+    st.session_state
+    .chat_sessions[current_id]["title"]
+)
+
+st.markdown(
+    f"""
+    <div class="nix-topbar">
+        <span class="nix-pill">✨ Dilytics AI ⌄</span>
+        <span class="nix-title">{current_title}</span>
+        <span class="nix-status">● Live</span>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 
 # ============================================================
@@ -1899,44 +1896,63 @@ hero_quick_prompt = None
 
 if len(messages) == 0:
 
+    display_name = st.session_state.username or "there"
+
     st.markdown(
-        """
-        <div class="dily-hero">
-            <div class="dily-hero-badge">🤖</div>
-            <h1>Dilytics Supply Chain AI</h1>
-            <div class="dily-hero-rule"></div>
-            <p class="sub">Ask anything about your supply chain data in natural language.</p>
+        f"""
+        <div class="nix-hero-row">
+            <h1>Hi {display_name}, <span>Ready to Explore<br/>Your Supply Chain?</span></h1>
+            <div class="nix-mascot-wrap">
+                <div class="nix-bubble">Hey there! 👋<br/>Need a boost?</div>
+                <div class="nix-mascot">🤖</div>
+            </div>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    hero_cards = [
-        ("📋", "Purchase\nOrders", "What is the total purchase order count?"),
-        ("🚚", "Shipments &\nDeliveries", "What is the total number of shipments?"),
-        ("🏢", "Inventory &\nWarehouses", "What is the purchase order value by warehouse?"),
-        ("👥", "Suppliers", "What is the supplier on-time delivery percentage?"),
-        ("📦", "Products", "What are the top products by ordered value?"),
-        ("📊", "Analytics\nReports", "What can I ask?"),
+    feature_cards = [
+        (
+            "📋",
+            "Track purchase orders, monitor suppliers, and "
+            "manage approvals — all in sync.",
+            "Fast Start",
+            "What is the total purchase order count?"
+        ),
+        (
+            "🚚",
+            "Stay on top of shipments, delays, and carriers. "
+            "Boost visibility with AI insights.",
+            "Live Tracking",
+            "What is the total number of shipments?"
+        ),
+        (
+            "📦",
+            "Analyze products and spend efficiently, and stay "
+            "ahead of supplier risk.",
+            "Analytics",
+            "What are the top products by ordered value?"
+        ),
     ]
 
-    with st.container(key="hero_cards"):
+    with st.container(key="feature_cards"):
 
-        card_cols = st.columns(6)
+        card_cols = st.columns(3)
 
-        for col, (icon, label, q_prompt) in zip(card_cols, hero_cards):
+        for col, (icon, desc, caption, q_prompt) in zip(
+            card_cols,
+            feature_cards
+        ):
 
             with col:
 
                 if st.button(
-                    f"{icon}\n{label}",
-                    key=f"hero_{label}",
+                    f"{icon}\n{desc}\n\n{caption}",
+                    key=f"feature_{caption}",
                     use_container_width=True
                 ):
 
                     hero_quick_prompt = q_prompt
-
-    st.write("")
 
 
 # ============================================================
@@ -1999,17 +2015,72 @@ for idx, msg in enumerate(messages):
 
 
 # ============================================================
-# CHAT INPUT
+# BOTTOM LINKS + CHAT INPUT + SUGGESTION PILLS
+# ============================================================
+
+st.markdown(
+    """
+    <div class="nix-bottom-links">
+        <span>✨ Ask anything about your supply chain</span>
+        <span>⚙️ Powered by Dilytics AI</span>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+chat_prompt = st.chat_input(
+    "Example: \"What is the total ordered value?\""
+)
+
+pills_quick_prompt = None
+
+with st.container(key="suggestion_pills"):
+
+    pill_cols = st.columns(5)
+
+    pill_definitions = [
+        ("📋 Purchase Orders", "What is the total purchase order count?"),
+        ("🚚 Shipments", "What is the total number of shipments?"),
+        ("🏭 Suppliers", "What is the supplier on-time delivery percentage?"),
+        ("📦 Products", "What are the top products by ordered value?"),
+    ]
+
+    for col, (label, q_prompt) in zip(pill_cols[:4], pill_definitions):
+
+        with col:
+
+            if st.button(label, key=f"pill_{label}", use_container_width=True):
+
+                pills_quick_prompt = q_prompt
+
+    with pill_cols[4]:
+
+        with st.popover("⋯ More", use_container_width=True):
+
+            for category, items in QUICK_LINK_CATEGORIES.items():
+
+                st.markdown(f"###### {category}")
+
+                for label, q_prompt in items:
+
+                    if st.button(
+                        label,
+                        key=f"pillmore_{category}_{label}",
+                        use_container_width=True
+                    ):
+
+                        pills_quick_prompt = q_prompt
+
+
+# ============================================================
+# RESOLVE THE ACTIVE USER PROMPT
 # ============================================================
 
 user_prompt = (
-    st.chat_input(
-        "Ask a question about suppliers, purchase orders, "
-        "shipments, deliveries, warehouses, carriers, or "
-        "inventory..."
-    )
+    chat_prompt
     or hero_quick_prompt
-    or sidebar_quick_prompt
+    or pills_quick_prompt
+    or rail_quick_prompt
 )
 
 
