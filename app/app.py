@@ -20,11 +20,34 @@ SCHEMA = "GOLD"
 WAREHOUSE = "COMPUTE_WH"
 ROLE = "ACCOUNTADMIN"
 
-# YAML file should be in the same folder as this Python file
-YAML_FILE = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "https://app.snowflake.com/xyuhkav/xrb12650/#/cortex/analyst/databases/SUPPLY_CHAIN_DW/schemas/GOLD/semanticView/SUPPLY_CHAIN_SEMANTIC/edit"
-)
+# YAML file should be in the same folder as this Python file.
+# IMPORTANT:
+# Do NOT put the Snowflake Cortex Analyst browser URL here.
+# This must point to the actual local YAML file packaged with the Streamlit app.
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+YAML_FILE = os.path.join(APP_DIR, "SUPPLY_CHAIN_SEMANTIC.yaml")
+
+# Optional fallback: if the exact filename is not found, look for a YAML
+# file in the same app folder. This makes deployment less fragile when the
+# uploaded YAML has a slightly different filename.
+if not os.path.isfile(YAML_FILE):
+    yaml_candidates = [
+        os.path.join(APP_DIR, name)
+        for name in os.listdir(APP_DIR)
+        if name.lower().endswith((".yaml", ".yml"))
+    ]
+
+    # Prefer a file containing "supply" and "chain" in its name.
+    preferred = [
+        path for path in yaml_candidates
+        if "supply" in os.path.basename(path).lower()
+        and "chain" in os.path.basename(path).lower()
+    ]
+
+    if preferred:
+        YAML_FILE = preferred[0]
+    elif len(yaml_candidates) == 1:
+        YAML_FILE = yaml_candidates[0]
 
 
 # ===================================================================
@@ -77,40 +100,53 @@ st.markdown(
 
 def load_semantic_yaml():
 
-    if not os.path.exists(YAML_FILE):
-
+    if not os.path.isfile(YAML_FILE):
         st.error(
-            f"Supply Chain YAML file not found:\n\n{YAML_FILE}"
+            "Supply Chain YAML file not found.\n\n"
+            f"Expected file: {YAML_FILE}\n\n"
+            "Make sure SUPPLY_CHAIN_SEMANTIC.yaml is uploaded into "
+            "the same folder as app.py."
         )
-
         return {}
 
-
     try:
-
-        with open(
-            YAML_FILE,
-            "r",
-            encoding="utf-8"
-        ) as file:
-
+        with open(YAML_FILE, "r", encoding="utf-8") as file:
             model = yaml.safe_load(file)
 
         if model is None:
+            st.error(
+                f"The YAML file is empty: {YAML_FILE}"
+            )
+            return {}
+
+        if not isinstance(model, dict):
+            st.error(
+                "The Supply Chain YAML was loaded, but its root structure "
+                "is not a YAML object/dictionary."
+            )
             return {}
 
         return model
 
-    except Exception as e:
-
+    except yaml.YAMLError as e:
         st.error(
-            f"Unable to load SUPPLY_CHAIN_SEMANTIC.yaml: {e}"
+            f"Invalid Supply Chain YAML syntax in {YAML_FILE}: {e}"
         )
+        return {}
 
+    except Exception as e:
+        st.error(
+            f"Unable to load Supply Chain YAML: {e}"
+        )
         return {}
 
 
 SEMANTIC_MODEL = load_semantic_yaml()
+
+# Keep the path available for troubleshooting without exposing any
+# credentials or Snowflake passwords.
+if SEMANTIC_MODEL:
+    st.session_state["semantic_yaml_loaded"] = True
 
 
 # ===================================================================
