@@ -25,12 +25,56 @@ st.markdown(
     """
     <style>
 
-    /* ---- Make the whole app body use full width, 2D/flat look ---- */
+    /* ============================================================
+       KILL THE "FLOATING CARD" LOOK
+       Streamlit (and many custom themes) wrap the whole app in an
+       outer container that has a gradient/colored page background,
+       while the actual content sits in a smaller white rounded
+       panel with a box-shadow and margin around it — this is what
+       reads as a "floating card". The rules below flatten every
+       layer of that wrapper so the content fills the full browser
+       viewport edge-to-edge instead.
+       ============================================================ */
+
+    html, body,
+    [data-testid="stAppViewContainer"],
+    [data-testid="stApp"],
+    .stApp {
+        background: #ffffff !important;   /* no gradient page background */
+        background-image: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        height: 100% !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+
+    [data-testid="stMain"],
+    [data-testid="stMainBlockContainer"],
+    .main,
     .block-container {
         max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
         padding-left: 2rem !important;
         padding-right: 2rem !important;
         padding-top: 1.5rem !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        background: #ffffff !important;
+    }
+
+    /* Some setups nest an extra wrapping <div> that carries the card
+       styling (rounded corners / shadow / fixed max-width). Force
+       every direct wrapper under the app container to go flat. */
+    [data-testid="stAppViewContainer"] > div,
+    [data-testid="stMain"] > div {
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        max-width: 100% !important;
+        width: 100% !important;
     }
 
     /* ---- Chat message list: full width, flat panels ---- */
@@ -54,6 +98,18 @@ st.markdown(
     }
 
     /* ---- Chat input: flat, full-width, docked bar (no floating pill) ---- */
+    [data-testid="stBottom"],
+    [data-testid="stBottom"] > div,
+    [data-testid="stBottomBlockContainer"] {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        background: #ffffff !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+    }
     [data-testid="stChatInput"] {
         max-width: 100% !important;
         width: 100% !important;
@@ -61,21 +117,11 @@ st.markdown(
         box-shadow: none !important;
         border-top: 1px solid #e0e0e0 !important;
     }
-    [data-testid="stChatInput"] textarea {
+    [data-testid="stChatInput"] textarea,
+    [data-testid="stChatInput"] > div {
         border-radius: 4px !important;
         box-shadow: none !important;
-    }
-
-    /* Chat input container - remove the floating card/shadow wrapper */
-    [data-testid="stBottom"] > div {
-        max-width: 100% !important;
-        box-shadow: none !important;
         background: #ffffff !important;
-    }
-    [data-testid="stBottomBlockContainer"] {
-        max-width: 100% !important;
-        padding-left: 2rem !important;
-        padding-right: 2rem !important;
     }
 
     /* ---- Sidebar: center the logo and New Chat button ---- */
