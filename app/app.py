@@ -27,10 +27,20 @@ st.markdown(
     /* ---------- Global cleanup ---------- */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
+
+    /* Keep the native header at its normal height (so the built-in
+       sidebar collapse/expand arrow it contains stays live and
+       clickable) but make it fully transparent and raise it above
+       our custom navbar's z-index so the arrow is never covered. */
     header[data-testid="stHeader"] {
-        background: transparent;
-        height: 0px;
+        background: transparent !important;
+        height: 3.75rem !important;
+        z-index: 1000001 !important;
     }
+    header[data-testid="stHeader"] * {
+        visibility: visible !important;
+    }
+
     .block-container {
         padding-top: 86px !important;
         max-width: 1100px;
