@@ -313,7 +313,7 @@ if not st.session_state.authenticated:
     st.write("")
     st.write("")
 
-    st.title("Welcome to Dilytics Supply Chain AI")
+    st.title("Welcome to Dilytics ChatBot")
 
     st.markdown(
         "Please login to connect to your Snowflake Data Warehouse."
