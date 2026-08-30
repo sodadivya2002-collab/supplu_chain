@@ -191,51 +191,43 @@ st.markdown(
         margin-bottom: 8px;
     }
 
-    /* ---------- Sidebar collapsed toggle: keep it visible & clickable ----------
-       By default this control can end up hidden behind the fixed navbar
-       (z-index 999999) or clipped because the native Streamlit header is
-       collapsed to height:0. Reposition it as a small tab flush against
-       the left edge, just below the navbar (where the sidebar panel
-       itself would sit), instead of overlapping the DILYTICS logo.
-       Multiple selectors are targeted because the exact test-id for
-       this control varies across Streamlit versions. */
+    /* ---------- Sidebar panel visibility is now managed entirely by our
+       own "Hide Panel" / "☰" buttons (see app logic), not by Streamlit's
+       native collapse mechanism — its position proved unreliable across
+       Streamlit versions. Hide every native control so there's no
+       leftover, badly-positioned arrow competing with our own. */
     [data-testid="stSidebarCollapsedControl"],
     [data-testid="collapsedControl"],
     [data-testid*="CollapsedControl"],
     header[data-testid="stHeader"] [data-testid*="Button"][aria-label*="sidebar" i],
     header[data-testid="stHeader"] button[aria-label*="sidebar" i] {
-        visibility: visible !important;
-        display: flex !important;
-        opacity: 1 !important;
-        align-items: center !important;
-        justify-content: center !important;
-        position: fixed !important;
-        top: 76px !important;
-        left: 0px !important;
-        right: auto !important;
-        bottom: auto !important;
-        width: 30px !important;
-        height: 42px !important;
-        margin: 0 !important;
-        transform: none !important;
-        background: #ffffff !important;
-        border: 1px solid #dbe1f0 !important;
-        border-left: none !important;
-        border-radius: 0 8px 8px 0 !important;
-        box-shadow: 2px 2px 8px rgba(20,35,127,0.18) !important;
-        z-index: 1000002 !important;
+        display: none !important;
+        visibility: hidden !important;
     }
-    [data-testid="stSidebarCollapsedControl"]:hover,
-    [data-testid="collapsedControl"]:hover,
-    [data-testid*="CollapsedControl"]:hover {
-        background: #f5f7fd !important;
-        border-color: #1a2f8f !important;
+
+    /* ---------- Our custom reopen tab (shown only when the panel is
+       hidden). Rendered as a normal Streamlit button in the document
+       flow — right below the navbar, flush left — so its position is
+       exact and doesn't depend on any native-control quirks. */
+    .st-key-sidebar_reopen_tab {
+        margin-top: -8px;
+        margin-bottom: 12px;
     }
-    [data-testid="stSidebarCollapsedControl"] svg,
-    [data-testid="collapsedControl"] svg,
-    [data-testid*="CollapsedControl"] svg {
-        color: #14237f !important;
-        fill: #14237f !important;
+    .st-key-sidebar_reopen_tab div[data-testid="stButton"] > button {
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        border-radius: 0 8px 8px 0;
+        border: 1px solid #dbe1f0;
+        border-left: none;
+        background: #ffffff;
+        color: #14237f;
+        font-size: 1.1rem;
+        box-shadow: 2px 2px 8px rgba(20,35,127,0.12);
+    }
+    .st-key-sidebar_reopen_tab div[data-testid="stButton"] > button:hover {
+        background: #f5f7fd;
+        border-color: #1a2f8f;
     }
 
     /* ---------- Chat input (rounded search-bar look) ---------- */
@@ -387,6 +379,17 @@ if not st.session_state.authenticated:
 # ============================================================
 
 session = st.session_state.snowpark_session
+
+
+# ============================================================
+# CUSTOM SIDEBAR TOGGLE STATE
+# (We manage panel visibility ourselves instead of relying on
+#  Streamlit's native collapse arrow, whose reopen position we
+#  cannot reliably control across Streamlit versions.)
+# ============================================================
+
+if "sidebar_open" not in st.session_state:
+    st.session_state.sidebar_open = True
 
 
 # ============================================================
@@ -1776,121 +1779,154 @@ QUICK_LINK_CATEGORIES = {
 # SIDEBAR
 # ============================================================
 
-with st.sidebar:
+sidebar_quick_prompt = None
 
-    st.markdown(
-        '<span class="status-pill">● Semantic Mart Live</span>',
-        unsafe_allow_html=True
-    )
+if st.session_state.sidebar_open:
 
-    st.write("")
+    with st.sidebar:
 
-
-    # --------------------------------------------------------
-    # NEW CHAT
-    # --------------------------------------------------------
-
-    if st.button(
-        "➕ New Chat",
-        use_container_width=True,
-        type="primary"
-    ):
-
-        new_id = datetime.now().strftime(
-            "%Y%m%d_%H%M%S"
-        )
-
-        st.session_state.current_session_id = new_id
-
-        st.session_state.chat_sessions[new_id] = {
-            "title": "New Conversation",
-            "messages": []
-        }
-
-        st.rerun()
-
-
-    st.markdown("---")
-
-    st.markdown(
-        "##### 🕒 Recent Conversations"
-    )
-
-
-    for s_id, s_data in reversed(
-        list(
-            st.session_state.chat_sessions.items()
-        )
-    ):
-
-        is_active = (
-            s_id ==
-            st.session_state.current_session_id
-        )
-
-        label = s_data["title"]
-
-        if len(label) > 20:
-
-            label = label[:18] + "..."
-
+        # ----------------------------------------------------
+        # HIDE PANEL (custom toggle — replaces native collapse
+        # arrow so we control exactly where its counterpart,
+        # the reopen tab, is positioned)
+        # ----------------------------------------------------
 
         if st.button(
-            f"{'👉 ' if is_active else '🗨️ '}{label}",
-            key=f"sess_{s_id}",
-            use_container_width=True
+            "⟨⟨ Hide Panel",
+            use_container_width=True,
+            key="hide_sidebar_btn"
         ):
 
-            st.session_state.current_session_id = s_id
+            st.session_state.sidebar_open = False
+            st.rerun()
+
+        st.markdown(
+            '<span class="status-pill">● Semantic Mart Live</span>',
+            unsafe_allow_html=True
+        )
+
+        st.write("")
+
+
+        # --------------------------------------------------------
+        # NEW CHAT
+        # --------------------------------------------------------
+
+        if st.button(
+            "➕ New Chat",
+            use_container_width=True,
+            type="primary"
+        ):
+
+            new_id = datetime.now().strftime(
+                "%Y%m%d_%H%M%S"
+            )
+
+            st.session_state.current_session_id = new_id
+
+            st.session_state.chat_sessions[new_id] = {
+                "title": "New Conversation",
+                "messages": []
+            }
 
             st.rerun()
 
 
-    st.markdown("---")
+        st.markdown("---")
 
-    st.markdown(
-        "##### 🔗 Quick Links"
-    )
-
-    sidebar_quick_prompt = None
-
-    for category, items in QUICK_LINK_CATEGORIES.items():
-
-        with st.expander(category, expanded=False):
-
-            for label, q_prompt in items:
-
-                if st.button(
-                    label,
-                    key=f"ql_{category}_{label}",
-                    use_container_width=True
-                ):
-
-                    sidebar_quick_prompt = q_prompt
-
-
-    st.markdown("---")
-
-
-    if st.button(
-        "🗑️ Clear All Sessions",
-        use_container_width=True
-    ):
-
-        st.session_state.chat_sessions = {}
-
-        new_id = datetime.now().strftime(
-            "%Y%m%d_%H%M%S"
+        st.markdown(
+            "##### 🕒 Recent Conversations"
         )
 
-        st.session_state.current_session_id = new_id
 
-        st.session_state.chat_sessions[new_id] = {
-            "title": "New Conversation",
-            "messages": []
-        }
+        for s_id, s_data in reversed(
+            list(
+                st.session_state.chat_sessions.items()
+            )
+        ):
 
-        st.rerun()
+            is_active = (
+                s_id ==
+                st.session_state.current_session_id
+            )
+
+            label = s_data["title"]
+
+            if len(label) > 20:
+
+                label = label[:18] + "..."
+
+
+            if st.button(
+                f"{'👉 ' if is_active else '🗨️ '}{label}",
+                key=f"sess_{s_id}",
+                use_container_width=True
+            ):
+
+                st.session_state.current_session_id = s_id
+
+                st.rerun()
+
+
+        st.markdown("---")
+
+        st.markdown(
+            "##### 🔗 Quick Links"
+        )
+
+        for category, items in QUICK_LINK_CATEGORIES.items():
+
+            with st.expander(category, expanded=False):
+
+                for label, q_prompt in items:
+
+                    if st.button(
+                        label,
+                        key=f"ql_{category}_{label}",
+                        use_container_width=True
+                    ):
+
+                        sidebar_quick_prompt = q_prompt
+
+
+        st.markdown("---")
+
+
+        if st.button(
+            "🗑️ Clear All Sessions",
+            use_container_width=True
+        ):
+
+            st.session_state.chat_sessions = {}
+
+            new_id = datetime.now().strftime(
+                "%Y%m%d_%H%M%S"
+            )
+
+            st.session_state.current_session_id = new_id
+
+            st.session_state.chat_sessions[new_id] = {
+                "title": "New Conversation",
+                "messages": []
+            }
+
+            st.rerun()
+
+else:
+
+    # ----------------------------------------------------
+    # REOPEN TAB — rendered in the main content flow, right
+    # below the navbar, flush left ("in the white space
+    # below the logo") instead of relying on Streamlit's
+    # native (unreliably positioned) collapsed-sidebar arrow.
+    # ----------------------------------------------------
+
+    with st.container(key="sidebar_reopen_tab"):
+
+        if st.button("☰", key="reopen_sidebar_btn"):
+
+            st.session_state.sidebar_open = True
+            st.rerun()
 
 
 # ============================================================
