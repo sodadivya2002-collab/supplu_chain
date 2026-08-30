@@ -10,7 +10,7 @@ from snowflake.snowpark import Session
 # ============================================================
 
 st.set_page_config(
-    page_title="Dilytics Supply Chain AI",
+    page_title="Supply Chain AI",
     page_icon="📦",
     layout="wide"
 )
