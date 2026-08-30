@@ -194,30 +194,46 @@ st.markdown(
     /* ---------- Sidebar collapsed toggle: keep it visible & clickable ----------
        By default this control can end up hidden behind the fixed navbar
        (z-index 999999) or clipped because the native Streamlit header is
-       collapsed to height:0. Pin it below the navbar with a higher
-       z-index so there is always a visible way to re-open the sidebar. */
-    [data-testid="stSidebarCollapsedControl"] {
+       collapsed to height:0. Reposition it as a small tab flush against
+       the left edge, just below the navbar (where the sidebar panel
+       itself would sit), instead of overlapping the DILYTICS logo.
+       Multiple selectors are targeted because the exact test-id for
+       this control varies across Streamlit versions. */
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="collapsedControl"],
+    [data-testid*="CollapsedControl"],
+    header[data-testid="stHeader"] [data-testid*="Button"][aria-label*="sidebar" i],
+    header[data-testid="stHeader"] button[aria-label*="sidebar" i] {
         visibility: visible !important;
         display: flex !important;
         opacity: 1 !important;
         align-items: center !important;
         justify-content: center !important;
         position: fixed !important;
-        top: 74px !important;
-        left: 10px !important;
-        width: 34px !important;
-        height: 34px !important;
+        top: 76px !important;
+        left: 0px !important;
+        right: auto !important;
+        bottom: auto !important;
+        width: 30px !important;
+        height: 42px !important;
+        margin: 0 !important;
+        transform: none !important;
         background: #ffffff !important;
         border: 1px solid #dbe1f0 !important;
-        border-radius: 50% !important;
-        box-shadow: 0 2px 8px rgba(20,35,127,0.18) !important;
-        z-index: 1000000 !important;
+        border-left: none !important;
+        border-radius: 0 8px 8px 0 !important;
+        box-shadow: 2px 2px 8px rgba(20,35,127,0.18) !important;
+        z-index: 1000002 !important;
     }
-    [data-testid="stSidebarCollapsedControl"]:hover {
+    [data-testid="stSidebarCollapsedControl"]:hover,
+    [data-testid="collapsedControl"]:hover,
+    [data-testid*="CollapsedControl"]:hover {
         background: #f5f7fd !important;
         border-color: #1a2f8f !important;
     }
-    [data-testid="stSidebarCollapsedControl"] svg {
+    [data-testid="stSidebarCollapsedControl"] svg,
+    [data-testid="collapsedControl"] svg,
+    [data-testid*="CollapsedControl"] svg {
         color: #14237f !important;
         fill: #14237f !important;
     }
