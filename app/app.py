@@ -295,18 +295,12 @@ def call_cortex_analyst(prompt):
                 None
             )
 
-        # Cortex Analyst REST API requires a bearer token.
-        # A dedicated cortex_analyst_token is preferred. If it is not
-        # supplied, the current login password is used as a fallback.
-        # This allows the existing login flow to remain unchanged when
-        # the password field contains a Snowflake PAT.
+ 
         analyst_token = st.secrets["snowflake"].get(
             "cortex_analyst_token",
             ""
         )
 
-        if not analyst_token:
-            analyst_token = st.session_state.password
 
         if not analyst_token:
             return (
