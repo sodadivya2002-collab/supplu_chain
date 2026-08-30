@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import requests
 import snowflake.connector
 from snowflake.snowpark import Session
 
@@ -288,6 +289,173 @@ def get_snowflake_config():
         "database": st.secrets["snowflake"]["database"],
         "schema": st.secrets["snowflake"]["schema"]
     }
+
+    # ========================================================
+    # CORTEX ANALYST
+    # ========================================================
+    # All actual Supply Chain questions are now handled by the
+    # Cortex Analyst semantic view instead of keyword matching.
+    # The existing Streamlit UI and result display remain unchanged.
+
+    try:
+
+        semantic_view = st.secrets["snowflake"].get(
+            "semantic_view",
+            ""
+        )
+
+        if not semantic_view:
+            return (
+                "Cortex Analyst is not configured yet. Please add "
+                "`semantic_view` under `[snowflake]` in your Streamlit "
+                "secrets.",
+                None
+            )
+
+        # Cortex Analyst REST API requires a bearer token.
+        # A dedicated cortex_analyst_token is preferred. If it is not
+        # supplied, the current login password is used as a fallback.
+        # This allows the existing login flow to remain unchanged when
+        # the password field contains a Snowflake PAT.
+        analyst_token = st.secrets["snowflake"].get(
+            "cortex_analyst_token",
+            ""
+        )
+
+        if not analyst_token:
+            analyst_token = st.session_state.password
+
+        if not analyst_token:
+            return (
+                "Cortex Analyst authentication is not configured. "
+                "Please add `cortex_analyst_token` under `[snowflake]` "
+                "in your Streamlit secrets.",
+                None
+            )
+
+        account = st.secrets["snowflake"]["account"]
+        account = str(account).strip()
+
+        if account.startswith("https://"):
+            host = account.rstrip("/")
+        elif account.startswith("http://"):
+            host = "https://" + account[7:].rstrip("/")
+        elif account.endswith(".snowflakecomputing.com"):
+            host = "https://" + account
+        else:
+            host = "https://" + account + ".snowflakecomputing.com"
+
+        url = host + "/api/v2/cortex/analyst/message"
+
+        headers = {
+            "Authorization": f"Bearer {analyst_token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-Snowflake-Authorization-Token-Type": "PROGRAMMATIC_ACCESS_TOKEN"
+        }
+
+        request_body = {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": prompt
+                        }
+                    ]
+                }
+            ],
+            "semantic_view": semantic_view,
+            "stream": False
+        }
+
+        response = requests.post(
+            url,
+            headers=headers,
+            json=request_body,
+            timeout=120
+        )
+
+        if response.status_code != 200:
+            try:
+                error_json = response.json()
+                error_message = (
+                    error_json.get("message")
+                    or error_json.get("error")
+                    or response.text
+                )
+            except Exception:
+                error_message = response.text
+
+            return (
+                "Cortex Analyst could not process the question.\n\n"
+                f"**Error:** {error_message}",
+                None
+            )
+
+        analyst_response = response.json()
+        message = analyst_response.get("message", {})
+        content = message.get("content", [])
+
+        explanation_parts = []
+        sql_query = None
+        suggestions = []
+
+        for item in content:
+
+            item_type = item.get("type")
+
+            if item_type == "text":
+                text = item.get("text", "").strip()
+                if text:
+                    explanation_parts.append(text)
+
+            elif item_type == "sql":
+                sql_query = item.get("statement", "").strip()
+
+            elif item_type == "suggestions":
+                suggestions = item.get("suggestions", []) or []
+
+        if suggestions and not sql_query:
+            suggestion_text = "\n".join(
+                f"- {item}" for item in suggestions
+            )
+
+            explanation_parts.append(
+                "I could not generate a query for that question. "
+                "Here are some questions I can answer:\n\n"
+                + suggestion_text
+            )
+
+        explanation = "\n\n".join(explanation_parts).strip()
+
+        if not explanation:
+            explanation = "Here is the result from Cortex Analyst."
+
+        return explanation, sql_query
+
+    except requests.exceptions.Timeout:
+
+        return (
+            "Cortex Analyst took too long to respond. "
+            "Please try the question again.",
+            None
+        )
+
+    except requests.exceptions.RequestException as e:
+
+        return (
+            f"Unable to connect to Cortex Analyst.\n\n**Error:** {str(e)}",
+            None
+        )
+
+    except Exception as e:
+
+        return (
+            f"Cortex Analyst error.\n\n**Error:** {str(e)}",
+            None
+        )
 
 
 # ============================================================
