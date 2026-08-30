@@ -10,7 +10,7 @@ from snowflake.snowpark import Session
 # ============================================================
 
 st.set_page_config(
-    page_title="Supply Chain AI",
+    page_title="Dilytics Supply Chain AI",
     page_icon="📦",
     layout="wide"
 )
@@ -313,7 +313,7 @@ if not st.session_state.authenticated:
     st.write("")
     st.write("")
 
-    st.title("Welcome to Dilytics ChatBot")
+    st.title("Welcome to Dilytics Supply Chain AI")
 
     st.markdown(
         "Please login to connect to your Snowflake Data Warehouse."
