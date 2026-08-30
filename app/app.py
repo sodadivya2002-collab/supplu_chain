@@ -71,36 +71,6 @@ st.markdown(
         border-radius: 4px;
         font-size: 0.9rem;
     }
-    .dily-navbar-divider {
-        width: 1px;
-        height: 26px;
-        background: rgba(255,255,255,0.25);
-    }
-    .dily-navbar-title {
-        color: #ffffff;
-        font-size: 1.05rem;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .dily-navbar-right {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-    }
-    .dily-nav-icon {
-        width: 34px;
-        height: 34px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(255,255,255,0.10);
-        color: #ffffff;
-        font-size: 1rem;
-    }
-
     /* ---------- Sidebar ---------- */
     section[data-testid="stSidebar"] {
         background: #f6f8fc;
@@ -211,31 +181,35 @@ st.markdown(
         margin-bottom: 8px;
     }
 
-    /* Hero icon cards */
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(button[kind="secondary"]) {
-        border-radius: 14px;
+    /* ---------- Sidebar collapsed toggle: keep it visible & clickable ----------
+       By default this control can end up hidden behind the fixed navbar
+       (z-index 999999) or clipped because the native Streamlit header is
+       collapsed to height:0. Pin it below the navbar with a higher
+       z-index so there is always a visible way to re-open the sidebar. */
+    [data-testid="stSidebarCollapsedControl"] {
+        visibility: visible !important;
+        display: flex !important;
+        opacity: 1 !important;
+        align-items: center !important;
+        justify-content: center !important;
+        position: fixed !important;
+        top: 74px !important;
+        left: 10px !important;
+        width: 34px !important;
+        height: 34px !important;
+        background: #ffffff !important;
+        border: 1px solid #dbe1f0 !important;
+        border-radius: 50% !important;
+        box-shadow: 0 2px 8px rgba(20,35,127,0.18) !important;
+        z-index: 1000000 !important;
     }
-    .st-key-hero_cards div[data-testid="stButton"] > button {
-        height: 108px;
-        width: 100%;
-        background: #ffffff;
-        border: 1px solid #e6eaf3;
-        border-radius: 14px;
-        color: #1f2a4d;
-        font-weight: 600;
-        font-size: 0.85rem;
-        white-space: pre-line;
-        line-height: 1.6;
-        box-shadow: 0 2px 6px rgba(20,35,127,0.05);
+    [data-testid="stSidebarCollapsedControl"]:hover {
+        background: #f5f7fd !important;
+        border-color: #1a2f8f !important;
     }
-    .st-key-hero_cards div[data-testid="stButton"] > button p {
-        white-space: pre-line;
-        font-size: 0.85rem;
-    }
-    .st-key-hero_cards div[data-testid="stButton"] > button:hover {
-        border-color: #1a2f8f;
-        background: #f5f7fd;
-        color: #14237f;
+    [data-testid="stSidebarCollapsedControl"] svg {
+        color: #14237f !important;
+        fill: #14237f !important;
     }
 
     /* ---------- Chat input (rounded search-bar look) ---------- */
@@ -302,8 +276,6 @@ if not st.session_state.authenticated:
         <div class="dily-navbar">
             <div class="dily-navbar-left">
                 <div class="dily-logo-box">DILYTICS</div>
-                <div class="dily-navbar-divider"></div>
-                <div class="dily-navbar-title">Dilytics Supply Chain AI ✨</div>
             </div>
         </div>
         """,
@@ -512,6 +484,24 @@ def display_chart_tab(
 # SUPPLY CHAIN SQL GENERATOR
 # ============================================================
 
+GREETING_PHRASES = [
+    "hi",
+    "hello",
+    "hey",
+    "good morning",
+    "good afternoon",
+    "good evening"
+]
+
+GREETING_SUGGESTIONS = [
+    "What is the total purchase order count?",
+    "How many shipments are currently in transit?",
+    "Which suppliers are high risk?",
+    "What are the top products by ordered value?",
+    "What is the supplier on-time delivery percentage?",
+]
+
+
 def generate_sql_from_prompt(prompt):
 
     p = prompt.lower().strip()
@@ -521,21 +511,14 @@ def generate_sql_from_prompt(prompt):
     # GREETINGS
     # ========================================================
 
-    if p in [
-        "hi",
-        "hello",
-        "hey",
-        "good morning",
-        "good afternoon",
-        "good evening"
-    ]:
+    if p in GREETING_PHRASES:
 
         return (
-            "Hello! 👋 I am your Supply Chain Intelligence "
-            "Assistant. You can ask me about purchase orders, "
-            "suppliers, shipments, deliveries, carriers, "
-            "shipping modes, warehouses, products, delays, "
-            "and delivery performance.",
+            "Hi there! 👋 I'm your **Supply Chain Intelligence "
+            "Assistant**. I can help you explore purchase orders, "
+            "suppliers, shipments, deliveries, warehouses, and more "
+            "— just ask me in plain English.\n\n"
+            "Here are a few things you can try:",
             None
         )
 
@@ -1714,13 +1697,6 @@ st.markdown(
     <div class="dily-navbar">
         <div class="dily-navbar-left">
             <div class="dily-logo-box">DILYTICS</div>
-            <div class="dily-navbar-divider"></div>
-            <div class="dily-navbar-title">Dilytics Supply Chain AI ✨</div>
-        </div>
-        <div class="dily-navbar-right">
-            <div class="dily-nav-icon">🔔</div>
-            <div class="dily-nav-icon">❓</div>
-            <div class="dily-nav-icon">👤</div>
         </div>
     </div>
     """,
@@ -1911,30 +1887,54 @@ if len(messages) == 0:
         unsafe_allow_html=True
     )
 
-    hero_cards = [
-        ("📋", "Purchase\nOrders", "What is the total purchase order count?"),
-        ("🚚", "Shipments &\nDeliveries", "What is the total number of shipments?"),
-        ("🏢", "Inventory &\nWarehouses", "What is the purchase order value by warehouse?"),
-        ("👥", "Suppliers", "What is the supplier on-time delivery percentage?"),
-        ("📦", "Products", "What are the top products by ordered value?"),
-        ("📊", "Analytics\nReports", "What can I ask?"),
-    ]
+    st.markdown(
+        """
+        <div style="display:flex; gap:16px; justify-content:center;
+                    margin: 10px 0 28px 0; flex-wrap:wrap;">
 
-    with st.container(key="hero_cards"):
+          <div style="flex:1; min-width:220px; max-width:300px;
+                      background:#ffffff; border:1px solid #e6eaf3;
+                      border-radius:14px; padding:22px 18px;
+                      box-shadow:0 2px 6px rgba(20,35,127,0.05);
+                      text-align:center;">
+              <div style="font-size:1.8rem; margin-bottom:10px;">💬</div>
+              <div style="font-weight:700; color:#101a3c; font-size:0.95rem;
+                          margin-bottom:6px;">Natural Language Questions</div>
+              <div style="font-size:0.85rem; color:#5b6685; line-height:1.5;">
+                  Ask questions about your supply chain in simple language.
+              </div>
+          </div>
 
-        card_cols = st.columns(6)
+          <div style="flex:1; min-width:220px; max-width:300px;
+                      background:#ffffff; border:1px solid #e6eaf3;
+                      border-radius:14px; padding:22px 18px;
+                      box-shadow:0 2px 6px rgba(20,35,127,0.05);
+                      text-align:center;">
+              <div style="font-size:1.8rem; margin-bottom:10px;">🔍</div>
+              <div style="font-weight:700; color:#101a3c; font-size:0.95rem;
+                          margin-bottom:6px;">Intelligent Data Exploration</div>
+              <div style="font-size:0.85rem; color:#5b6685; line-height:1.5;">
+                  Explore and understand your supply chain data easily.
+              </div>
+          </div>
 
-        for col, (icon, label, q_prompt) in zip(card_cols, hero_cards):
+          <div style="flex:1; min-width:220px; max-width:300px;
+                      background:#ffffff; border:1px solid #e6eaf3;
+                      border-radius:14px; padding:22px 18px;
+                      box-shadow:0 2px 6px rgba(20,35,127,0.05);
+                      text-align:center;">
+              <div style="font-size:1.8rem; margin-bottom:10px;">⚡</div>
+              <div style="font-weight:700; color:#101a3c; font-size:0.95rem;
+                          margin-bottom:6px;">Instant Insights</div>
+              <div style="font-size:0.85rem; color:#5b6685; line-height:1.5;">
+                  Get answers and results directly from your data.
+              </div>
+          </div>
 
-            with col:
-
-                if st.button(
-                    f"{icon}\n{label}",
-                    key=f"hero_{label}",
-                    use_container_width=True
-                ):
-
-                    hero_quick_prompt = q_prompt
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     st.write("")
 
@@ -1942,6 +1942,8 @@ if len(messages) == 0:
 # ============================================================
 # DISPLAY CHAT HISTORY
 # ============================================================
+
+suggestion_click_prompt = None
 
 for idx, msg in enumerate(messages):
 
@@ -1998,6 +2000,29 @@ for idx, msg in enumerate(messages):
                 )
 
 
+        if msg.get("suggestions"):
+
+            st.write("")
+
+            sugg_cols = st.columns(
+                len(msg["suggestions"])
+            )
+
+            for s_i, (scol, sugg_q) in enumerate(
+                zip(sugg_cols, msg["suggestions"])
+            ):
+
+                with scol:
+
+                    if st.button(
+                        sugg_q,
+                        key=f"sugg_{current_id}_{idx}_{s_i}",
+                        use_container_width=True
+                    ):
+
+                        suggestion_click_prompt = sugg_q
+
+
 # ============================================================
 # CHAT INPUT
 # ============================================================
@@ -2010,6 +2035,7 @@ user_prompt = (
     )
     or hero_quick_prompt
     or sidebar_quick_prompt
+    or suggestion_click_prompt
 )
 
 
@@ -2066,6 +2092,17 @@ if user_prompt:
             generate_sql_from_prompt(
                 user_prompt
             )
+        )
+
+        is_greeting_prompt = (
+            user_prompt.strip().lower()
+            in GREETING_PHRASES
+        )
+
+        suggestions = (
+            GREETING_SUGGESTIONS
+            if is_greeting_prompt
+            else None
         )
 
 
@@ -2152,7 +2189,8 @@ if user_prompt:
             "role": "assistant",
             "content": explanation,
             "sql": sql_query,
-            "data": df
+            "data": df,
+            "suggestions": suggestions
         }
     )
 
