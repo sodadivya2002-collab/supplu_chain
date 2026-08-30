@@ -192,44 +192,17 @@ st.markdown(
     }
 
     /* ---------- Sidebar panel visibility is now managed entirely by our
-       own "«" / "☰" icon buttons (see app logic), not by Streamlit's
+       own "Hide Panel" / "☰" buttons (see app logic), not by Streamlit's
        native collapse mechanism — its position proved unreliable across
        Streamlit versions. Hide every native control so there's no
        leftover, badly-positioned arrow competing with our own. */
     [data-testid="stSidebarCollapsedControl"],
     [data-testid="collapsedControl"],
     [data-testid*="CollapsedControl"],
-    [data-testid="stSidebarHeader"] button,
-    [data-testid="stSidebarCollapseButton"],
-    section[data-testid="stSidebar"] [data-testid*="Collapse"],
-    section[data-testid="stSidebar"] button[kind="header"],
     header[data-testid="stHeader"] [data-testid*="Button"][aria-label*="sidebar" i],
     header[data-testid="stHeader"] button[aria-label*="sidebar" i] {
         display: none !important;
         visibility: hidden !important;
-    }
-
-    /* ---------- Our custom "hide panel" icon button — small, icon-only,
-       right-aligned at the top of the sidebar. Tooltip on hover comes
-       from Streamlit's built-in help= parameter. */
-    .st-key-sidebar_hide_tab {
-        margin-bottom: 4px;
-    }
-    .st-key-sidebar_hide_tab div[data-testid="stButton"] > button {
-        width: 36px;
-        height: 36px;
-        padding: 0;
-        border-radius: 8px;
-        border: 1px solid #dbe1f0;
-        background: #ffffff;
-        color: #14237f;
-        font-size: 1.05rem;
-        font-weight: 700;
-        box-shadow: 0 1px 4px rgba(20,35,127,0.10);
-    }
-    .st-key-sidebar_hide_tab div[data-testid="stButton"] > button:hover {
-        background: #f5f7fd;
-        border-color: #1a2f8f;
     }
 
     /* ---------- Our custom reopen tab (shown only when the panel is
@@ -1813,24 +1786,19 @@ if st.session_state.sidebar_open:
     with st.sidebar:
 
         # ----------------------------------------------------
-        # HIDE PANEL (custom toggle — icon-only, right-aligned;
-        # hovering shows a "Hide Panel" tooltip via help=)
+        # HIDE PANEL (custom toggle — replaces native collapse
+        # arrow so we control exactly where its counterpart,
+        # the reopen tab, is positioned)
         # ----------------------------------------------------
 
-        with st.container(key="sidebar_hide_tab"):
+        if st.button(
+            "⟨⟨ Hide Panel",
+            use_container_width=True,
+            key="hide_sidebar_btn"
+        ):
 
-            hide_cols = st.columns([6, 1])
-
-            with hide_cols[1]:
-
-                if st.button(
-                    "«",
-                    key="hide_sidebar_btn",
-                    help="Hide Panel"
-                ):
-
-                    st.session_state.sidebar_open = False
-                    st.rerun()
+            st.session_state.sidebar_open = False
+            st.rerun()
 
         st.markdown(
             '<span class="status-pill">● Semantic Mart Live</span>',
@@ -1955,7 +1923,7 @@ else:
 
     with st.container(key="sidebar_reopen_tab"):
 
-        if st.button("☰", key="reopen_sidebar_btn", help="Show Panel"):
+        if st.button("☰", key="reopen_sidebar_btn"):
 
             st.session_state.sidebar_open = True
             st.rerun()
