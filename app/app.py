@@ -819,10 +819,6 @@ QUICK_LINK_CATEGORIES = {
 }
 
 
-# ============================================================
-# SIDEBAR
-# ============================================================
-
 sidebar_quick_prompt = None
 
 if st.session_state.sidebar_open:
@@ -840,7 +836,6 @@ if st.session_state.sidebar_open:
                     key="hide_sidebar_btn",
                     help="Hide Panel"
                 ):
-
                     st.session_state.sidebar_open = False
                     st.rerun()
 
@@ -857,9 +852,7 @@ if st.session_state.sidebar_open:
             type="primary"
         ):
 
-            new_id = datetime.now().strftime(
-                "%Y%m%d_%H%M%S"
-            )
+            new_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
             st.session_state.current_session_id = new_id
 
@@ -872,25 +865,19 @@ if st.session_state.sidebar_open:
 
         st.markdown("---")
 
-        st.markdown(
-            "##### 🕒 Recent Conversations"
-        )
+        st.markdown("##### 🕒 Recent Conversations")
 
         for s_id, s_data in reversed(
-            list(
-                st.session_state.chat_sessions.items()
-            )
+            list(st.session_state.chat_sessions.items())
         ):
 
             is_active = (
-                s_id ==
-                st.session_state.current_session_id
+                s_id == st.session_state.current_session_id
             )
 
             label = s_data["title"]
 
             if len(label) > 20:
-
                 label = label[:18] + "..."
 
             if st.button(
@@ -900,14 +887,11 @@ if st.session_state.sidebar_open:
             ):
 
                 st.session_state.current_session_id = s_id
-
                 st.rerun()
 
         st.markdown("---")
 
-        st.markdown(
-            "##### 🔗 Quick Links"
-        )
+        st.markdown("##### 🔗 Quick Links")
 
         for category, items in QUICK_LINK_CATEGORIES.items():
 
@@ -932,9 +916,7 @@ if st.session_state.sidebar_open:
 
             st.session_state.chat_sessions = {}
 
-            new_id = datetime.now().strftime(
-                "%Y%m%d_%H%M%S"
-            )
+            new_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
             st.session_state.current_session_id = new_id
 
@@ -947,14 +929,41 @@ if st.session_state.sidebar_open:
 
 else:
 
+    # Small fixed tab when sidebar is closed
+    st.markdown(
+        """
+        <style>
+        .sidebar-reopen-wrapper {
+            position: fixed;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 999999;
+        }
+
+        .sidebar-reopen-wrapper button {
+            width: 42px !important;
+            height: 70px !important;
+            border-radius: 0 12px 12px 0 !important;
+            border: none !important;
+            font-size: 22px !important;
+            padding: 0 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
     with st.container(key="sidebar_reopen_tab"):
 
-        if st.button("☰", key="reopen_sidebar_btn", help="Show Panel"):
+        if st.button(
+            "☰",
+            key="reopen_sidebar_btn",
+            help="Show Panel"
+        ):
 
             st.session_state.sidebar_open = True
             st.rerun()
-
-
 # ============================================================
 # HERO SECTION  (only shown when the current chat is empty)
 # ============================================================
