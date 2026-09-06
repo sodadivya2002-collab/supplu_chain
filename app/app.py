@@ -168,12 +168,20 @@ st.markdown(
     /* Active-mode highlight: Module / Upload Files buttons get a
        teal glow when that mode is the one currently in effect.
        Both buttons stay fully clickable either way — this is a
-       highlight, never a disable. */
+       highlight, never a disable.
+       Two selector forms are included (plain class + the
+       stVerticalBlockBorderWrapper form some Streamlit versions
+       use) so the highlight still applies even if one form's
+       markup changes between Streamlit releases. */
     .st-key-module_btn_active div[data-testid="stButton"] > button[kind="primary"],
-    .st-key-upload_btn_active div[data-testid="stButton"] > button[kind="primary"] {
+    .st-key-upload_btn_active div[data-testid="stButton"] > button[kind="primary"],
+    div[data-testid="stVerticalBlockBorderWrapper"].st-key-module_btn_active button[kind="primary"],
+    div[data-testid="stVerticalBlockBorderWrapper"].st-key-upload_btn_active button[kind="primary"],
+    .st-key-module_btn_active button[kind="primary"],
+    .st-key-upload_btn_active button[kind="primary"] {
         border-color: #2dd4bf !important;
         color: #2dd4bf !important;
-        box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.25);
+        box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.25) !important;
     }
 
     section[data-testid="stSidebar"] div[data-testid="stExpander"] {
@@ -820,6 +828,53 @@ def _parse_json_response(raw_text):
     return json.loads(cleaned)
 
 
+def _generate_narrative_overview(df, fname):
+    """Asks the LLM to describe, in plain business language, what
+    this dataset represents and what it's typically used for —
+    based on the column names and a few sample rows. This is
+    separate from the numeric/categorical stats block: those are
+    computed directly with pandas (real numbers), while this is
+    purely an interpretive, human-readable summary. Returns None
+    on any failure (missing config, network error, etc.) so the
+    caller can just fall back to the stats-only view."""
+
+    try:
+
+        columns = list(df.columns)
+        sample_csv = df.head(5).to_csv(index=False)
+
+        system_prompt = (
+            "You are a data analyst describing a dataset to a "
+            "non-technical business user. Given the file name, "
+            "column names, and a few sample rows, write a short "
+            "plain-English description (2-4 sentences, flowing "
+            "prose, no bullet points, no markdown headers) of what "
+            "this dataset represents and what it is typically used "
+            "for. Infer the business context from the column names "
+            "(e.g. event/attendance tracking, sales orders, "
+            "inventory levels). Do NOT mention data types, row or "
+            "column counts, or statistics — only the business "
+            "meaning of the data."
+        )
+
+        user_message = (
+            f"File name: {fname}\n"
+            f"Columns: {', '.join(columns)}\n\n"
+            f"Sample rows:\n{sample_csv}"
+        )
+
+        narrative = _call_groq_json(system_prompt, user_message)
+
+        return narrative.strip() if narrative else None
+
+    except Exception:
+
+        # Narrative summary is a nice-to-have on top of the real
+        # stats below — never let it block or error out the
+        # overview if Groq isn't configured or is unreachable.
+        return None
+
+
 def answer_from_file(prompt, fname):
     """Answer a question about the active uploaded file, via the
     Groq API. Tabular files (csv/xlsx/xls) are queried with real
@@ -940,11 +995,16 @@ def answer_from_file(prompt, fname):
 
 
 def generate_file_overview(fname):
-    """Automatically summarizes a freshly uploaded file. For
-    tabular files the numbers are computed directly from the real
-    data with pandas (row/column counts, missing values, numeric
-    ranges) — not asked of an LLM — so nothing is guessed. Returns
-    (explanation, sql, preview_df)."""
+    """Automatically summarizes a freshly uploaded file.
+
+    The response leads with a plain-English narrative (via
+    `_generate_narrative_overview`) describing what the dataset
+    IS and what it's used for — this is the part the user reads
+    first. Underneath it, the real pandas-computed technical
+    details (row/column counts, missing values, numeric ranges,
+    distinct value counts) are still included as a reference
+    section — nothing is guessed for those, they come straight
+    from the data. Returns (explanation, sql, preview_df)."""
 
     file_data = st.session_state.stored_files.get(fname, {})
     df = file_data.get("df")
@@ -960,11 +1020,17 @@ def generate_file_overview(fname):
     total_rows = len(df)
     total_cols = len(df.columns)
 
-    lines = [
-        f"**{fname}** — {total_rows:,} rows, {total_cols} columns.",
-        "",
-        "**Columns:**"
-    ]
+    narrative = _generate_narrative_overview(df, fname)
+
+    lines = []
+
+    if narrative:
+        lines.append(narrative)
+        lines.append("")
+
+    lines.append(f"**{fname}** — {total_rows:,} rows, {total_cols} columns.")
+    lines.append("")
+    lines.append("**Columns:**")
 
     for col in df.columns:
         dtype = df[col].dtype
@@ -1541,7 +1607,10 @@ if st.session_state.sidebar_open:
         # exclusive, but the Module button is always clickable —
         # picking a module here switches mode away from the active
         # file automatically. The currently-active mode is shown
-        # with a highlighted border instead of disabling anything.
+        # with a highlighted border (CSS) AND a ✅ in the label
+        # itself, so the highlight is visible even if the CSS
+        # class selector doesn't match on a given Streamlit
+        # version.
         module_is_current_mode = (
             not st.session_state.active_file
             and st.session_state.selected_module != "None"
@@ -1555,8 +1624,14 @@ if st.session_state.sidebar_open:
             )
         ):
 
+            module_button_label = (
+                "🧩 Module ✅"
+                if module_is_current_mode
+                else "🧩 Module"
+            )
+
             if st.button(
-                "🧩 Module",
+                module_button_label,
                 use_container_width=True,
                 type="primary",
                 key="btn_module"
@@ -1602,6 +1677,9 @@ if st.session_state.sidebar_open:
         st.write("")
 
         # ---------------- Upload Files ----------------
+        # Same idea as Module above: the ✅ suffix guarantees a
+        # visible "you are in upload mode" signal regardless of
+        # whether the CSS highlight selector matches.
         file_is_current_mode = bool(st.session_state.active_file)
 
         with st.container(
@@ -1612,8 +1690,14 @@ if st.session_state.sidebar_open:
             )
         ):
 
+            upload_button_label = (
+                "📁 Upload Files ✅"
+                if file_is_current_mode
+                else "📁 Upload Files"
+            )
+
             if st.button(
-                "📁 Upload Files",
+                upload_button_label,
                 use_container_width=True,
                 type="primary",
                 key="btn_upload"
