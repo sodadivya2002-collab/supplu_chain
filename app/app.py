@@ -275,6 +275,10 @@ st.markdown(
         margin: 0 auto;
         padding: 20px 0 6px 0;
     }
+    .dily-login-hero .dily-logo-box {
+        display: inline-block;
+        margin-bottom: 18px;
+    }
     .dily-login-hero h1 {
         font-size: 1.8rem;
         font-weight: 700;
@@ -740,23 +744,13 @@ if "snowpark_session" not in st.session_state:
 
 if not st.session_state.authenticated:
 
-    st.markdown(
-        """
-        <div class="dily-navbar">
-            <div class="dily-navbar-left">
-                <div class="dily-logo-box">DILYTICS</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
     st.write("")
     st.write("")
 
     st.markdown(
         """
         <div class="dily-login-hero">
+            <div class="dily-logo-box">DILYTICS</div>
             <h1>Welcome to Dilytics Supply Chain AI</h1>
             <p class="sub">Please log in to connect to your Snowflake data warehouse.</p>
         </div>
