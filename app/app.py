@@ -659,12 +659,18 @@ def call_cortex_analyst(prompt, module="Supply Chain"):
 # ============================================================
 # FILE UPLOAD HELPERS
 # ============================================================
-# Extracts plain text from an uploaded file so it can be used
-# as context for Q&A. Falls back gracefully if an optional
-# parsing library (pypdf / python-docx) is not installed.
+# Extracts data from an uploaded file. Tabular files (csv/xlsx/xls)
+# are parsed into a full pandas DataFrame — nothing is truncated —
+# so questions can be answered with real SQL over the WHOLE file
+# instead of guesswork over a text snippet. Non-tabular files
+# (txt/pdf/docx) fall back to plain extracted text.
 # ============================================================
 
-def extract_text_from_upload(uploaded_file):
+def extract_data_from_upload(uploaded_file):
+    """Returns (text, dataframe). `dataframe` is a full pandas
+    DataFrame for tabular files (csv/xlsx/xls), or None otherwise.
+    `text` is always a string (used as a text preview / fallback
+    context for non-tabular files)."""
 
     name = uploaded_file.name
     ext = name.split(".")[-1].lower() if "." in name else ""
@@ -672,15 +678,15 @@ def extract_text_from_upload(uploaded_file):
     try:
 
         if ext == "txt":
-            return uploaded_file.read().decode("utf-8", errors="ignore")
+            return uploaded_file.read().decode("utf-8", errors="ignore"), None
 
         elif ext == "csv":
             df = pd.read_csv(uploaded_file)
-            return df.to_csv(index=False)
+            return df.to_csv(index=False), df
 
         elif ext in ("xlsx", "xls"):
             df = pd.read_excel(uploaded_file)
-            return df.to_csv(index=False)
+            return df.to_csv(index=False), df
 
         elif ext == "pdf":
             try:
@@ -690,49 +696,199 @@ def extract_text_from_upload(uploaded_file):
             reader = PdfReader(uploaded_file)
             return "\n".join(
                 (page.extract_text() or "") for page in reader.pages
-            )
+            ), None
 
         elif ext == "docx":
             import docx
             document = docx.Document(uploaded_file)
-            return "\n".join(p.text for p in document.paragraphs)
+            return "\n".join(p.text for p in document.paragraphs), None
 
         elif ext in ("png", "jpg", "jpeg"):
-            return "[Image file uploaded — no text extracted.]"
+            return "[Image file uploaded — no text extracted.]", None
 
         else:
-            return "[Unsupported file type for text extraction.]"
+            return "[Unsupported file type for text extraction.]", None
 
     except ImportError as e:
         return (
             f"[Could not read '{name}' — missing library ({e}). "
-            f"Install pypdf / python-docx to enable this file type.]"
+            f"Install pypdf / python-docx to enable this file type.]",
+            None
         )
 
     except Exception as e:
-        return f"[Could not read '{name}': {e}]"
+        return f"[Could not read '{name}': {e}]", None
 
 
-def answer_from_file(prompt, file_text):
-    """Answer a question using the active uploaded file as context,
-    via the Groq API (free tier, no Snowflake Cortex dependency).
-    Returns (explanation, sql) to match the shape used elsewhere
-    in the app."""
+def _call_groq_json(system_prompt, user_message):
+    """Calls the Groq chat completions API and returns the raw
+    response text (expected to be a JSON object). Raises on
+    network/HTTP errors so callers can report them."""
 
-    try:
+    groq_api_key = st.secrets.get("groq", {}).get("api_key", "")
 
-        groq_api_key = st.secrets.get("groq", {}).get("api_key", "")
+    if not groq_api_key:
+        raise RuntimeError(
+            "File Q&A is not configured yet. Please add `api_key` "
+            "under a `[groq]` section in your Streamlit secrets "
+            "(get a free key at console.groq.com)."
+        )
 
-        if not groq_api_key:
+    url = "https://api.groq.com/openai/v1/chat/completions"
+
+    headers = {
+        "Authorization": f"Bearer {groq_api_key}",
+        "Content-Type": "application/json"
+    }
+
+    request_body = {
+        "model": "openai/gpt-oss-20b",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message}
+        ],
+        "temperature": 0.1
+    }
+
+    response = requests.post(
+        url,
+        headers=headers,
+        json=request_body,
+        timeout=60
+    )
+
+    if response.status_code != 200:
+        try:
+            error_json = response.json()
+            error_message = (
+                error_json.get("error", {}).get("message")
+                or response.text
+            )
+        except Exception:
+            error_message = response.text
+
+        raise RuntimeError(error_message)
+
+    result = response.json()
+
+    return (
+        result.get("choices", [{}])[0]
+        .get("message", {})
+        .get("content", "")
+        .strip()
+    )
+
+
+def _parse_json_response(raw_text):
+    """Best-effort parse of a JSON object out of an LLM response,
+    stripping markdown code fences if present."""
+
+    import json
+
+    cleaned = raw_text.strip()
+
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`")
+        if cleaned.lower().startswith("json"):
+            cleaned = cleaned[4:]
+        cleaned = cleaned.strip()
+
+    return json.loads(cleaned)
+
+
+def answer_from_file(prompt, fname):
+    """Answer a question about the active uploaded file, via the
+    Groq API. Tabular files (csv/xlsx/xls) are queried with real
+    SQL over the FULL dataset (loaded into an in-memory SQLite
+    table) so KPI-style questions return the same shape as the
+    Cortex Analyst path: (explanation, sql, result_dataframe).
+    Non-tabular files fall back to a plain text-context answer."""
+
+    file_data = st.session_state.stored_files.get(fname, {})
+    df = file_data.get("df")
+
+    # ---------------- Tabular file: text-to-SQL over SQLite ----------------
+    if df is not None:
+
+        try:
+
+            import sqlite3
+
+            total_rows = len(df)
+
+            schema_lines = [
+                f"- {col} ({str(dtype)})"
+                for col, dtype in df.dtypes.items()
+            ]
+            schema_text = "\n".join(schema_lines)
+
+            sample_csv = df.head(5).to_csv(index=False)
+
+            system_prompt = (
+                "You are a data analyst. You have access to a SQLite "
+                "table named `uploaded_data` with this schema:\n"
+                f"{schema_text}\n\n"
+                f"The table has exactly {total_rows} rows in total "
+                "(not just the sample below). Here are the first 5 "
+                f"rows as a sample of the data format:\n{sample_csv}\n\n"
+                "Given the user's question, respond with ONLY a JSON "
+                "object (no markdown, no code fences) with exactly "
+                "two fields:\n"
+                '  "explanation": a short natural-language summary of '
+                "what the answer shows.\n"
+                '  "sql": a single valid SQLite SELECT query against '
+                "`uploaded_data` that answers the question using the "
+                "FULL table (never assume only the sample rows exist). "
+                "If the question is a greeting or cannot be answered "
+                "with a query, set \"sql\" to null and just answer in "
+                '"explanation".'
+            )
+
+            raw_response = _call_groq_json(system_prompt, prompt)
+
+            try:
+                parsed = _parse_json_response(raw_response)
+            except Exception:
+                # Model didn't return clean JSON — treat the whole
+                # response as the explanation with no query.
+                return raw_response, None, None
+
+            explanation = parsed.get("explanation", "").strip()
+            sql_query = parsed.get("sql")
+
+            if not sql_query:
+                return (
+                    explanation or "I couldn't generate an answer from the file.",
+                    None,
+                    None
+                )
+
+            conn = sqlite3.connect(":memory:")
+
+            try:
+                df.to_sql("uploaded_data", conn, index=False, if_exists="replace")
+                result_df = pd.read_sql_query(sql_query, conn)
+            finally:
+                conn.close()
+
+            return explanation or "Here is the result from your file.", sql_query, result_df
+
+        except RuntimeError as e:
+            return f"Error answering from the uploaded file.\n\n**Error:** {str(e)}", None, None
+
+        except Exception as e:
             return (
-                "File Q&A is not configured yet. Please add "
-                "`api_key` under a `[groq]` section in your "
-                "Streamlit secrets (get a free key at "
-                "console.groq.com).",
+                "The generated query could not be run against the "
+                f"file.\n\n**Error:** {str(e)}",
+                None,
                 None
             )
 
-        context = file_text[:12000]
+    # ---------------- Non-tabular file: plain text context ----------------
+    try:
+
+        file_text = file_data.get("text", "")
+        context = file_text[:60000]
 
         system_prompt = (
             "You are a helpful assistant. Use the document content "
@@ -745,67 +901,18 @@ def answer_from_file(prompt, file_text):
             f"QUESTION: {prompt}"
         )
 
-        url = "https://api.groq.com/openai/v1/chat/completions"
-
-        headers = {
-            "Authorization": f"Bearer {groq_api_key}",
-            "Content-Type": "application/json"
-        }
-
-        request_body = {
-            "model": "openai/gpt-oss-20b",
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ],
-            "temperature": 0.2
-        }
-
-        response = requests.post(
-            url,
-            headers=headers,
-            json=request_body,
-            timeout=60
-        )
-
-        if response.status_code != 200:
-            try:
-                error_json = response.json()
-                error_message = (
-                    error_json.get("error", {}).get("message")
-                    or response.text
-                )
-            except Exception:
-                error_message = response.text
-
-            return (
-                "Groq could not answer from the uploaded file.\n\n"
-                f"**Error:** {error_message}",
-                None
-            )
-
-        result = response.json()
-        answer = (
-            result.get("choices", [{}])[0]
-            .get("message", {})
-            .get("content", "")
-            .strip()
-        )
+        answer = _call_groq_json(system_prompt, user_message)
 
         if answer:
-            return answer, None
+            return answer, None, None
 
-        return "I couldn't generate an answer from the file.", None
+        return "I couldn't generate an answer from the file.", None, None
 
-    except requests.exceptions.Timeout:
-
-        return (
-            "The request to Groq took too long. Please try again.",
-            None
-        )
+    except RuntimeError as e:
+        return f"Error answering from the uploaded file.\n\n**Error:** {str(e)}", None, None
 
     except Exception as e:
-        return f"Error answering from the uploaded file.\n\n**Error:** {str(e)}", None
+        return f"Error answering from the uploaded file.\n\n**Error:** {str(e)}", None, None
 
 
 # ============================================================
@@ -932,7 +1039,7 @@ if "show_module_selector" not in st.session_state:
     st.session_state.show_module_selector = False
 
 if "selected_module" not in st.session_state:
-    st.session_state.selected_module = "Supply Chain"
+    st.session_state.selected_module = "None"
 
 if "show_files_panel" not in st.session_state:
     st.session_state.show_files_panel = False
@@ -1095,6 +1202,7 @@ MODULE_GREETING_SUGGESTIONS = {
         "What is the total inventory value by product category?",
         "How many products need to be reordered?",
     ],
+    "None": [],
 }
 
 # Backward-compatible alias — kept in case anything else references it.
@@ -1131,22 +1239,45 @@ Try things like:
 Ask in plain English — Cortex Analyst will turn it into a query
 against the inventory semantic view.
 """,
+    "None": """
+No module is selected yet, and no file is active.
+
+- To ask about **Supply Chain** or **Inventory** data, click
+  **🧩 Module** in the sidebar and pick one.
+- To ask about your own data, click **📁 Upload Files** and
+  attach a file — the Module option is disabled automatically
+  while a file is active.
+""",
 }
 
 
 def generate_sql_from_prompt(prompt):
+    """Returns (explanation, sql, result_df).
+
+    result_df is pre-computed data (used for the file-upload path,
+    which runs its own SQL engine); it's None for the Cortex
+    Analyst path, where the caller executes `sql` against the
+    live Snowflake session instead."""
 
     p = prompt.lower().strip()
 
-    module = st.session_state.get("selected_module", "Supply Chain")
+    module = st.session_state.get("selected_module", "None")
+    active_file = st.session_state.get("active_file")
 
     if p in GREETING_PHRASES:
 
+        if active_file:
+            greeting_subject = f"your uploaded file **{active_file}**"
+        elif module != "None":
+            greeting_subject = f"your **{module}** data"
+        else:
+            greeting_subject = "your data"
+
         return (
-            f"Hi there! 👋 I'm your **{module} Intelligence "
-            "Assistant**. Ask me anything about your "
-            f"{module.lower()} data in plain English.\n\n"
+            f"Hi there! 👋 Ask me anything about {greeting_subject} "
+            "in plain English.\n\n"
             "Here are a few things you can try:",
+            None,
             None
         )
 
@@ -1158,23 +1289,48 @@ def generate_sql_from_prompt(prompt):
         or p == "help"
     ):
 
+        if active_file:
+            return (
+                f"You can ask me questions about your uploaded file "
+                f"**{active_file}** — try things like \"how many "
+                "records are there\", \"summarize this file\", or "
+                "ask about any KPI in the data.",
+                None,
+                None
+            )
+
         return (
             MODULE_HELP_TEXT.get(
                 module,
-                MODULE_HELP_TEXT["Supply Chain"]
+                MODULE_HELP_TEXT["None"]
             ),
+            None,
             None
         )
 
-    active_file = st.session_state.get("active_file")
-
+    # File Q&A takes priority whenever a file is active — the
+    # sidebar disables Module selection while a file is active,
+    # so the two are mutually exclusive.
     if active_file and active_file in st.session_state.stored_files:
 
-        file_text = st.session_state.stored_files[active_file]["text"]
+        explanation, sql_query, result_df = answer_from_file(prompt, active_file)
 
-        return answer_from_file(prompt, file_text)
+        return explanation, sql_query, result_df
 
-    return call_cortex_analyst(prompt, module)
+    if module == "None":
+
+        return (
+            "Please select a module (**Supply Chain** or "
+            "**Inventory**) from the **🧩 Module** menu in the "
+            "sidebar, or upload a file, before asking a data "
+            "question.",
+            None,
+            None
+        )
+
+    explanation, sql_query = call_cortex_analyst(prompt, module)
+
+    return explanation, sql_query, None
 
 
 # ============================================================
@@ -1234,20 +1390,33 @@ if st.session_state.sidebar_open:
         st.write("")
 
         # ---------------- Module ----------------
+        # Disabled while a file is active — file Q&A and module
+        # (Cortex Analyst) Q&A are mutually exclusive.
+        module_disabled = bool(st.session_state.active_file)
+
         if st.button(
             "🧩 Module",
             use_container_width=True,
             type="primary",
-            key="btn_module"
+            key="btn_module",
+            disabled=module_disabled
         ):
 
             st.session_state.show_module_selector = (
                 not st.session_state.show_module_selector
             )
 
-        if st.session_state.show_module_selector:
+        if module_disabled:
+
+            st.caption(
+                "Module is disabled while a file is active. "
+                "Remove the file to ask module questions."
+            )
+
+        elif st.session_state.show_module_selector:
 
             module_options = [
+                "None",
                 "Supply Chain",
                 "Inventory"
             ]
@@ -1455,7 +1624,15 @@ else:
 
 if len(messages) == 0:
 
-    _hero_module = st.session_state.get("selected_module", "Supply Chain")
+    _selected_module = st.session_state.get("selected_module", "None")
+    _active_file = st.session_state.get("active_file")
+
+    if _active_file:
+        _hero_module = _active_file
+    elif _selected_module != "None":
+        _hero_module = _selected_module
+    else:
+        _hero_module = "Data"
 
     st.markdown(
         f"""
@@ -1610,12 +1787,18 @@ if uploaded_chat_files:
 
         if f.name not in st.session_state.stored_files:
 
-            text_content = extract_text_from_upload(f)
+            text_content, parsed_df = extract_data_from_upload(f)
 
             st.session_state.stored_files[f.name] = {
                 "text": text_content,
-                "type": f.type
+                "type": f.type,
+                "df": parsed_df
             }
+
+        # Newly uploaded file becomes the active file automatically —
+        # file Q&A and Module Q&A are mutually exclusive, so this
+        # also disables the Module button (see sidebar section).
+        st.session_state.active_file = f.name
 
     file_names = ", ".join(f.name for f in uploaded_chat_files)
 
@@ -1658,7 +1841,7 @@ if user_prompt:
 
     with st.chat_message("assistant"):
 
-        explanation, sql_query = (
+        explanation, sql_query, file_df = (
             generate_sql_from_prompt(
                 user_prompt
             )
@@ -1671,8 +1854,8 @@ if user_prompt:
 
         suggestions = (
             MODULE_GREETING_SUGGESTIONS.get(
-                st.session_state.get("selected_module", "Supply Chain"),
-                MODULE_GREETING_SUGGESTIONS["Supply Chain"]
+                st.session_state.get("selected_module", "None"),
+                MODULE_GREETING_SUGGESTIONS["None"]
             )
             if is_greeting_prompt
             else None
@@ -1684,8 +1867,61 @@ if user_prompt:
 
         df = None
 
-        if sql_query:
+        if file_df is not None:
 
+            # File-Q&A path: the SQL was already generated AND
+            # executed against the uploaded file's in-memory table
+            # inside answer_from_file(). Just render it — same
+            # Generated SQL / Data / Chart layout as the Cortex
+            # Analyst path below.
+            df = file_df
+
+            if sql_query:
+
+                with st.expander(
+                    "Generated SQL",
+                    expanded=False
+                ):
+
+                    st.code(
+                        sql_query,
+                        language="sql"
+                    )
+
+            if df.empty:
+
+                st.info(
+                    "The query executed successfully, "
+                    "but no records were returned."
+                )
+
+            else:
+
+                tab1, tab2 = st.tabs(
+                    [
+                        "Data 📄",
+                        "Chart 📈"
+                    ]
+                )
+
+                with tab1:
+
+                    st.dataframe(
+                        df,
+                        use_container_width=True
+                    )
+
+                with tab2:
+
+                    display_chart_tab(
+                        df,
+                        key_prefix=f"live_{current_id}"
+                    )
+
+        elif sql_query:
+
+            # Cortex Analyst path: sql_query needs to be executed
+            # against the live Snowflake session.
             with st.expander(
                 "Generated SQL",
                 expanded=False
