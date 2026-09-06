@@ -750,8 +750,7 @@ if not st.session_state.authenticated:
     st.markdown(
         """
         <div class="dily-login-hero">
-            <div class="dily-logo-box">DILYTICS</div>
-            <h1>Welcome to Dilytics Supply Chain AI</h1>
+            <h1>Welcome to Dilytics Chatbot</h1>
             <p class="sub">Please log in to connect to your Snowflake data warehouse.</p>
         </div>
         """,
