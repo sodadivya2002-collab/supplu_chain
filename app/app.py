@@ -426,27 +426,34 @@ st.markdown(
     /* The mic button lives in its own st.columns() cell placed   */
     /* directly beside the chat input (see the CHAT INPUT section */
     /* in the script) so it's genuinely on the same row — no      */
-    /* fixed-position CSS math involved.                          */
+    /* fixed-position CSS math involved. Styled as a plain icon   */
+    /* (no border/box), tight against the send button, matching  */
+    /* the requested look.                                       */
+    .st-key-chat_row div[data-testid="stHorizontalBlock"] {
+        gap: 0.35rem !important;
+        align-items: flex-end !important;
+    }
     .st-key-mic_beside_btn {
         display: flex;
         align-items: flex-end;
+        justify-content: center;
         height: 100%;
-        padding-bottom: 4px;
+        padding-bottom: 9px;
     }
     .st-key-mic_beside_btn div[data-testid="stButton"] > button {
-        width: 40px;
-        height: 40px;
+        width: 34px;
+        height: 34px;
         padding: 0;
         border-radius: 50%;
         background: transparent;
-        border: 1.5px solid #2dd4bf;
-        color: #2dd4bf;
-        font-size: 1.1rem;
+        border: none;
+        color: #9a9aa8;
+        font-size: 1.05rem;
         box-shadow: none;
     }
     .st-key-mic_beside_btn div[data-testid="stButton"] > button:hover {
-        color: #5eead4;
-        border-color: #5eead4;
+        color: #2dd4bf;
+        border: none;
         background: transparent;
     }
 
@@ -1587,45 +1594,51 @@ if st.session_state.show_mic_input:
 # CHAT INPUT  (+ mic button on the same row)
 # ============================================================
 
-col_input, col_mic = st.columns([0.93, 0.07])
+# ============================================================
+# CHAT INPUT  (+ mic button on the same row)
+# ============================================================
 
-with col_input:
+with st.container(key="chat_row"):
 
-    try:
+    col_input, col_mic = st.columns([0.95, 0.05], gap="small")
 
-        chat_result = st.chat_input(
-            "Ask me anything about your data...",
-            accept_file="multiple",
-            file_type=["pdf", "docx", "xlsx", "csv", "txt", "png", "jpg", "jpeg"]
-        )
+    with col_input:
 
-        if chat_result:
-            user_prompt = chat_result.text
-            uploaded_chat_files = chat_result.files
-        else:
-            user_prompt = None
+        try:
+
+            chat_result = st.chat_input(
+                "Ask me anything about your data...",
+                accept_file="multiple",
+                file_type=["pdf", "docx", "xlsx", "csv", "txt", "png", "jpg", "jpeg"]
+            )
+
+            if chat_result:
+                user_prompt = chat_result.text
+                uploaded_chat_files = chat_result.files
+            else:
+                user_prompt = None
+                uploaded_chat_files = []
+
+        except TypeError:
+
+            user_prompt = st.chat_input(
+                "Ask me anything about your data..."
+            )
             uploaded_chat_files = []
 
-    except TypeError:
+    with col_mic:
 
-        user_prompt = st.chat_input(
-            "Ask me anything about your data..."
-        )
-        uploaded_chat_files = []
+        with st.container(key="mic_beside_btn"):
 
-with col_mic:
+            if st.button(
+                "🎤",
+                key="btn_mic_toggle",
+                help="Voice input",
+                use_container_width=True
+            ):
 
-    with st.container(key="mic_beside_btn"):
-
-        if st.button(
-            "🎤",
-            key="btn_mic_toggle",
-            help="Voice input",
-            use_container_width=True
-        ):
-
-            st.session_state.show_mic_input = not st.session_state.show_mic_input
-            st.rerun()
+                st.session_state.show_mic_input = not st.session_state.show_mic_input
+                st.rerun()
 
 user_prompt = (
     user_prompt
