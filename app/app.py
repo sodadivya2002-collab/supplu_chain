@@ -476,20 +476,45 @@ def get_snowflake_config():
 # CORTEX ANALYST
 # ============================================================
 
-def call_cortex_analyst(prompt):
+# Each module points at a different Cortex Analyst semantic view.
+# Add the secret key here whenever a new module goes live, and
+# add the matching value under [snowflake] in your Streamlit
+# secrets (e.g. semantic_view_supply_chain = "...",
+# semantic_view_inventory = "...").
+MODULE_SEMANTIC_VIEW_KEYS = {
+    "Supply Chain": "semantic_view_supply_chain",
+    "Inventory": "semantic_view_inventory",
+}
+
+
+def call_cortex_analyst(prompt, module="Supply Chain"):
 
     try:
 
+        secret_key = MODULE_SEMANTIC_VIEW_KEYS.get(
+            module,
+            "semantic_view"
+        )
+
         semantic_view = st.secrets["snowflake"].get(
-            "semantic_view",
+            secret_key,
             ""
         )
 
+        # Backward compatibility: older deployments only ever set
+        # `semantic_view` (no module suffix) for Supply Chain.
+        if not semantic_view and module == "Supply Chain":
+
+            semantic_view = st.secrets["snowflake"].get(
+                "semantic_view",
+                ""
+            )
+
         if not semantic_view:
             return (
-                "Cortex Analyst is not configured yet. Please add "
-                "`semantic_view` under `[snowflake]` in your Streamlit "
-                "secrets.",
+                f"Cortex Analyst is not configured yet for the "
+                f"**{module}** module. Please add `{secret_key}` "
+                f"under `[snowflake]` in your Streamlit secrets.",
                 None
             )
 
@@ -990,40 +1015,28 @@ GREETING_PHRASES = [
     "good evening"
 ]
 
-GREETING_SUGGESTIONS = [
-    "What is the total purchase order count?",
-    "How many shipments are currently in transit?",
-    "Which suppliers are high risk?",
-    "What are the top products by ordered value?",
-    "What is the supplier on-time delivery percentage?",
-]
+MODULE_GREETING_SUGGESTIONS = {
+    "Supply Chain": [
+        "What is the total purchase order count?",
+        "How many shipments are currently in transit?",
+        "Which suppliers are high risk?",
+        "What are the top products by ordered value?",
+        "What is the supplier on-time delivery percentage?",
+    ],
+    "Inventory": [
+        "What is the total available inventory as of the latest snapshot?",
+        "What is the total quantity of inventory currently on hand?",
+        "How many products and warehouses are out of stock?",
+        "What is the total inventory value by product category?",
+        "How many products need to be reordered?",
+    ],
+}
 
+# Backward-compatible alias — kept in case anything else references it.
+GREETING_SUGGESTIONS = MODULE_GREETING_SUGGESTIONS["Supply Chain"]
 
-def generate_sql_from_prompt(prompt):
-
-    p = prompt.lower().strip()
-
-    if p in GREETING_PHRASES:
-
-        return (
-            "Hi there! 👋 I'm your **Supply Chain Intelligence "
-            "Assistant**. I can help you explore purchase orders, "
-            "suppliers, shipments, deliveries, warehouses, and more "
-            "— just ask me in plain English.\n\n"
-            "Here are a few things you can try:",
-            None
-        )
-
-    if (
-        "what can i ask" in p
-        or "what questions" in p
-        or "what can you do" in p
-        or "examples" in p
-        or p == "help"
-    ):
-
-        return (
-            """
+MODULE_HELP_TEXT = {
+    "Supply Chain": """
 You can ask me questions about **Supply Chain data**.
 
 Try things like:
@@ -1038,6 +1051,53 @@ Try things like:
 Ask in plain English — Cortex Analyst will turn it into a query
 against the supply chain semantic view.
 """,
+    "Inventory": """
+You can ask me questions about **Inventory data**.
+
+Try things like:
+
+- What is the total available inventory as of the latest snapshot?
+- What is the total quantity of inventory currently on hand?
+- How many products and warehouses are out of stock?
+- What is the total inventory value by product category?
+- How many products need to be reordered?
+- What are the top 10 products by inventory value?
+
+Ask in plain English — Cortex Analyst will turn it into a query
+against the inventory semantic view.
+""",
+}
+
+
+def generate_sql_from_prompt(prompt):
+
+    p = prompt.lower().strip()
+
+    module = st.session_state.get("selected_module", "Supply Chain")
+
+    if p in GREETING_PHRASES:
+
+        return (
+            f"Hi there! 👋 I'm your **{module} Intelligence "
+            "Assistant**. Ask me anything about your "
+            f"{module.lower()} data in plain English.\n\n"
+            "Here are a few things you can try:",
+            None
+        )
+
+    if (
+        "what can i ask" in p
+        or "what questions" in p
+        or "what can you do" in p
+        or "examples" in p
+        or p == "help"
+    ):
+
+        return (
+            MODULE_HELP_TEXT.get(
+                module,
+                MODULE_HELP_TEXT["Supply Chain"]
+            ),
             None
         )
 
@@ -1049,7 +1109,7 @@ against the supply chain semantic view.
 
         return answer_from_file(prompt, file_text)
 
-    return call_cortex_analyst(prompt)
+    return call_cortex_analyst(prompt, module)
 
 
 # ============================================================
@@ -1124,16 +1184,21 @@ if st.session_state.sidebar_open:
 
             module_options = [
                 "Supply Chain",
+                "Inventory",
                 "Finance (coming soon)",
                 "HR (coming soon)"
             ]
 
+            current_index = (
+                module_options.index(st.session_state.selected_module)
+                if st.session_state.selected_module in module_options
+                else 0
+            )
+
             st.session_state.selected_module = st.selectbox(
                 "Select module",
                 module_options,
-                index=module_options.index(
-                    st.session_state.selected_module
-                ),
+                index=current_index,
                 key="module_selectbox",
                 label_visibility="collapsed"
             )
@@ -1327,15 +1392,17 @@ else:
 
 if len(messages) == 0:
 
+    _hero_module = st.session_state.get("selected_module", "Supply Chain")
+
     st.markdown(
-        """
+        f"""
         <div class="dily-hero">
             <div class="dily-hero-copy">
                 <span class="dily-hero-badge">DILYTICS</span>
-                <h1>Chat with your data<br>using <span>Cortex AI</span></h1>
+                <h1>Chat with your {_hero_module}<br>data using <span>Cortex AI</span></h1>
                 <p class="sub">
                     Ask questions in plain English and get instant
-                    insights across your business data.
+                    insights across your {_hero_module.lower()} data.
                 </p>
             </div>
             <div class="dily-hero-graphic">
@@ -1540,7 +1607,10 @@ if user_prompt:
         )
 
         suggestions = (
-            GREETING_SUGGESTIONS
+            MODULE_GREETING_SUGGESTIONS.get(
+                st.session_state.get("selected_module", "Supply Chain"),
+                MODULE_GREETING_SUGGESTIONS["Supply Chain"]
+            )
             if is_greeting_prompt
             else None
         )
