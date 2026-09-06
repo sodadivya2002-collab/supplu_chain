@@ -1184,9 +1184,7 @@ if st.session_state.sidebar_open:
 
             module_options = [
                 "Supply Chain",
-                "Inventory",
-                "Finance (coming soon)",
-                "HR (coming soon)"
+                "Inventory"
             ]
 
             current_index = (
