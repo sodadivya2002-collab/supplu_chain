@@ -423,28 +423,28 @@ st.markdown(
     }
 
     /* ---------- Mic / voice input ---------- */
-    /* Rendered in normal page flow (right-aligned above the chat  */
-    /* input), NOT fixed-positioned — fixed offsets from the      */
-    /* viewport edge break on different screen widths / toolbars, */
-    /* so this stays reliably visible everywhere.                 */
-    .st-key-mic_inline_btn {
-        max-width: 760px;
-        margin: 0 auto;
+    /* The mic button lives in its own st.columns() cell placed   */
+    /* directly beside the chat input (see the CHAT INPUT section */
+    /* in the script) so it's genuinely on the same row — no      */
+    /* fixed-position CSS math involved.                          */
+    .st-key-mic_beside_btn {
         display: flex;
-        justify-content: flex-end;
+        align-items: flex-end;
+        height: 100%;
+        padding-bottom: 4px;
     }
-    .st-key-mic_inline_btn div[data-testid="stButton"] > button {
-        width: 34px;
-        height: 34px;
+    .st-key-mic_beside_btn div[data-testid="stButton"] > button {
+        width: 40px;
+        height: 40px;
         padding: 0;
         border-radius: 50%;
         background: transparent;
         border: 1.5px solid #2dd4bf;
         color: #2dd4bf;
-        font-size: 1.05rem;
+        font-size: 1.1rem;
         box-shadow: none;
     }
-    .st-key-mic_inline_btn div[data-testid="stButton"] > button:hover {
+    .st-key-mic_beside_btn div[data-testid="stButton"] > button:hover {
         color: #5eead4;
         border-color: #5eead4;
         background: transparent;
@@ -1544,21 +1544,15 @@ if st.session_state.active_file:
 # ============================================================
 # MIC / VOICE INPUT
 # ============================================================
-# A small circular button, right-aligned directly above the
-# chat input, so it reads as paired with the send button.
-# Kept in normal page flow (not fixed-positioned) so it stays
-# visible on any screen width.
+# The mic button sits in a column directly beside the chat
+# input, on the same row — this is done with st.columns(), not
+# a CSS overlay, because Streamlit's chat_input can't otherwise
+# be embedded next to a real, correctly-aligned button. As a
+# side effect, chat_input renders inline here rather than
+# auto-sticking to the very bottom of the browser window (that
+# floating behaviour only applies when chat_input is called at
+# the script's top level, not inside a column).
 # ============================================================
-
-with st.container(key="mic_inline_btn"):
-
-    if st.button(
-        "🎤",
-        key="btn_mic_toggle",
-        help="Voice input"
-    ):
-
-        st.session_state.show_mic_input = not st.session_state.show_mic_input
 
 mic_prompt = None
 
@@ -1590,30 +1584,48 @@ if st.session_state.show_mic_input:
 
 
 # ============================================================
-# CHAT INPUT
+# CHAT INPUT  (+ mic button on the same row)
 # ============================================================
 
-try:
+col_input, col_mic = st.columns([0.93, 0.07])
 
-    chat_result = st.chat_input(
-        "Ask me anything about your data...",
-        accept_file="multiple",
-        file_type=["pdf", "docx", "xlsx", "csv", "txt", "png", "jpg", "jpeg"]
-    )
+with col_input:
 
-    if chat_result:
-        user_prompt = chat_result.text
-        uploaded_chat_files = chat_result.files
-    else:
-        user_prompt = None
+    try:
+
+        chat_result = st.chat_input(
+            "Ask me anything about your data...",
+            accept_file="multiple",
+            file_type=["pdf", "docx", "xlsx", "csv", "txt", "png", "jpg", "jpeg"]
+        )
+
+        if chat_result:
+            user_prompt = chat_result.text
+            uploaded_chat_files = chat_result.files
+        else:
+            user_prompt = None
+            uploaded_chat_files = []
+
+    except TypeError:
+
+        user_prompt = st.chat_input(
+            "Ask me anything about your data..."
+        )
         uploaded_chat_files = []
 
-except TypeError:
+with col_mic:
 
-    user_prompt = st.chat_input(
-        "Ask me anything about your data..."
-    )
-    uploaded_chat_files = []
+    with st.container(key="mic_beside_btn"):
+
+        if st.button(
+            "🎤",
+            key="btn_mic_toggle",
+            help="Voice input",
+            use_container_width=True
+        ):
+
+            st.session_state.show_mic_input = not st.session_state.show_mic_input
+            st.rerun()
 
 user_prompt = (
     user_prompt
