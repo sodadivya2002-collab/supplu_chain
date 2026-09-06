@@ -146,10 +146,24 @@ st.markdown(
         text-transform: none;
         letter-spacing: normal;
     }
+    /* Enabled state: lit up with a light-white border so it reads
+       clearly as clickable, distinct from the disabled state below. */
+    section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"]:not(:disabled) {
+        border-color: rgba(245, 245, 247, 0.55);
+        color: #ffffff !important;
+    }
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"]:hover {
         background: transparent;
         color: #2dd4bf !important;
         border-color: #2dd4bf;
+    }
+    /* Disabled state: dimmed and non-interactive looking. */
+    section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"]:disabled {
+        background: transparent;
+        color: #55555f !important;
+        border-color: #22222b;
+        opacity: 0.55;
+        cursor: not-allowed;
     }
 
     section[data-testid="stSidebar"] div[data-testid="stExpander"] {
@@ -915,6 +929,79 @@ def answer_from_file(prompt, fname):
         return f"Error answering from the uploaded file.\n\n**Error:** {str(e)}", None, None
 
 
+def generate_file_overview(fname):
+    """Automatically summarizes a freshly uploaded file. For
+    tabular files the numbers are computed directly from the real
+    data with pandas (row/column counts, missing values, numeric
+    ranges) — not asked of an LLM — so nothing is guessed. Returns
+    (explanation, sql, preview_df)."""
+
+    file_data = st.session_state.stored_files.get(fname, {})
+    df = file_data.get("df")
+
+    if df is None:
+        # Non-tabular file — ask the LLM to summarize the extracted text.
+        return answer_from_file(
+            "Give me an overview and the key observations about "
+            "this document.",
+            fname
+        )
+
+    total_rows = len(df)
+    total_cols = len(df.columns)
+
+    lines = [
+        f"**{fname}** — {total_rows:,} rows, {total_cols} columns.",
+        "",
+        "**Columns:**"
+    ]
+
+    for col in df.columns:
+        dtype = df[col].dtype
+        null_count = int(df[col].isna().sum())
+        null_note = f", {null_count} missing" if null_count else ""
+        lines.append(f"- `{col}` ({dtype}){null_note}")
+
+    numeric_cols = df.select_dtypes(include="number").columns.tolist()
+
+    if numeric_cols:
+
+        lines.append("")
+        lines.append("**Numeric summary:**")
+
+        for col in numeric_cols:
+            series = df[col].dropna()
+            if series.empty:
+                continue
+            lines.append(
+                f"- `{col}`: min {series.min():,.2f}, "
+                f"avg {series.mean():,.2f}, max {series.max():,.2f}"
+            )
+
+    categorical_cols = df.select_dtypes(include="object").columns.tolist()
+
+    if categorical_cols:
+
+        lines.append("")
+        lines.append("**Categorical columns:**")
+
+        for col in categorical_cols[:5]:
+            distinct = df[col].nunique(dropna=True)
+            top_value = (
+                df[col].value_counts().idxmax()
+                if distinct > 0 else "—"
+            )
+            lines.append(
+                f"- `{col}`: {distinct} distinct values, "
+                f"most common: \"{top_value}\""
+            )
+
+    explanation = "\n".join(lines)
+    preview_df = df.head(10)
+
+    return explanation, None, preview_df
+
+
 # ============================================================
 # SESSION STATE
 # ============================================================
@@ -1174,6 +1261,57 @@ def display_chart_tab(
         )
 
 
+def show_query_result(sql_query, df, key_prefix):
+    """Renders the shared Generated-SQL / Data / Chart layout used
+    for both the Cortex Analyst path and the file-upload SQL path,
+    so both feel identical to the user."""
+
+    if sql_query:
+
+        with st.expander(
+            "Generated SQL",
+            expanded=False
+        ):
+
+            st.code(
+                sql_query,
+                language="sql"
+            )
+
+    if df is None:
+        return
+
+    if df.empty:
+
+        st.info(
+            "The query executed successfully, "
+            "but no records were returned."
+        )
+
+    else:
+
+        tab1, tab2 = st.tabs(
+            [
+                "Data 📄",
+                "Chart 📈"
+            ]
+        )
+
+        with tab1:
+
+            st.dataframe(
+                df,
+                use_container_width=True
+            )
+
+        with tab2:
+
+            display_chart_tab(
+                df,
+                key_prefix=key_prefix
+            )
+
+
 # ============================================================
 # QUESTION ROUTER
 # ============================================================
@@ -1221,8 +1359,8 @@ Try things like:
 - What is the supplier on-time delivery percentage?
 - What are the top products by ordered value?
 
-Ask in plain English — Cortex Analyst will turn it into a query
-against the supply chain semantic view.
+Ask a question in your own words — Cortex Analyst will turn it
+into a query against the supply chain semantic view.
 """,
     "Inventory": """
 You can ask me questions about **Inventory data**.
@@ -1236,8 +1374,8 @@ Try things like:
 - How many products need to be reordered?
 - What are the top 10 products by inventory value?
 
-Ask in plain English — Cortex Analyst will turn it into a query
-against the inventory semantic view.
+Ask a question in your own words — Cortex Analyst will turn it
+into a query against the inventory semantic view.
 """,
     "None": """
 No module is selected yet, and no file is active.
@@ -1274,8 +1412,7 @@ def generate_sql_from_prompt(prompt):
             greeting_subject = "your data"
 
         return (
-            f"Hi there! 👋 Ask me anything about {greeting_subject} "
-            "in plain English.\n\n"
+            f"Hi there! 👋 Ask me anything about {greeting_subject}.\n\n"
             "Here are a few things you can try:",
             None,
             None
@@ -1406,14 +1543,7 @@ if st.session_state.sidebar_open:
                 not st.session_state.show_module_selector
             )
 
-        if module_disabled:
-
-            st.caption(
-                "Module is disabled while a file is active. "
-                "Remove the file to ask module questions."
-            )
-
-        elif st.session_state.show_module_selector:
+        if not module_disabled and st.session_state.show_module_selector:
 
             module_options = [
                 "None",
@@ -1563,7 +1693,17 @@ if st.session_state.sidebar_open:
             key="btn_clear_sessions"
         ):
 
+            # Full reset — chats, uploaded files, active file, and
+            # module selection all go back to their fresh-start
+            # defaults, not just the chat history.
             st.session_state.chat_sessions = {}
+            st.session_state.stored_files = {}
+            st.session_state.active_file = None
+            st.session_state.selected_file = None
+            st.session_state.selected_module = "None"
+            st.session_state.show_module_selector = False
+            st.session_state.show_files_panel = False
+            st.session_state.show_history_panel = False
 
             new_id = datetime.now().strftime(
                 "%Y%m%d_%H%M%S"
@@ -1641,7 +1781,7 @@ if len(messages) == 0:
                 <span class="dily-hero-badge">DILYTICS</span>
                 <h1>Chat with your {_hero_module}<br>data using <span>Cortex AI</span></h1>
                 <p class="sub">
-                    Ask questions in plain English and get instant
+                    Ask questions and get instant
                     insights across your {_hero_module.lower()} data.
                 </p>
             </div>
@@ -1783,6 +1923,8 @@ user_prompt = (
 
 if uploaded_chat_files:
 
+    typed_prompt = (user_prompt or "").strip()
+
     for f in uploaded_chat_files:
 
         if f.name not in st.session_state.stored_files:
@@ -1801,10 +1943,65 @@ if uploaded_chat_files:
         st.session_state.active_file = f.name
 
     file_names = ", ".join(f.name for f in uploaded_chat_files)
+    attach_note = f"(Attached: {file_names})"
 
-    user_prompt = (
-        f"{user_prompt or ''}\n\n(Attached: {file_names})"
-    ).strip()
+    if typed_prompt:
+
+        # A question was typed alongside the upload — treat it as
+        # a real question and let it flow through the normal
+        # PROCESS QUESTION section below.
+        user_prompt = f"{typed_prompt}\n\n{attach_note}"
+
+    else:
+
+        # No question was typed — automatically analyze the file
+        # and post the observations as an assistant turn, without
+        # waiting for the user to ask anything.
+        if len(messages) == 0:
+
+            st.session_state.chat_sessions[
+                current_id
+            ]["title"] = file_names[:25] + (
+                "..." if len(file_names) > 25 else ""
+            )
+
+        messages.append(
+            {
+                "role": "user",
+                "content": attach_note
+            }
+        )
+
+        with st.chat_message("user"):
+            st.markdown(attach_note)
+
+        last_uploaded = uploaded_chat_files[-1].name
+
+        with st.chat_message("assistant"):
+
+            explanation, sql_query, preview_df = generate_file_overview(
+                last_uploaded
+            )
+
+            st.markdown(explanation)
+
+            show_query_result(
+                sql_query,
+                preview_df,
+                key_prefix=f"overview_{current_id}"
+            )
+
+        messages.append(
+            {
+                "role": "assistant",
+                "content": explanation,
+                "sql": sql_query,
+                "data": preview_df,
+                "suggestions": None
+            }
+        )
+
+        user_prompt = None
 
 
 # ============================================================
@@ -1876,47 +2073,11 @@ if user_prompt:
             # Analyst path below.
             df = file_df
 
-            if sql_query:
-
-                with st.expander(
-                    "Generated SQL",
-                    expanded=False
-                ):
-
-                    st.code(
-                        sql_query,
-                        language="sql"
-                    )
-
-            if df.empty:
-
-                st.info(
-                    "The query executed successfully, "
-                    "but no records were returned."
-                )
-
-            else:
-
-                tab1, tab2 = st.tabs(
-                    [
-                        "Data 📄",
-                        "Chart 📈"
-                    ]
-                )
-
-                with tab1:
-
-                    st.dataframe(
-                        df,
-                        use_container_width=True
-                    )
-
-                with tab2:
-
-                    display_chart_tab(
-                        df,
-                        key_prefix=f"live_{current_id}"
-                    )
+            show_query_result(
+                sql_query,
+                df,
+                key_prefix=f"live_{current_id}"
+            )
 
         elif sql_query:
 
