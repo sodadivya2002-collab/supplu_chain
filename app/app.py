@@ -18,7 +18,14 @@ st.set_page_config(
 
 
 # ============================================================
-# CUSTOM CSS  (navbar / sidebar / hero / cards / chat input)
+# CUSTOM CSS  (dark, commercial "AI assistant" theme)
+# ============================================================
+# Palette:
+#   Background : #0b0b0f / #101014
+#   Surface    : #16161c / #1b1b22
+#   Border     : #26262f
+#   Accent     : #2dd4bf (teal)  /  #f43f5e (pink, secondary accent)
+#   Text       : #f5f5f7 primary, #9a9aa8 secondary
 # ============================================================
 
 st.markdown(
@@ -29,6 +36,15 @@ st.markdown(
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
 
+    html, body, [class*="css"] {
+        font-family: "Inter", "Segoe UI", sans-serif;
+    }
+
+    .stApp {
+        background: radial-gradient(1200px 600px at 50% -10%, #14141c 0%, #0b0b0f 55%, #0b0b0f 100%) !important;
+        color: #f5f5f7;
+    }
+
     header[data-testid="stHeader"] {
         background: transparent !important;
         height: 3.75rem !important;
@@ -36,75 +52,62 @@ st.markdown(
     }
     header[data-testid="stHeader"] * {
         visibility: visible !important;
+        fill: #f5f5f7 !important;
     }
 
     .block-container {
         padding-top: 86px !important;
         max-width: 1100px;
     }
+
+    /* ---------- Sidebar ---------- */
+    section[data-testid="stSidebar"] {
+        background: #0e0e13;
+        border-right: 1px solid #22222b;
+    }
     section[data-testid="stSidebar"] > div:first-child {
         padding-top: 78px;
     }
-    body, [class*="css"] {
-        font-family: "Inter", "Segoe UI", sans-serif;
-    }
-
-    .dily-navbar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 62px;
-        background: linear-gradient(90deg, #0b1a63 0%, #14237f 100%);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 26px;
-        z-index: 999999;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.18);
-    }
-    .dily-navbar-left {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-    }
-    .dily-logo-box {
-        background: #d6231c;
-        color: #ffffff;
-        font-weight: 800;
-        letter-spacing: 1px;
-        padding: 7px 14px;
-        border-radius: 4px;
-        font-size: 0.9rem;
-    }
-    section[data-testid="stSidebar"] {
-        background: #f6f8fc;
-        border-right: 1px solid #e6eaf3;
-    }
     section[data-testid="stSidebar"] h5,
-    section[data-testid="stSidebar"] h4 {
-        color: #45506b;
+    section[data-testid="stSidebar"] h4,
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] span,
+    section[data-testid="stSidebar"] label {
+        color: #9a9aa8 !important;
         font-size: 0.78rem;
         text-transform: uppercase;
         letter-spacing: 0.04em;
+    }
+    section[data-testid="stSidebar"] hr {
+        border-color: #22222b;
     }
 
     .status-pill {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background-color: #ecfdf5;
-        color: #065f46;
-        border: 1px solid #a7f3d0;
+        background-color: rgba(45,212,191,0.10);
+        color: #2dd4bf;
+        border: 1px solid rgba(45,212,191,0.35);
         border-radius: 20px;
         padding: 3px 10px;
         font-size: 0.75rem;
         font-weight: 600;
+        text-transform: none !important;
     }
 
+    /* ---------- Buttons (generic) ---------- */
     div[data-testid="stButton"] > button {
-        border-radius: 8px;
+        border-radius: 10px;
         font-weight: 500;
+        background: #1b1b22;
+        color: #f5f5f7;
+        border: 1px solid #2a2a34;
+        transition: all 0.15s ease;
+    }
+    div[data-testid="stButton"] > button:hover {
+        border-color: #2dd4bf;
+        color: #2dd4bf;
     }
 
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button {
@@ -112,26 +115,31 @@ st.markdown(
         border: none;
         text-align: left;
         justify-content: flex-start;
-        color: #33405c;
+        color: #cfcfd8 !important;
         font-weight: 500;
+        text-transform: none;
+        letter-spacing: normal;
         padding: 6px 8px;
+        font-size: 0.88rem;
     }
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button:hover {
-        background: #eef1fb;
-        color: #14237f;
+        background: #1b1b22;
+        color: #2dd4bf !important;
     }
 
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"] {
-        background: #1a2f8f;
-        color: #ffffff;
-        border-radius: 8px;
-        padding: 8px 10px;
+        background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
+        color: #06231f !important;
+        border-radius: 10px;
+        padding: 9px 10px;
         text-align: center;
         justify-content: center;
+        font-weight: 700;
+        border: none;
     }
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"]:hover {
-        background: #14237f;
-        color: #ffffff;
+        filter: brightness(1.08);
+        color: #06231f !important;
     }
 
     section[data-testid="stSidebar"] div[data-testid="stExpander"] {
@@ -140,48 +148,49 @@ st.markdown(
     }
     section[data-testid="stSidebar"] div[data-testid="stExpander"] summary {
         font-weight: 500;
-        color: #33405c;
+        color: #cfcfd8 !important;
+        text-transform: none;
         padding: 4px 4px;
     }
     section[data-testid="stSidebar"] div[data-testid="stExpander"] summary:hover {
-        color: #14237f;
+        color: #2dd4bf !important;
+    }
+    section[data-testid="stSidebar"] div[data-testid="stExpanderDetails"] {
+        background: #131318;
+        border-radius: 8px;
     }
 
-    .dily-hero {
-        text-align: center;
-        padding: 30px 0 10px 0;
-    }
-    .dily-hero-badge {
-        width: 66px;
-        height: 66px;
-        border-radius: 50%;
-        background: #ffffff;
-        box-shadow: 0 4px 18px rgba(20,35,127,0.18);
+    /* ---------- Top navbar ---------- */
+    .dily-navbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 62px;
+        background: #0e0e13;
+        border-bottom: 1px solid #22222b;
         display: flex;
         align-items: center;
-        justify-content: center;
-        margin: 0 auto 18px auto;
-        font-size: 2rem;
+        justify-content: space-between;
+        padding: 0 26px;
+        z-index: 999999;
     }
-    .dily-hero h1 {
-        font-size: 2.1rem;
+    .dily-navbar-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    .dily-logo-box {
+        background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
+        color: #06231f;
         font-weight: 800;
-        color: #101a3c;
-        margin-bottom: 6px;
-    }
-    .dily-hero-rule {
-        width: 60px;
-        height: 3px;
-        background: #1a2f8f;
-        margin: 10px auto 16px auto;
-        border-radius: 2px;
-    }
-    .dily-hero p.sub {
-        color: #5b6685;
-        font-size: 1rem;
-        margin-bottom: 8px;
+        letter-spacing: 1px;
+        padding: 7px 14px;
+        border-radius: 6px;
+        font-size: 0.9rem;
     }
 
+    /* ---------- Sidebar collapse tabs ---------- */
     [data-testid="stSidebarCollapsedControl"],
     [data-testid="collapsedControl"],
     [data-testid*="CollapsedControl"],
@@ -203,16 +212,15 @@ st.markdown(
         height: 36px;
         padding: 0;
         border-radius: 8px;
-        border: 1px solid #dbe1f0;
-        background: #ffffff;
-        color: #14237f;
+        border: 1px solid #2a2a34;
+        background: #16161c;
+        color: #2dd4bf !important;
         font-size: 1.05rem;
         font-weight: 700;
-        box-shadow: 0 1px 4px rgba(20,35,127,0.10);
     }
     .st-key-sidebar_hide_tab div[data-testid="stButton"] > button:hover {
-        background: #f5f7fd;
-        border-color: #1a2f8f;
+        background: #1b1b22;
+        border-color: #2dd4bf;
     }
 
     .st-key-sidebar_reopen_tab {
@@ -224,27 +232,137 @@ st.markdown(
         height: 40px;
         padding: 0;
         border-radius: 0 8px 8px 0;
-        border: 1px solid #dbe1f0;
+        border: 1px solid #2a2a34;
         border-left: none;
-        background: #ffffff;
-        color: #14237f;
-        font-size: 1.1rem;
-        box-shadow: 2px 2px 8px rgba(20,35,127,0.12);
+        background: #16161c;
+        color: #2dd4bf !important;
     }
     .st-key-sidebar_reopen_tab div[data-testid="stButton"] > button:hover {
-        background: #f5f7fd;
-        border-color: #1a2f8f;
+        background: #1b1b22;
     }
 
+    /* ---------- Hero ---------- */
+    .dily-hero {
+        text-align: center;
+        padding: 54px 0 6px 0;
+    }
+    .dily-hero .greet {
+        font-size: 1.05rem;
+        color: #9a9aa8;
+        margin-bottom: 2px;
+        font-weight: 500;
+    }
+    .dily-hero h1 {
+        font-size: 2.4rem;
+        font-weight: 700;
+        color: #f5f5f7;
+        margin-bottom: 0;
+        letter-spacing: -0.02em;
+    }
+    .dily-hero p.sub {
+        color: #7a7a89;
+        font-size: 0.95rem;
+        margin-top: 10px;
+        margin-bottom: 26px;
+    }
+
+    /* ---------- Hero quick-action pills ---------- */
+    .st-key-hero_pill_0 div[data-testid="stButton"] > button,
+    .st-key-hero_pill_1 div[data-testid="stButton"] > button,
+    .st-key-hero_pill_2 div[data-testid="stButton"] > button,
+    .st-key-hero_pill_3 div[data-testid="stButton"] > button {
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        padding: 7px 4px;
+        width: 100%;
+        border: 1px solid transparent;
+    }
+    .st-key-hero_pill_0 div[data-testid="stButton"] > button {
+        background: rgba(45,212,191,0.12);
+        color: #2dd4bf;
+        border-color: rgba(45,212,191,0.35);
+    }
+    .st-key-hero_pill_1 div[data-testid="stButton"] > button {
+        background: rgba(244,63,94,0.12);
+        color: #fb7185;
+        border-color: rgba(244,63,94,0.35);
+    }
+    .st-key-hero_pill_2 div[data-testid="stButton"] > button {
+        background: rgba(34,197,94,0.12);
+        color: #4ade80;
+        border-color: rgba(34,197,94,0.35);
+    }
+    .st-key-hero_pill_3 div[data-testid="stButton"] > button {
+        background: rgba(168,85,247,0.12);
+        color: #c084fc;
+        border-color: rgba(168,85,247,0.35);
+    }
+    .st-key-hero_pill_0 div[data-testid="stButton"] > button:hover,
+    .st-key-hero_pill_1 div[data-testid="stButton"] > button:hover,
+    .st-key-hero_pill_2 div[data-testid="stButton"] > button:hover,
+    .st-key-hero_pill_3 div[data-testid="stButton"] > button:hover {
+        filter: brightness(1.25);
+    }
+
+    /* ---------- Chat input ---------- */
     div[data-testid="stChatInput"] {
-        border-radius: 30px !important;
-        border: 1px solid #dbe1f0 !important;
-        box-shadow: 0 2px 10px rgba(20,35,127,0.08);
+        border-radius: 26px !important;
+        border: 1px solid #26262f !important;
+        background: #16161c !important;
+        box-shadow: 0 0 0 1px rgba(45,212,191,0.06), 0 8px 24px rgba(0,0,0,0.35);
         max-width: 760px;
         margin: 6px auto 0 auto;
     }
+    div[data-testid="stChatInput"]:focus-within {
+        border-color: #2dd4bf !important;
+        box-shadow: 0 0 0 3px rgba(45,212,191,0.15);
+    }
     div[data-testid="stChatInput"] textarea {
         font-size: 0.92rem;
+        color: #f5f5f7 !important;
+        background: transparent !important;
+    }
+    div[data-testid="stChatInput"] textarea::placeholder {
+        color: #6b6b78 !important;
+    }
+    div[data-testid="stChatInput"] button {
+        background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%) !important;
+        border-radius: 50% !important;
+    }
+    div[data-testid="stChatInput"] button svg {
+        fill: #06231f !important;
+    }
+
+    /* ---------- Chat messages ---------- */
+    div[data-testid="stChatMessage"] {
+        background: #14141a;
+        border: 1px solid #22222b;
+        border-radius: 14px;
+        padding: 4px 6px;
+    }
+
+    /* ---------- Text inputs (login page) ---------- */
+    div[data-testid="stTextInput"] input {
+        background: #16161c !important;
+        color: #f5f5f7 !important;
+        border: 1px solid #2a2a34 !important;
+        border-radius: 10px !important;
+    }
+    div[data-testid="stTextInput"] label {
+        color: #cfcfd8 !important;
+    }
+
+    /* ---------- Dataframe / expander ---------- */
+    div[data-testid="stExpander"] {
+        background: #14141a;
+        border: 1px solid #22222b;
+        border-radius: 10px;
+    }
+
+    /* ---------- Misc text ---------- */
+    h1, h2, h3, h4, h5, h6, p, label, .stMarkdown {
+        color: #f5f5f7;
     }
 
     </style>
@@ -273,9 +391,7 @@ def get_snowflake_config():
 # ============================================================
 # All actual Supply Chain questions are handled by the Cortex
 # Analyst semantic view instead of keyword matching. This is a
-# standalone, top-level function (previously it was accidentally
-# nested inside get_snowflake_config(), after its return
-# statement, so it never ran).
+# standalone, top-level function.
 # ============================================================
 
 def call_cortex_analyst(prompt):
@@ -295,12 +411,10 @@ def call_cortex_analyst(prompt):
                 None
             )
 
- 
         analyst_token = st.secrets["snowflake"].get(
             "cortex_analyst_token",
             ""
         )
-
 
         if not analyst_token:
             return (
@@ -475,73 +589,81 @@ if not st.session_state.authenticated:
     st.write("")
     st.write("")
 
-    st.title("Welcome to Dilytics Supply Chain AI")
-
     st.markdown(
-        "Please login to connect to your Snowflake Data Warehouse."
+        """
+        <div class="dily-hero">
+            <h1>Welcome to Dilytics Supply Chain AI</h1>
+            <p class="sub">Please log in to connect to your Snowflake data warehouse.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-    st.session_state.username = st.text_input(
-        "Enter Snowflake Username:",
-        value=st.session_state.username
-    )
+    login_col = st.columns([1, 1.2, 1])[1]
 
-    st.session_state.password = st.text_input(
-        "Enter Password:",
-        type="password"
-    )
+    with login_col:
 
-    if st.button("Login"):
+        st.session_state.username = st.text_input(
+            "Snowflake Username",
+            value=st.session_state.username
+        )
 
-        if not st.session_state.username:
+        st.session_state.password = st.text_input(
+            "Password",
+            type="password"
+        )
 
-            st.error("Please enter your Snowflake username.")
-            st.stop()
+        if st.button("Login", use_container_width=True, type="primary"):
 
-        if not st.session_state.password:
+            if not st.session_state.username:
 
-            st.error("Please enter your Snowflake password.")
-            st.stop()
+                st.error("Please enter your Snowflake username.")
+                st.stop()
 
-        try:
+            if not st.session_state.password:
 
-            with st.spinner("Connecting to Snowflake..."):
+                st.error("Please enter your Snowflake password.")
+                st.stop()
 
-                config = get_snowflake_config()
+            try:
 
-                connection_parameters = {
-                    "account": config["account"],
-                    "user": st.session_state.username,
-                    "password": st.session_state.password,
-                    "role": config["role"],
-                    "warehouse": config["warehouse"],
-                    "database": config["database"],
-                    "schema": config["schema"]
-                }
+                with st.spinner("Connecting to Snowflake..."):
 
-                # Test connection
-                conn = snowflake.connector.connect(
-                    **connection_parameters
+                    config = get_snowflake_config()
+
+                    connection_parameters = {
+                        "account": config["account"],
+                        "user": st.session_state.username,
+                        "password": st.session_state.password,
+                        "role": config["role"],
+                        "warehouse": config["warehouse"],
+                        "database": config["database"],
+                        "schema": config["schema"]
+                    }
+
+                    # Test connection
+                    conn = snowflake.connector.connect(
+                        **connection_parameters
+                    )
+
+                    conn.close()
+
+                    # Create Snowpark session
+                    st.session_state.snowpark_session = (
+                        Session.builder
+                        .configs(connection_parameters)
+                        .create()
+                    )
+
+                    st.session_state.authenticated = True
+
+                    st.rerun()
+
+            except Exception as e:
+
+                st.error(
+                    f"Authentication failed: {str(e)}"
                 )
-
-                conn.close()
-
-                # Create Snowpark session
-                st.session_state.snowpark_session = (
-                    Session.builder
-                    .configs(connection_parameters)
-                    .create()
-                )
-
-                st.session_state.authenticated = True
-
-                st.rerun()
-
-        except Exception as e:
-
-            st.error(
-                f"Authentication failed: {str(e)}"
-            )
 
     st.stop()
 
@@ -681,11 +803,6 @@ def display_chart_tab(
 # ============================================================
 # QUESTION ROUTER
 # ============================================================
-# Greetings and "help" are answered locally (no point paying an
-# API round trip for those). Every other question is routed
-# straight to Cortex Analyst — no keyword matching, no hard-coded
-# SQL branches in between.
-# ============================================================
 
 GREETING_PHRASES = [
     "hi",
@@ -709,10 +826,6 @@ def generate_sql_from_prompt(prompt):
 
     p = prompt.lower().strip()
 
-    # ========================================================
-    # GREETINGS
-    # ========================================================
-
     if p in GREETING_PHRASES:
 
         return (
@@ -723,10 +836,6 @@ def generate_sql_from_prompt(prompt):
             "Here are a few things you can try:",
             None
         )
-
-    # ========================================================
-    # HELP
-    # ========================================================
 
     if (
         "what can i ask" in p
@@ -755,15 +864,11 @@ against the supply chain semantic view.
             None
         )
 
-    # ========================================================
-    # EVERYTHING ELSE -> CORTEX ANALYST
-    # ========================================================
-
     return call_cortex_analyst(prompt)
 
 
 # ============================================================
-# TOP NAVBAR  (rendered on every authenticated page)
+# TOP NAVBAR
 # ============================================================
 
 st.markdown(
@@ -958,71 +1063,53 @@ else:
 # ============================================================
 # HERO SECTION  (only shown when the current chat is empty)
 # ============================================================
+# Redesigned to match the dark "assistant" style: short greeting,
+# large headline, and a row of colored quick-action pills — no
+# decorative background artwork.
+# ============================================================
 
 hero_quick_prompt = None
 
+HERO_PILLS = [
+    ("Purchase Orders", "What is the total purchase order count?"),
+    ("Shipments", "How many shipments are currently in transit?"),
+    ("Suppliers", "Which suppliers are high risk?"),
+    ("Top Products", "What are the top products by ordered value?"),
+]
+
 if len(messages) == 0:
 
+    display_name = (
+        st.session_state.username.split("@")[0].split(".")[0].title()
+        if st.session_state.username
+        else "there"
+    )
+
     st.markdown(
-        """
+        f"""
         <div class="dily-hero">
-            <div class="dily-hero-badge">🤖</div>
-            <h1>Dilytics Supply Chain AI</h1>
-            <div class="dily-hero-rule"></div>
-            <p class="sub">Ask anything about your supply chain data in natural language.</p>
+            <div class="greet">Hey! {display_name}</div>
+            <h1>What can I help with?</h1>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    st.markdown(
-        """
-        <div style="display:flex; gap:16px; justify-content:center;
-                    margin: 10px 0 28px 0; flex-wrap:wrap;">
+    pill_cols = st.columns(len(HERO_PILLS))
 
-          <div style="flex:1; min-width:220px; max-width:300px;
-                      background:#ffffff; border:1px solid #e6eaf3;
-                      border-radius:14px; padding:22px 18px;
-                      box-shadow:0 2px 6px rgba(20,35,127,0.05);
-                      text-align:center;">
-              <div style="font-size:1.8rem; margin-bottom:10px;">💬</div>
-              <div style="font-weight:700; color:#101a3c; font-size:0.95rem;
-                          margin-bottom:6px;">Natural Language Questions</div>
-              <div style="font-size:0.85rem; color:#5b6685; line-height:1.5;">
-                  Ask questions about your supply chain in simple language.
-              </div>
-          </div>
+    for i, (label, q_prompt) in enumerate(HERO_PILLS):
 
-          <div style="flex:1; min-width:220px; max-width:300px;
-                      background:#ffffff; border:1px solid #e6eaf3;
-                      border-radius:14px; padding:22px 18px;
-                      box-shadow:0 2px 6px rgba(20,35,127,0.05);
-                      text-align:center;">
-              <div style="font-size:1.8rem; margin-bottom:10px;">🔍</div>
-              <div style="font-weight:700; color:#101a3c; font-size:0.95rem;
-                          margin-bottom:6px;">Intelligent Data Exploration</div>
-              <div style="font-size:0.85rem; color:#5b6685; line-height:1.5;">
-                  Explore and understand your supply chain data easily.
-              </div>
-          </div>
+        with pill_cols[i]:
 
-          <div style="flex:1; min-width:220px; max-width:300px;
-                      background:#ffffff; border:1px solid #e6eaf3;
-                      border-radius:14px; padding:22px 18px;
-                      box-shadow:0 2px 6px rgba(20,35,127,0.05);
-                      text-align:center;">
-              <div style="font-size:1.8rem; margin-bottom:10px;">⚡</div>
-              <div style="font-weight:700; color:#101a3c; font-size:0.95rem;
-                          margin-bottom:6px;">Instant Insights</div>
-              <div style="font-size:0.85rem; color:#5b6685; line-height:1.5;">
-                  Get answers and results directly from your data.
-              </div>
-          </div>
+            with st.container(key=f"hero_pill_{i}"):
 
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+                if st.button(
+                    label,
+                    key=f"hero_pill_btn_{i}",
+                    use_container_width=True
+                ):
+
+                    hero_quick_prompt = q_prompt
 
     st.write("")
 
@@ -1112,7 +1199,7 @@ for idx, msg in enumerate(messages):
 
 user_prompt = (
     st.chat_input(
-        "Ask a question about suppliers, purchase orders, "
+        "Ask me anything about suppliers, purchase orders, "
         "shipments, deliveries, warehouses, carriers, or "
         "inventory..."
     )
