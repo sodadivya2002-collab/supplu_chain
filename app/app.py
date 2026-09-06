@@ -171,8 +171,8 @@ st.markdown(
         border-bottom: 1px solid #22222b;
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        padding: 0 26px;
+        justify-content: flex-end;
+        padding: 0 26px 0 76px;
         z-index: 999999;
     }
     .dily-navbar-left {
@@ -190,6 +190,72 @@ st.markdown(
         font-size: 0.9rem;
     }
 
+    /* ---------- Floating toggle + account chip (top corners, screenshot style) ---------- */
+    .dily-toggle-fixed {
+        position: fixed;
+        top: 14px;
+        left: 18px;
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000010;
+        box-shadow: 0 2px 10px rgba(45,212,191,0.25);
+    }
+    .st-key-floating_toggle {
+        position: fixed !important;
+        top: 12px;
+        left: 16px;
+        z-index: 1000010;
+    }
+    .st-key-floating_toggle div[data-testid="stButton"] > button {
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        border-radius: 9px;
+        background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
+        color: #06231f;
+        border: none;
+        font-size: 1rem;
+        font-weight: 800;
+        box-shadow: 0 2px 10px rgba(45,212,191,0.25);
+    }
+    .st-key-floating_toggle div[data-testid="stButton"] > button:hover {
+        filter: brightness(1.08);
+        color: #06231f;
+    }
+
+    .dily-account {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .dily-avatar {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: rgba(45,212,191,0.15);
+        color: #2dd4bf;
+        border: 1px solid rgba(45,212,191,0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+    .dily-account-name {
+        font-size: 0.85rem;
+        color: #f5f5f7;
+        font-weight: 500;
+    }
+    .dily-account-chevron {
+        color: #7a7a89;
+        font-size: 0.7rem;
+    }
+
     /* ---------- Sidebar collapse tabs ---------- */
     [data-testid="stSidebarCollapsedControl"],
     [data-testid="collapsedControl"],
@@ -204,46 +270,11 @@ st.markdown(
         visibility: hidden !important;
     }
 
-    .st-key-sidebar_hide_tab {
-        margin-bottom: 4px;
-    }
-    .st-key-sidebar_hide_tab div[data-testid="stButton"] > button {
-        width: 36px;
-        height: 36px;
-        padding: 0;
-        border-radius: 8px;
-        border: 1px solid #2a2a34;
-        background: #16161c;
-        color: #2dd4bf !important;
-        font-size: 1.05rem;
-        font-weight: 700;
-    }
-    .st-key-sidebar_hide_tab div[data-testid="stButton"] > button:hover {
-        background: #1b1b22;
-        border-color: #2dd4bf;
-    }
-
-    .st-key-sidebar_reopen_tab {
-        margin-top: -8px;
-        margin-bottom: 12px;
-    }
-    .st-key-sidebar_reopen_tab div[data-testid="stButton"] > button {
-        width: 40px;
-        height: 40px;
-        padding: 0;
-        border-radius: 0 8px 8px 0;
-        border: 1px solid #2a2a34;
-        border-left: none;
-        background: #16161c;
-        color: #2dd4bf !important;
-    }
-    .st-key-sidebar_reopen_tab div[data-testid="stButton"] > button:hover {
-        background: #1b1b22;
-    }
-
     /* ---------- Hero ---------- */
     .dily-hero {
-        text-align: center;
+        text-align: left;
+        max-width: 900px;
+        margin: 0 auto;
         padding: 54px 0 6px 0;
     }
     .dily-hero .greet {
@@ -266,44 +297,49 @@ st.markdown(
         margin-bottom: 26px;
     }
 
-    /* ---------- Hero quick-action pills ---------- */
+    /* ---------- Hero description cards (screenshot style: colored title pill + copy) ---------- */
+    .dily-card {
+        background: #131318;
+        border: 1px solid #22222b;
+        border-radius: 14px;
+        padding: 14px 16px;
+        height: 100%;
+    }
+    .dily-card-badge {
+        display: inline-block;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 14px;
+        margin-bottom: 8px;
+    }
+    .dily-card-desc {
+        font-size: 0.78rem;
+        color: #8f8f9c;
+        line-height: 1.4;
+    }
+    .dily-card-teal .dily-card-badge { background: rgba(45,212,191,0.15); color: #2dd4bf; }
+    .dily-card-pink .dily-card-badge { background: rgba(244,63,94,0.15); color: #fb7185; }
+    .dily-card-green .dily-card-badge { background: rgba(34,197,94,0.15); color: #4ade80; }
+    .dily-card-purple .dily-card-badge { background: rgba(168,85,247,0.15); color: #c084fc; }
+
     .st-key-hero_pill_0 div[data-testid="stButton"] > button,
     .st-key-hero_pill_1 div[data-testid="stButton"] > button,
     .st-key-hero_pill_2 div[data-testid="stButton"] > button,
     .st-key-hero_pill_3 div[data-testid="stButton"] > button {
-        border-radius: 20px;
-        font-weight: 600;
-        font-size: 0.85rem;
-        padding: 7px 4px;
+        border: none;
+        background: transparent;
+        color: #6b6b78;
+        font-size: 0.72rem;
+        font-weight: 500;
+        padding: 2px 0;
         width: 100%;
-        border: 1px solid transparent;
+        text-align: left;
     }
-    .st-key-hero_pill_0 div[data-testid="stButton"] > button {
-        background: rgba(45,212,191,0.12);
-        color: #2dd4bf;
-        border-color: rgba(45,212,191,0.35);
-    }
-    .st-key-hero_pill_1 div[data-testid="stButton"] > button {
-        background: rgba(244,63,94,0.12);
-        color: #fb7185;
-        border-color: rgba(244,63,94,0.35);
-    }
-    .st-key-hero_pill_2 div[data-testid="stButton"] > button {
-        background: rgba(34,197,94,0.12);
-        color: #4ade80;
-        border-color: rgba(34,197,94,0.35);
-    }
-    .st-key-hero_pill_3 div[data-testid="stButton"] > button {
-        background: rgba(168,85,247,0.12);
-        color: #c084fc;
-        border-color: rgba(168,85,247,0.35);
-    }
-    .st-key-hero_pill_0 div[data-testid="stButton"] > button:hover,
-    .st-key-hero_pill_1 div[data-testid="stButton"] > button:hover,
-    .st-key-hero_pill_2 div[data-testid="stButton"] > button:hover,
-    .st-key-hero_pill_3 div[data-testid="stButton"] > button:hover {
-        filter: brightness(1.25);
-    }
+    .st-key-hero_pill_0 div[data-testid="stButton"] > button:hover { color: #2dd4bf; }
+    .st-key-hero_pill_1 div[data-testid="stButton"] > button:hover { color: #fb7185; }
+    .st-key-hero_pill_2 div[data-testid="stButton"] > button:hover { color: #4ade80; }
+    .st-key-hero_pill_3 div[data-testid="stButton"] > button:hover { color: #c084fc; }
 
     /* ---------- Chat input ---------- */
     div[data-testid="stChatInput"] {
@@ -868,19 +904,40 @@ against the supply chain semantic view.
 
 
 # ============================================================
-# TOP NAVBAR
+# TOP NAVBAR + FLOATING SIDEBAR TOGGLE + ACCOUNT CHIP
+# ============================================================
+# Matches the reference screenshot: a small teal toggle pinned to
+# the top-left corner (independent of the navbar), and an
+# account chip (avatar + name) pinned to the top-right.
 # ============================================================
 
+_display_name_raw = st.session_state.username or "User"
+_initials = "".join(
+    part[0].upper()
+    for part in _display_name_raw.replace(".", " ").replace("@", " ").split()[:2]
+) or "U"
+
 st.markdown(
-    """
+    f"""
     <div class="dily-navbar">
-        <div class="dily-navbar-left">
-            <div class="dily-logo-box">DILYTICS</div>
+        <div class="dily-account">
+            <div class="dily-avatar">{_initials}</div>
+            <span class="dily-account-name">{_display_name_raw.split('@')[0]}</span>
+            <span class="dily-account-chevron">▾</span>
         </div>
     </div>
     """,
     unsafe_allow_html=True
 )
+
+with st.container(key="floating_toggle"):
+
+    _toggle_label = "«" if st.session_state.sidebar_open else "»"
+
+    if st.button(_toggle_label, key="floating_toggle_btn", help="Toggle panel"):
+
+        st.session_state.sidebar_open = not st.session_state.sidebar_open
+        st.rerun()
 
 
 # ============================================================
@@ -933,21 +990,6 @@ sidebar_quick_prompt = None
 if st.session_state.sidebar_open:
 
     with st.sidebar:
-
-        with st.container(key="sidebar_hide_tab"):
-
-            hide_cols = st.columns([6, 1])
-
-            with hide_cols[1]:
-
-                if st.button(
-                    "«",
-                    key="hide_sidebar_btn",
-                    help="Hide Panel"
-                ):
-
-                    st.session_state.sidebar_open = False
-                    st.rerun()
 
         st.markdown(
             '<span class="status-pill">● Semantic Mart Live</span>',
@@ -1050,16 +1092,6 @@ if st.session_state.sidebar_open:
 
             st.rerun()
 
-else:
-
-    with st.container(key="sidebar_reopen_tab"):
-
-        if st.button("☰", key="reopen_sidebar_btn", help="Show Panel"):
-
-            st.session_state.sidebar_open = True
-            st.rerun()
-
-
 # ============================================================
 # HERO SECTION  (only shown when the current chat is empty)
 # ============================================================
@@ -1070,11 +1102,11 @@ else:
 
 hero_quick_prompt = None
 
-HERO_PILLS = [
-    ("Purchase Orders", "What is the total purchase order count?"),
-    ("Shipments", "How many shipments are currently in transit?"),
-    ("Suppliers", "Which suppliers are high risk?"),
-    ("Top Products", "What are the top products by ordered value?"),
+# (badge_color_class, badge_label, description, sample_question)
+HERO_CARDS = [
+    ("teal", "Purchase Orders", "Track PO counts, open commitment, and status breakdowns.", "What is the total purchase order count?"),
+    ("pink", "Suppliers", "Spot high-risk, single-source, or under-performing suppliers.", "Which suppliers are high risk?"),
+    ("green", "Shipments", "Monitor in-transit shipments, delays, and delay reasons.", "How many shipments are currently in transit?"),
 ]
 
 if len(messages) == 0:
@@ -1095,16 +1127,26 @@ if len(messages) == 0:
         unsafe_allow_html=True
     )
 
-    pill_cols = st.columns(len(HERO_PILLS))
+    card_cols = st.columns(len(HERO_CARDS))
 
-    for i, (label, q_prompt) in enumerate(HERO_PILLS):
+    for i, (color, label, desc, q_prompt) in enumerate(HERO_CARDS):
 
-        with pill_cols[i]:
+        with card_cols[i]:
+
+            st.markdown(
+                f"""
+                <div class="dily-card dily-card-{color}">
+                    <span class="dily-card-badge">{label}</span>
+                    <div class="dily-card-desc">{desc}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
             with st.container(key=f"hero_pill_{i}"):
 
                 if st.button(
-                    label,
+                    "Ask this →",
                     key=f"hero_pill_btn_{i}",
                     use_container_width=True
                 ):
@@ -1196,17 +1238,54 @@ for idx, msg in enumerate(messages):
 # ============================================================
 # CHAT INPUT
 # ============================================================
+# `accept_file` adds a native attach (paperclip) button inside
+# the chat input, matching the reference UI. This needs
+# Streamlit 1.40+; on older versions we fall back to a plain
+# text-only input so the app doesn't crash.
+# ============================================================
 
-user_prompt = (
-    st.chat_input(
+try:
+
+    chat_result = st.chat_input(
+        "Ask me anything about suppliers, purchase orders, "
+        "shipments, deliveries, warehouses, carriers, or "
+        "inventory...",
+        accept_file="multiple",
+        file_type=["pdf", "docx", "xlsx", "csv", "txt", "png", "jpg", "jpeg"]
+    )
+
+    if chat_result:
+        user_prompt = chat_result.text
+        uploaded_chat_files = chat_result.files
+    else:
+        user_prompt = None
+        uploaded_chat_files = []
+
+except TypeError:
+
+    # Older Streamlit without accept_file support.
+    user_prompt = st.chat_input(
         "Ask me anything about suppliers, purchase orders, "
         "shipments, deliveries, warehouses, carriers, or "
         "inventory..."
     )
+    uploaded_chat_files = []
+
+user_prompt = (
+    user_prompt
     or hero_quick_prompt
     or sidebar_quick_prompt
     or suggestion_click_prompt
 )
+
+if uploaded_chat_files:
+    # File-aware Q&A (reading/understanding the uploaded file's
+    # content) is a bigger feature — this just confirms receipt
+    # for now so the attach button is visibly functional.
+    file_names = ", ".join(f.name for f in uploaded_chat_files)
+    user_prompt = (
+        f"{user_prompt or ''}\n\n(Attached: {file_names})"
+    ).strip()
 
 
 # ============================================================
