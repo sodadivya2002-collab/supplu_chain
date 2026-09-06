@@ -1222,6 +1222,17 @@ if st.session_state.sidebar_open:
         st.write("")
 
         # ---------------- History ----------------
+        if st.button(
+            "🕒 History",
+            use_container_width=True,
+            type="primary",
+            key="btn_history"
+        ):
+
+            st.session_state.show_history_panel = (
+                not st.session_state.show_history_panel
+            )
+
         if st.session_state.show_history_panel:
 
             past_sessions = [
@@ -1251,19 +1262,6 @@ if st.session_state.sidebar_open:
 
                     st.session_state.current_session_id = s_id
                     st.rerun()
-
-            st.write("")
-
-        if st.button(
-            "🕒 History",
-            use_container_width=True,
-            type="primary",
-            key="btn_history"
-        ):
-
-            st.session_state.show_history_panel = (
-                not st.session_state.show_history_panel
-            )
 
         st.write("")
 
@@ -1317,6 +1315,7 @@ else:
             ("🧩", "rail_module"),
             ("📁", "rail_upload"),
             ("🕒", "rail_history"),
+            ("🗑️", "rail_clear_sessions"),
         ]
 
         for icon, rail_key in rail_icons:
