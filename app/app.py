@@ -994,6 +994,104 @@ def answer_from_file(prompt, fname):
         return f"Error answering from the uploaded file.\n\n**Error:** {str(e)}", None, None
 
 
+def generate_file_question_suggestions(fname):
+    """Returns a list of ~5 short, clickable KPI/analysis
+    questions grounded in the actual columns of the uploaded
+    file `fname`. Results are cached per filename in
+    session_state so the LLM is only called once per upload,
+    not on every rerun or button click. Falls back to a
+    deterministic, schema-based list (no LLM needed) if Groq
+    isn't configured or the call fails, so something useful is
+    always shown."""
+
+    cached = st.session_state.file_question_suggestions.get(fname)
+
+    if cached:
+        return cached
+
+    file_data = st.session_state.stored_files.get(fname, {})
+    df = file_data.get("df")
+
+    if df is None:
+        # Non-tabular file (pdf/docx/txt) — generic fallback.
+        fallback = [
+            "Summarize this document.",
+            "What are the key points in this file?",
+        ]
+        st.session_state.file_question_suggestions[fname] = fallback
+        return fallback
+
+    columns = list(df.columns)
+    numeric_cols = df.select_dtypes(include="number").columns.tolist()
+    categorical_cols = df.select_dtypes(include="object").columns.tolist()
+
+    questions = None
+
+    try:
+
+        sample_csv = df.head(5).to_csv(index=False)
+
+        system_prompt = (
+            "You are a data analyst. Given a dataset's column names "
+            "and a few sample rows, suggest 5 short, specific KPI or "
+            "business-analysis questions a user could ask about this "
+            "data — questions answerable with a SQL query over this "
+            "table. Ground every question in actual column names "
+            "from the data (don't invent columns). Respond with "
+            "ONLY a JSON array of 5 short question strings, e.g. "
+            '["question 1", "question 2", ...]. No markdown, no '
+            "extra text, no explanation — just the JSON array."
+        )
+
+        user_message = (
+            f"Columns: {', '.join(columns)}\n\n"
+            f"Sample rows:\n{sample_csv}"
+        )
+
+        raw_response = _call_groq_json(system_prompt, user_message)
+        parsed = _parse_json_response(raw_response)
+
+        if isinstance(parsed, list) and parsed:
+            questions = [
+                str(q).strip() for q in parsed if str(q).strip()
+            ][:5]
+
+    except Exception:
+        questions = None
+
+    if not questions:
+
+        # Deterministic fallback built straight from the schema —
+        # always available even without Groq configured.
+        questions = ["How many total records are there?"]
+
+        if categorical_cols:
+            questions.append(
+                f"What is the breakdown by {categorical_cols[0]}?"
+            )
+
+        if numeric_cols:
+            questions.append(
+                f"What is the average {numeric_cols[0]}?"
+            )
+
+        if len(categorical_cols) > 1:
+            questions.append(
+                f"How many records fall under each {categorical_cols[1]}?"
+            )
+
+        if numeric_cols and categorical_cols:
+            questions.append(
+                f"What is the total {numeric_cols[0]} by {categorical_cols[0]}?"
+            )
+
+        questions = questions[:5]
+
+    st.session_state.file_question_suggestions[fname] = questions
+
+    return questions
+
+
 def generate_file_overview(fname):
     """Automatically summarizes a freshly uploaded file.
 
@@ -1218,6 +1316,15 @@ if "active_file" not in st.session_state:
 
 if "show_history_panel" not in st.session_state:
     st.session_state.show_history_panel = False
+
+if "show_suggestions_panel" not in st.session_state:
+    st.session_state.show_suggestions_panel = False
+
+if "file_question_suggestions" not in st.session_state:
+    # Cache of generated question suggestions per uploaded
+    # filename, so the LLM is only called once per file instead
+    # of on every rerun/click.
+    st.session_state.file_question_suggestions = {}
 
 
 # ============================================================
@@ -1465,13 +1572,40 @@ No module is selected yet, and no file is active.
 }
 
 
+def _is_question_suggestion_request(p):
+    """True for phrasings like 'suggest me some kpi analysis
+    questions related to this document', 'suggest some questions
+    related to this file', 'give me some example questions', etc.
+    Broad on purpose — the old exact-phrase matching below missed
+    these and let them fall through to the file-Q&A SQL path,
+    which produced generic one-line answers with no actual
+    question list."""
+
+    suggestion_triggers = [
+        "suggest",
+        "give me some question",
+        "give me question",
+        "sample questions",
+        "example questions",
+    ]
+
+    mentions_questions = "question" in p
+
+    return mentions_questions and any(
+        trigger in p for trigger in suggestion_triggers
+    )
+
+
 def generate_sql_from_prompt(prompt):
-    """Returns (explanation, sql, result_df).
+    """Returns (explanation, sql, result_df, suggestions).
 
     result_df is pre-computed data (used for the file-upload path,
     which runs its own SQL engine); it's None for the Cortex
     Analyst path, where the caller executes `sql` against the
-    live Snowflake session instead."""
+    live Snowflake session instead. `suggestions` is a list of
+    short question strings to render as clickable buttons under
+    the assistant's reply, or None when there's nothing to
+    suggest."""
 
     p = prompt.lower().strip()
 
@@ -1482,14 +1616,57 @@ def generate_sql_from_prompt(prompt):
 
         if active_file:
             greeting_subject = f"your uploaded file **{active_file}**"
+            greeting_suggestions = generate_file_question_suggestions(active_file)
         elif module != "None":
             greeting_subject = f"your **{module}** data"
+            greeting_suggestions = MODULE_GREETING_SUGGESTIONS.get(module, [])
         else:
             greeting_subject = "your data"
+            greeting_suggestions = None
 
         return (
             f"Hi there! 👋 Ask me anything about {greeting_subject}.\n\n"
             "Here are a few things you can try:",
+            None,
+            None,
+            greeting_suggestions
+        )
+
+    if _is_question_suggestion_request(p):
+
+        # Explicit "suggest me some questions" style request —
+        # always answer with a real, clickable question list
+        # grounded in whichever mode (file or module) is active,
+        # instead of routing through the generic SQL/answer path.
+        if active_file:
+
+            suggestions = generate_file_question_suggestions(active_file)
+
+            return (
+                f"Here are some questions you could ask about "
+                f"**{active_file}**:",
+                None,
+                None,
+                suggestions
+            )
+
+        if module != "None":
+
+            suggestions = MODULE_GREETING_SUGGESTIONS.get(module, [])
+
+            return (
+                f"Here are some questions you could ask about your "
+                f"**{module}** data:",
+                None,
+                None,
+                suggestions
+            )
+
+        return (
+            "Select a module (**Supply Chain** or **Inventory**) "
+            "from the **🧩 Module** menu, or upload a file first — "
+            "then I can suggest specific questions for that data.",
+            None,
             None,
             None
         )
@@ -1503,13 +1680,15 @@ def generate_sql_from_prompt(prompt):
     ):
 
         if active_file:
+
+            suggestions = generate_file_question_suggestions(active_file)
+
             return (
                 f"You can ask me questions about your uploaded file "
-                f"**{active_file}** — try things like \"how many "
-                "records are there\", \"summarize this file\", or "
-                "ask about any KPI in the data.",
+                f"**{active_file}** — here are a few to try:",
                 None,
-                None
+                None,
+                suggestions
             )
 
         return (
@@ -1518,7 +1697,8 @@ def generate_sql_from_prompt(prompt):
                 MODULE_HELP_TEXT["None"]
             ),
             None,
-            None
+            None,
+            MODULE_GREETING_SUGGESTIONS.get(module, None) if module != "None" else None
         )
 
     # File Q&A takes priority whenever a file is active — the
@@ -1528,7 +1708,7 @@ def generate_sql_from_prompt(prompt):
 
         explanation, sql_query, result_df = answer_from_file(prompt, active_file)
 
-        return explanation, sql_query, result_df
+        return explanation, sql_query, result_df, None
 
     if module == "None":
 
@@ -1538,12 +1718,13 @@ def generate_sql_from_prompt(prompt):
             "sidebar, or upload a file, before asking a data "
             "question.",
             None,
+            None,
             None
         )
 
     explanation, sql_query = call_cortex_analyst(prompt, module)
 
-    return explanation, sql_query, None
+    return explanation, sql_query, None, None
 
 
 # ============================================================
@@ -1570,10 +1751,16 @@ with st.container(key="floating_toggle"):
 # ============================================================
 # SIDEBAR
 # ============================================================
-# Order: New Chat, Module, Upload, History, Clear Session.
-# Every button below is styled the same way (outlined, no
-# fill — see CSS block above).
+# Order: New Chat, Module, Upload, Suggested Questions, History,
+# Clear Session. Every button below is styled the same way
+# (outlined, no fill — see CSS block above).
 # ============================================================
+
+# Set by a click on one of the sidebar's "Suggested Questions"
+# buttons below. Declared here (top-level script scope) so it's
+# available later when combined with `user_prompt`, further down
+# the script.
+pending_prompt_from_click = None
 
 if st.session_state.sidebar_open:
 
@@ -1771,6 +1958,67 @@ if st.session_state.sidebar_open:
 
                                 st.session_state.selected_file = None
                                 st.rerun()
+
+        st.write("")
+
+        # ---------------- Suggested Questions ----------------
+        # Shows questions relevant to whichever mode is currently
+        # enabled (active file takes priority, then module) — the
+        # same mutual-exclusivity rule used everywhere else in the
+        # sidebar. Clicking a question submits it as if the user
+        # had typed it, via `pending_prompt_from_click` below.
+        if st.button(
+            "💡 Suggested Questions",
+            use_container_width=True,
+            type="primary",
+            key="btn_suggestions"
+        ):
+
+            st.session_state.show_suggestions_panel = (
+                not st.session_state.show_suggestions_panel
+            )
+
+        if st.session_state.show_suggestions_panel:
+
+            if st.session_state.active_file:
+
+                sidebar_suggestions = generate_file_question_suggestions(
+                    st.session_state.active_file
+                )
+
+                st.caption(
+                    f"Questions about **{st.session_state.active_file}**:"
+                )
+
+            elif st.session_state.selected_module != "None":
+
+                sidebar_suggestions = MODULE_GREETING_SUGGESTIONS.get(
+                    st.session_state.selected_module,
+                    []
+                )
+
+                st.caption(
+                    f"Questions about **{st.session_state.selected_module}**:"
+                )
+
+            else:
+
+                sidebar_suggestions = []
+
+                st.caption(
+                    "Select a module or upload a file first to see "
+                    "suggested questions here."
+                )
+
+            for sq_i, sq in enumerate(sidebar_suggestions):
+
+                if st.button(
+                    sq,
+                    key=f"sidebar_sugg_{sq_i}",
+                    use_container_width=True
+                ):
+
+                    pending_prompt_from_click = sq
 
         st.write("")
 
@@ -2059,6 +2307,7 @@ except TypeError:
 user_prompt = (
     user_prompt
     or suggestion_click_prompt
+    or pending_prompt_from_click
 )
 
 if uploaded_chat_files:
@@ -2178,24 +2427,15 @@ if user_prompt:
 
     with st.chat_message("assistant"):
 
-        explanation, sql_query, file_df = (
+        # generate_sql_from_prompt now returns the right
+        # `suggestions` list itself (greeting, "suggest me
+        # questions"-style requests, and "what can I ask" all
+        # resolve their own suggestions internally, grounded in
+        # whichever mode — file or module — is currently active).
+        explanation, sql_query, file_df, suggestions = (
             generate_sql_from_prompt(
                 user_prompt
             )
-        )
-
-        is_greeting_prompt = (
-            user_prompt.strip().lower()
-            in GREETING_PHRASES
-        )
-
-        suggestions = (
-            MODULE_GREETING_SUGGESTIONS.get(
-                st.session_state.get("selected_module", "None"),
-                MODULE_GREETING_SUGGESTIONS["None"]
-            )
-            if is_greeting_prompt
-            else None
         )
 
         st.markdown(
