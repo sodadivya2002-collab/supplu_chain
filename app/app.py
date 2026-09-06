@@ -5,13 +5,7 @@ import requests
 import snowflake.connector
 from snowflake.snowpark import Session
 
-try:
-    import speech_recognition as sr
-    SPEECH_RECOGNITION_AVAILABLE = True
-except ImportError:
-    SPEECH_RECOGNITION_AVAILABLE = False
-
-
+ 
 # ============================================================
 # PAGE CONFIG
 # ============================================================
@@ -32,12 +26,6 @@ st.set_page_config(
 #   Border     : #26262f
 #   Accent     : #2dd4bf (teal)  /  #f43f5e (pink, secondary accent)
 #   Text       : #f5f5f7 primary, #9a9aa8 secondary
-#
-# NOTE ON BUTTONS: every button (main sidebar actions, history
-# items, file rows, use/remove) is now a bordered/outlined
-# button with NO filled background. The only visual "color" is
-# the teal border + teal text that appears on hover / when a
-# button is the primary action. Nothing is filled with color.
 # ============================================================
 
 st.markdown(
@@ -78,6 +66,7 @@ st.markdown(
         border-right: none;
         box-shadow: none;
     }
+    /* Kill any other default Streamlit dividers between panes */
     [data-testid="stSidebar"] ~ div,
     [data-testid="stAppViewContainer"] > .main,
     div[data-testid="stMainBlockContainer"] {
@@ -101,11 +90,25 @@ st.markdown(
         border-color: #22222b;
     }
 
-    /* ---------- Buttons (generic, whole app) ---------- */
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background-color: rgba(45,212,191,0.10);
+        color: #2dd4bf;
+        border: 1px solid rgba(45,212,191,0.35);
+        border-radius: 20px;
+        padding: 3px 10px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: none !important;
+    }
+
+    /* ---------- Buttons (generic) ---------- */
     div[data-testid="stButton"] > button {
         border-radius: 10px;
         font-weight: 500;
-        background: transparent;
+        background: #1b1b22;
         color: #f5f5f7;
         border: 1px solid #2a2a34;
         transition: all 0.15s ease;
@@ -113,49 +116,38 @@ st.markdown(
     div[data-testid="stButton"] > button:hover {
         border-color: #2dd4bf;
         color: #2dd4bf;
-        background: transparent;
     }
 
-    /* ---------- Sidebar: main nav-style buttons (secondary look) ---------- */
-    /* Used for history items, file rows, use/remove actions */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button {
         background: transparent;
-        border: 1px solid transparent;
+        border: none;
         text-align: left;
         justify-content: flex-start;
         color: #cfcfd8 !important;
         font-weight: 500;
         text-transform: none;
         letter-spacing: normal;
-        padding: 6px 10px;
+        padding: 6px 8px;
         font-size: 0.88rem;
-        border-radius: 8px;
     }
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button:hover {
-        background: transparent;
-        border-color: #2dd4bf;
+        background: #1b1b22;
         color: #2dd4bf !important;
     }
 
-    /* ---------- Sidebar: primary action buttons ---------- */
-    /* New Chat / Module / Upload / History / Clear Session — all */
-    /* share the same outlined style, no fill, teal border only.  */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"] {
-        background: transparent;
-        color: #f5f5f7 !important;
-        border: 1.5px solid #2a2a34;
+        background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
+        color: #06231f !important;
         border-radius: 10px;
         padding: 9px 10px;
         text-align: center;
         justify-content: center;
         font-weight: 700;
-        text-transform: none;
-        letter-spacing: normal;
+        border: none;
     }
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"]:hover {
-        background: transparent;
-        color: #2dd4bf !important;
-        border-color: #2dd4bf;
+        filter: brightness(1.08);
+        color: #06231f !important;
     }
 
     section[data-testid="stSidebar"] div[data-testid="stExpander"] {
@@ -197,8 +189,8 @@ st.markdown(
         gap: 16px;
     }
     .dily-logo-box {
-        background: #d6231c;
-        color: #ffffff;
+        background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
+        color: #06231f;
         font-weight: 800;
         letter-spacing: 1px;
         padding: 7px 14px;
@@ -229,6 +221,7 @@ st.markdown(
         color: #5eead4;
         background: transparent;
     }
+    /* Kill Streamlit's default tooltip bubble on hover (the white box) */
     .st-key-floating_toggle [data-testid="stTooltipHoverTarget"] + div,
     .st-key-floating_toggle div[role="tooltip"],
     div[data-testid="stTooltipContent"] {
@@ -251,8 +244,7 @@ st.markdown(
         justify-content: center;
     }
     .dily-icon-rail div[data-testid="stButton"] > button:hover {
-        background: transparent;
-        border-color: #2dd4bf;
+        background: #1b1b22;
         color: #2dd4bf;
     }
     .dily-icon-rail div[data-testid="column"] {
@@ -274,7 +266,7 @@ st.markdown(
         visibility: hidden !important;
     }
 
-    /* ---------- Login page heading ---------- */
+    /* ---------- Login page heading (block layout, unlike the flex hero banner) ---------- */
     .dily-login-hero {
         text-align: center;
         max-width: 640px;
@@ -372,7 +364,10 @@ st.markdown(
     .dily-hero-graphic .dot2 { top: 40px; right: -14px; }
     .dily-hero-graphic .dot3 { bottom: 6px; right: 30px; }
 
+
     /* ---------- Chat input ---------- */
+    /* Kill the light background strip Streamlit renders behind the
+       chat input (the bottom-fixed container), across versions. */
     div[data-testid="stBottom"],
     div[data-testid="stBottomBlockContainer"],
     .stBottomBlockContainer,
@@ -407,73 +402,20 @@ st.markdown(
     }
     div[data-testid="stChatInput"] button[kind="icon"],
     div[data-testid="stChatInput"] button {
-        background: transparent !important;
-        border: 1.5px solid #2dd4bf !important;
+        background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%) !important;
         border-radius: 50% !important;
+        border: none !important;
     }
     div[data-testid="stChatInput"] button svg {
-        fill: #2dd4bf !important;
+        fill: #06231f !important;
     }
+    /* File-attach icon button: no border/box, just the plus glyph */
     div[data-testid="stChatInputFileUploaderButton"] button,
     div[data-testid="stChatInput"] button[title*="attach" i] {
         background: transparent !important;
         color: #2dd4bf !important;
         border: none !important;
         box-shadow: none !important;
-    }
-
-    /* ---------- Mic / voice input ---------- */
-    /* The mic button lives in its own st.columns() cell placed   */
-    /* directly beside the chat input (see the CHAT INPUT section */
-    /* in the script) so it's genuinely on the same row — no      */
-    /* fixed-position CSS math involved. Styled as a plain icon   */
-    /* (no border/box), tight against the send button, matching  */
-    /* the requested look.                                       */
-    .st-key-chat_row div[data-testid="stHorizontalBlock"] {
-        gap: 0.35rem !important;
-        align-items: flex-end !important;
-    }
-    .st-key-mic_beside_btn {
-        display: flex;
-        align-items: flex-end;
-        justify-content: center;
-        height: 100%;
-        padding-bottom: 9px;
-    }
-    .st-key-mic_beside_btn div[data-testid="stButton"] > button {
-        width: 34px;
-        height: 34px;
-        padding: 0;
-        border-radius: 50%;
-        background: transparent;
-        border: none;
-        color: #9a9aa8;
-        font-size: 1.05rem;
-        box-shadow: none;
-    }
-    .st-key-mic_beside_btn div[data-testid="stButton"] > button:hover {
-        color: #2dd4bf;
-        border: none;
-        background: transparent;
-    }
-
-    div[data-testid="stAudioInput"] {
-        max-width: 760px;
-        margin: 6px auto 0 auto;
-        border-radius: 26px !important;
-        border: 1px solid #26262f !important;
-        background: #16161c !important;
-        padding: 4px 10px;
-    }
-    div[data-testid="stAudioInput"] button {
-        background: transparent !important;
-        border: 1.5px solid #2dd4bf !important;
-        color: #2dd4bf !important;
-        border-radius: 50% !important;
-    }
-    div[data-testid="stAudioInput"] button:hover {
-        color: #5eead4 !important;
-        border-color: #5eead4 !important;
     }
 
     /* ---------- Chat messages ---------- */
@@ -530,6 +472,10 @@ def get_snowflake_config():
 
 # ============================================================
 # CORTEX ANALYST
+# ============================================================
+# All actual Supply Chain questions are handled by the Cortex
+# Analyst semantic view instead of keyword matching. This is a
+# standalone, top-level function.
 # ============================================================
 
 def call_cortex_analyst(prompt):
@@ -688,124 +634,6 @@ def call_cortex_analyst(prompt):
 
 
 # ============================================================
-# FILE UPLOAD HELPERS
-# ============================================================
-# Extracts plain text from an uploaded file so it can be used
-# as context for Q&A. Falls back gracefully if an optional
-# parsing library (pypdf / python-docx) is not installed.
-# ============================================================
-
-def extract_text_from_upload(uploaded_file):
-
-    name = uploaded_file.name
-    ext = name.split(".")[-1].lower() if "." in name else ""
-
-    try:
-
-        if ext == "txt":
-            return uploaded_file.read().decode("utf-8", errors="ignore")
-
-        elif ext == "csv":
-            df = pd.read_csv(uploaded_file)
-            return df.to_csv(index=False)
-
-        elif ext in ("xlsx", "xls"):
-            df = pd.read_excel(uploaded_file)
-            return df.to_csv(index=False)
-
-        elif ext == "pdf":
-            try:
-                from pypdf import PdfReader
-            except ImportError:
-                from PyPDF2 import PdfReader
-            reader = PdfReader(uploaded_file)
-            return "\n".join(
-                (page.extract_text() or "") for page in reader.pages
-            )
-
-        elif ext == "docx":
-            import docx
-            document = docx.Document(uploaded_file)
-            return "\n".join(p.text for p in document.paragraphs)
-
-        elif ext in ("png", "jpg", "jpeg"):
-            return "[Image file uploaded — no text extracted.]"
-
-        else:
-            return "[Unsupported file type for text extraction.]"
-
-    except ImportError as e:
-        return (
-            f"[Could not read '{name}' — missing library ({e}). "
-            f"Install pypdf / python-docx to enable this file type.]"
-        )
-
-    except Exception as e:
-        return f"[Could not read '{name}': {e}]"
-
-
-def transcribe_audio(audio_file):
-    """Transcribe a recorded audio clip to text using Google's free
-    Web Speech API (via the SpeechRecognition package). Returns a
-    (text, error_message) tuple — exactly one of the two is set."""
-
-    if not SPEECH_RECOGNITION_AVAILABLE:
-        return None, (
-            "The `SpeechRecognition` package is not installed. "
-            "Run `pip install SpeechRecognition` to enable the mic."
-        )
-
-    try:
-        recognizer = sr.Recognizer()
-        audio_file.seek(0)
-
-        with sr.AudioFile(audio_file) as source:
-            audio_data = recognizer.record(source)
-
-        text = recognizer.recognize_google(audio_data)
-        return text, None
-
-    except sr.UnknownValueError:
-        return None, "Couldn't understand the audio — please try again."
-
-    except sr.RequestError as e:
-        return None, f"Speech recognition service error: {e}"
-
-    except Exception as e:
-        return None, f"Could not transcribe audio: {e}"
-
-
-def answer_from_file(prompt, file_text):
-    """Answer a question using the active uploaded file as context,
-    via Snowflake Cortex COMPLETE. Returns (explanation, sql) to
-    match the shape used elsewhere in the app."""
-
-    try:
-
-        context = file_text[:12000]
-
-        cortex_prompt = (
-            "You are a helpful assistant. Use the document content "
-            "below to answer the question. If the answer is not in "
-            "the document, say so clearly.\n\n"
-            f"DOCUMENT:\n{context}\n\n"
-            f"QUESTION: {prompt}"
-        )
-
-        sql = "SELECT SNOWFLAKE.CORTEX.COMPLETE(?, ?) AS RESPONSE"
-
-        result = session.sql(sql, params=["llama3-70b", cortex_prompt]).collect()
-
-        if result:
-            return result[0]["RESPONSE"], None
-
-        return "I couldn't generate an answer from the file.", None
-
-    except Exception as e:
-        return f"Error answering from the uploaded file.\n\n**Error:** {str(e)}", None
-
-
-# ============================================================
 # SESSION STATE
 # ============================================================
 
@@ -897,12 +725,14 @@ if not st.session_state.authenticated:
                         "schema": config["schema"]
                     }
 
+                    # Test connection
                     conn = snowflake.connector.connect(
                         **connection_parameters
                     )
 
                     conn.close()
 
+                    # Create Snowpark session
                     st.session_state.snowpark_session = (
                         Session.builder
                         .configs(connection_parameters)
@@ -935,33 +765,6 @@ session = st.session_state.snowpark_session
 
 if "sidebar_open" not in st.session_state:
     st.session_state.sidebar_open = True
-
-if "show_module_selector" not in st.session_state:
-    st.session_state.show_module_selector = False
-
-if "selected_module" not in st.session_state:
-    st.session_state.selected_module = "Supply Chain"
-
-if "show_files_panel" not in st.session_state:
-    st.session_state.show_files_panel = False
-
-if "stored_files" not in st.session_state:
-    st.session_state.stored_files = {}
-
-if "selected_file" not in st.session_state:
-    st.session_state.selected_file = None
-
-if "active_file" not in st.session_state:
-    st.session_state.active_file = None
-
-if "show_history_panel" not in st.session_state:
-    st.session_state.show_history_panel = False
-
-if "show_mic_input" not in st.session_state:
-    st.session_state.show_mic_input = False
-
-if "last_audio_hash" not in st.session_state:
-    st.session_state.last_audio_hash = None
 
 
 # ============================================================
@@ -1145,19 +948,14 @@ against the supply chain semantic view.
             None
         )
 
-    active_file = st.session_state.get("active_file")
-
-    if active_file and active_file in st.session_state.stored_files:
-
-        file_text = st.session_state.stored_files[active_file]["text"]
-
-        return answer_from_file(prompt, file_text)
-
     return call_cortex_analyst(prompt)
 
 
 # ============================================================
 # TOP NAVBAR + FLOATING SIDEBAR TOGGLE
+# ============================================================
+# No username/account chip shown — just a plain teal toggle icon
+# pinned to the top-left, no border/box, no tooltip bubble.
 # ============================================================
 
 st.markdown(
@@ -1178,23 +976,67 @@ with st.container(key="floating_toggle"):
 
 
 # ============================================================
+# SIDEBAR QUICK-LINK CATEGORIES
+# ============================================================
+
+QUICK_LINK_CATEGORIES = {
+    "📋 Purchase Orders": [
+        ("Total PO count", "What is the total purchase order count?"),
+        ("Total ordered value", "What is the total ordered value?"),
+        ("Open commitment", "What is the total open commitment?"),
+        ("PO status breakdown", "What is the purchase order status breakdown?"),
+    ],
+    "🚚 Shipments": [
+        ("Total shipments", "What is the total number of shipments?"),
+        ("In transit", "How many shipments are currently in transit?"),
+        ("Delayed shipments", "How many shipments are delayed?"),
+        ("Top delay reasons", "What are the top delay reasons?"),
+    ],
+    "📦 Inventory": [
+        ("PO value by warehouse", "What is the purchase order value by warehouse?"),
+        ("Ordered qty by category", "What is the ordered quantity by product category?"),
+    ],
+    "🏭 Suppliers": [
+        ("On-time delivery %", "What is the supplier on-time delivery percentage?"),
+        ("High risk suppliers", "Which suppliers are high risk?"),
+        ("Single source suppliers", "Which suppliers are single source?"),
+        ("Active contracts", "Which suppliers have active contracts?"),
+    ],
+    "🏢 Warehouses": [
+        ("PO value by warehouse", "What is the purchase order value by warehouse?"),
+    ],
+    "🚢 Carriers": [
+        ("Shipments by carrier", "What is the shipment count by carrier?"),
+        ("Freight cost by carrier", "What is freight cost by carrier?"),
+    ],
+    "🛠️ Products": [
+        ("Top products by value", "What are the top products by ordered value?"),
+        ("Ordered value by brand", "What is the ordered value by brand?"),
+    ],
+}
+
+
+# ============================================================
 # SIDEBAR
 # ============================================================
-# Order: New Chat, Module, Upload, History, Clear Session.
-# Every button below is styled the same way (outlined, no
-# fill — see CSS block above).
-# ============================================================
+
+sidebar_quick_prompt = None
 
 if st.session_state.sidebar_open:
 
     with st.sidebar:
 
-        # ---------------- New Chat ----------------
+        st.markdown(
+            '<span class="status-pill">● Semantic Mart Live</span>',
+            unsafe_allow_html=True
+        )
+
+        st.write("")
+
         if st.button(
             "➕ New Chat",
             use_container_width=True,
-            type="primary",
-            key="btn_new_chat"
+            type="primary"
         ):
 
             new_id = datetime.now().strftime(
@@ -1210,166 +1052,64 @@ if st.session_state.sidebar_open:
 
             st.rerun()
 
-        st.write("")
+        st.markdown("---")
 
-        # ---------------- Module ----------------
-        if st.button(
-            "🧩 Module",
-            use_container_width=True,
-            type="primary",
-            key="btn_module"
+        st.markdown(
+            "##### 🕒 Recent Conversations"
+        )
+
+        for s_id, s_data in reversed(
+            list(
+                st.session_state.chat_sessions.items()
+            )
         ):
 
-            st.session_state.show_module_selector = (
-                not st.session_state.show_module_selector
+            is_active = (
+                s_id ==
+                st.session_state.current_session_id
             )
 
-        if st.session_state.show_module_selector:
+            label = s_data["title"]
 
-            module_options = [
-                "Supply Chain",
-                "Finance (coming soon)",
-                "HR (coming soon)"
-            ]
+            if len(label) > 20:
 
-            st.session_state.selected_module = st.selectbox(
-                "Select module",
-                module_options,
-                index=module_options.index(
-                    st.session_state.selected_module
-                ),
-                key="module_selectbox",
-                label_visibility="collapsed"
-            )
+                label = label[:18] + "..."
 
-        st.write("")
+            if st.button(
+                f"{'👉 ' if is_active else '🗨️ '}{label}",
+                key=f"sess_{s_id}",
+                use_container_width=True
+            ):
 
-        # ---------------- Upload Files ----------------
-        if st.button(
-            "📁 Upload Files",
-            use_container_width=True,
-            type="primary",
-            key="btn_upload"
-        ):
+                st.session_state.current_session_id = s_id
 
-            st.session_state.show_files_panel = (
-                not st.session_state.show_files_panel
-            )
+                st.rerun()
 
-        if st.session_state.show_files_panel:
+        st.markdown("---")
 
-            if not st.session_state.stored_files:
+        st.markdown(
+            "##### 🔗 Quick Links"
+        )
 
-                st.caption(
-                    "No files uploaded yet. Use the attach icon "
-                    "inside the chat box below to add one."
-                )
+        for category, items in QUICK_LINK_CATEGORIES.items():
 
-            else:
+            with st.expander(category, expanded=False):
 
-                for fname in list(st.session_state.stored_files.keys()):
-
-                    is_active = (fname == st.session_state.active_file)
-                    row_label = f"{'✅ ' if is_active else '📄 '}{fname}"
+                for label, q_prompt in items:
 
                     if st.button(
-                        row_label,
-                        key=f"file_row_{fname}",
+                        label,
+                        key=f"ql_{category}_{label}",
                         use_container_width=True
                     ):
 
-                        st.session_state.selected_file = (
-                            None
-                            if st.session_state.selected_file == fname
-                            else fname
-                        )
+                        sidebar_quick_prompt = q_prompt
 
-                    if st.session_state.selected_file == fname:
+        st.markdown("---")
 
-                        fcol1, fcol2 = st.columns(2)
-
-                        with fcol1:
-
-                            if st.button(
-                                "Use",
-                                key=f"use_{fname}",
-                                use_container_width=True
-                            ):
-
-                                st.session_state.active_file = fname
-                                st.session_state.selected_file = None
-                                st.rerun()
-
-                        with fcol2:
-
-                            if st.button(
-                                "Remove",
-                                key=f"remove_{fname}",
-                                use_container_width=True
-                            ):
-
-                                del st.session_state.stored_files[fname]
-
-                                if st.session_state.active_file == fname:
-                                    st.session_state.active_file = None
-
-                                st.session_state.selected_file = None
-                                st.rerun()
-
-        st.write("")
-
-        # ---------------- History ----------------
-        if st.session_state.show_history_panel:
-
-            past_sessions = [
-                (s_id, s_data)
-                for s_id, s_data in reversed(
-                    list(st.session_state.chat_sessions.items())
-                )
-                if s_id != st.session_state.current_session_id
-            ]
-
-            if not past_sessions:
-
-                st.caption("No past conversations yet.")
-
-            for s_id, s_data in past_sessions:
-
-                label = s_data["title"]
-
-                if len(label) > 20:
-                    label = label[:18] + "..."
-
-                if st.button(
-                    f"🗨️ {label}",
-                    key=f"sess_{s_id}",
-                    use_container_width=True
-                ):
-
-                    st.session_state.current_session_id = s_id
-                    st.rerun()
-
-            st.write("")
-
-        if st.button(
-            "🕒 History",
-            use_container_width=True,
-            type="primary",
-            key="btn_history"
-        ):
-
-            st.session_state.show_history_panel = (
-                not st.session_state.show_history_panel
-            )
-
-        st.write("")
-
-        # ---------------- Clear All Sessions ----------------
         if st.button(
             "🗑️ Clear All Sessions",
-            use_container_width=True,
-            type="primary",
-            key="btn_clear_sessions"
+            use_container_width=True
         ):
 
             st.session_state.chat_sessions = {}
@@ -1389,7 +1129,8 @@ if st.session_state.sidebar_open:
 
 else:
 
-    # Collapsed state: slim icon-only rail.
+    # Collapsed state: show a slim icon-only rail instead of an
+    # empty blank sidebar column, matching the reference screenshot.
     st.markdown(
         """
         <style>
@@ -1411,9 +1152,8 @@ else:
 
         rail_icons = [
             ("➕", "rail_new_chat"),
-            ("🧩", "rail_module"),
-            ("📁", "rail_upload"),
-            ("🕒", "rail_history"),
+            ("🕒", "rail_recent"),
+            ("🔗", "rail_links"),
         ]
 
         for icon, rail_key in rail_icons:
@@ -1425,10 +1165,16 @@ else:
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-
 # ============================================================
 # HERO SECTION  (only shown when the current chat is empty)
 # ============================================================
+# Module-agnostic marketing banner: badge, headline, subtitle,
+# and a flat circular graphic — no supply-chain-specific wording
+# so this same shell works for other modules later. CTA buttons
+# and the checklist row were removed per request.
+# ============================================================
+
+hero_quick_prompt = None
 
 if len(messages) == 0:
 
@@ -1537,130 +1283,49 @@ for idx, msg in enumerate(messages):
 
 
 # ============================================================
-# ACTIVE FILE INDICATOR
+# CHAT INPUT
+# ============================================================
+# `accept_file` adds a native attach (paperclip) button inside
+# the chat input, matching the reference UI. This needs
+# Streamlit 1.40+; on older versions we fall back to a plain
+# text-only input so the app doesn't crash.
 # ============================================================
 
-if st.session_state.active_file:
+try:
 
-    st.caption(
-        f"📄 Currently answering from file: "
-        f"**{st.session_state.active_file}**"
+    chat_result = st.chat_input(
+        "Ask me anything about your data...",
+        accept_file="multiple",
+        file_type=["pdf", "docx", "xlsx", "csv", "txt", "png", "jpg", "jpeg"]
     )
 
+    if chat_result:
+        user_prompt = chat_result.text
+        uploaded_chat_files = chat_result.files
+    else:
+        user_prompt = None
+        uploaded_chat_files = []
 
-# ============================================================
-# MIC / VOICE INPUT
-# ============================================================
-# The mic button sits in a column directly beside the chat
-# input, on the same row — this is done with st.columns(), not
-# a CSS overlay, because Streamlit's chat_input can't otherwise
-# be embedded next to a real, correctly-aligned button. As a
-# side effect, chat_input renders inline here rather than
-# auto-sticking to the very bottom of the browser window (that
-# floating behaviour only applies when chat_input is called at
-# the script's top level, not inside a column).
-# ============================================================
+except TypeError:
 
-mic_prompt = None
-
-if st.session_state.show_mic_input:
-
-    audio_value = st.audio_input(
-        "Record your question",
-        key="mic_audio",
-        label_visibility="collapsed"
+    # Older Streamlit without accept_file support.
+    user_prompt = st.chat_input(
+        "Ask me anything about your data..."
     )
-
-    if audio_value is not None:
-
-        audio_bytes = audio_value.getvalue()
-        audio_hash = hash(audio_bytes)
-
-        if st.session_state.last_audio_hash != audio_hash:
-
-            st.session_state.last_audio_hash = audio_hash
-
-            with st.spinner("Transcribing..."):
-                transcribed_text, transcribe_error = transcribe_audio(audio_value)
-
-            if transcribed_text:
-                mic_prompt = transcribed_text
-                st.success(f'Heard: "{transcribed_text}"')
-            elif transcribe_error:
-                st.warning(transcribe_error)
-
-
-# ============================================================
-# CHAT INPUT  (+ mic button on the same row)
-# ============================================================
-
-# ============================================================
-# CHAT INPUT  (+ mic button on the same row)
-# ============================================================
-
-with st.container(key="chat_row"):
-
-    col_input, col_mic = st.columns([0.95, 0.05], gap="small")
-
-    with col_input:
-
-        try:
-
-            chat_result = st.chat_input(
-                "Ask me anything about your data...",
-                accept_file="multiple",
-                file_type=["pdf", "docx", "xlsx", "csv", "txt", "png", "jpg", "jpeg"]
-            )
-
-            if chat_result:
-                user_prompt = chat_result.text
-                uploaded_chat_files = chat_result.files
-            else:
-                user_prompt = None
-                uploaded_chat_files = []
-
-        except TypeError:
-
-            user_prompt = st.chat_input(
-                "Ask me anything about your data..."
-            )
-            uploaded_chat_files = []
-
-    with col_mic:
-
-        with st.container(key="mic_beside_btn"):
-
-            if st.button(
-                "🎤",
-                key="btn_mic_toggle",
-                help="Voice input",
-                use_container_width=True
-            ):
-
-                st.session_state.show_mic_input = not st.session_state.show_mic_input
-                st.rerun()
+    uploaded_chat_files = []
 
 user_prompt = (
     user_prompt
+    or hero_quick_prompt
+    or sidebar_quick_prompt
     or suggestion_click_prompt
-    or mic_prompt
 )
 
 if uploaded_chat_files:
-
-    for f in uploaded_chat_files:
-
-        if f.name not in st.session_state.stored_files:
-
-            text_content = extract_text_from_upload(f)
-
-            st.session_state.stored_files[f.name] = {
-                "text": text_content,
-                "type": f.type
-            }
-
+    # File-aware Q&A (reading/understanding the uploaded file's
+    # content) is a bigger feature — this just confirms receipt
+    # for now so the attach button is visibly functional.
     file_names = ", ".join(f.name for f in uploaded_chat_files)
-
     user_prompt = (
         f"{user_prompt or ''}\n\n(Attached: {file_names})"
     ).strip()
