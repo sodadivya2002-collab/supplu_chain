@@ -5,6 +5,12 @@ import requests
 import snowflake.connector
 from snowflake.snowpark import Session
 
+try:
+    import speech_recognition as sr
+    SPEECH_RECOGNITION_AVAILABLE = True
+except ImportError:
+    SPEECH_RECOGNITION_AVAILABLE = False
+
 
 # ============================================================
 # PAGE CONFIG
@@ -416,6 +422,26 @@ st.markdown(
         box-shadow: none !important;
     }
 
+    /* ---------- Mic / audio input ---------- */
+    div[data-testid="stAudioInput"] {
+        max-width: 760px;
+        margin: 6px auto 0 auto;
+        border-radius: 26px !important;
+        border: 1px solid #26262f !important;
+        background: #16161c !important;
+        padding: 4px 10px;
+    }
+    div[data-testid="stAudioInput"] button {
+        background: transparent !important;
+        border: 1.5px solid #2dd4bf !important;
+        color: #2dd4bf !important;
+        border-radius: 50% !important;
+    }
+    div[data-testid="stAudioInput"] button:hover {
+        color: #5eead4 !important;
+        border-color: #5eead4 !important;
+    }
+
     /* ---------- Chat messages ---------- */
     div[data-testid="stChatMessage"] {
         background: #14141a;
@@ -684,6 +710,37 @@ def extract_text_from_upload(uploaded_file):
         return f"[Could not read '{name}': {e}]"
 
 
+def transcribe_audio(audio_file):
+    """Transcribe a recorded audio clip to text using Google's free
+    Web Speech API (via the SpeechRecognition package). Returns a
+    (text, error_message) tuple — exactly one of the two is set."""
+
+    if not SPEECH_RECOGNITION_AVAILABLE:
+        return None, (
+            "The `SpeechRecognition` package is not installed. "
+            "Run `pip install SpeechRecognition` to enable the mic."
+        )
+
+    try:
+        recognizer = sr.Recognizer()
+        audio_file.seek(0)
+
+        with sr.AudioFile(audio_file) as source:
+            audio_data = recognizer.record(source)
+
+        text = recognizer.recognize_google(audio_data)
+        return text, None
+
+    except sr.UnknownValueError:
+        return None, "Couldn't understand the audio — please try again."
+
+    except sr.RequestError as e:
+        return None, f"Speech recognition service error: {e}"
+
+    except Exception as e:
+        return None, f"Could not transcribe audio: {e}"
+
+
 def answer_from_file(prompt, file_text):
     """Answer a question using the active uploaded file as context,
     via Snowflake Cortex COMPLETE. Returns (explanation, sql) to
@@ -865,6 +922,12 @@ if "active_file" not in st.session_state:
 
 if "show_history_panel" not in st.session_state:
     st.session_state.show_history_panel = False
+
+if "show_mic_input" not in st.session_state:
+    st.session_state.show_mic_input = False
+
+if "last_audio_hash" not in st.session_state:
+    st.session_state.last_audio_hash = None
 
 
 # ============================================================
@@ -1444,6 +1507,52 @@ if st.session_state.active_file:
 
 
 # ============================================================
+# MIC / VOICE INPUT
+# ============================================================
+
+mic_col1, mic_col2, mic_col3 = st.columns([1, 0.12, 1])
+
+with mic_col2:
+
+    if st.button(
+        "🎤",
+        key="btn_mic_toggle",
+        help="Voice input",
+        use_container_width=True
+    ):
+
+        st.session_state.show_mic_input = not st.session_state.show_mic_input
+
+mic_prompt = None
+
+if st.session_state.show_mic_input:
+
+    audio_value = st.audio_input(
+        "Record your question",
+        key="mic_audio",
+        label_visibility="collapsed"
+    )
+
+    if audio_value is not None:
+
+        audio_bytes = audio_value.getvalue()
+        audio_hash = hash(audio_bytes)
+
+        if st.session_state.last_audio_hash != audio_hash:
+
+            st.session_state.last_audio_hash = audio_hash
+
+            with st.spinner("Transcribing..."):
+                transcribed_text, transcribe_error = transcribe_audio(audio_value)
+
+            if transcribed_text:
+                mic_prompt = transcribed_text
+                st.success(f'Heard: "{transcribed_text}"')
+            elif transcribe_error:
+                st.warning(transcribe_error)
+
+
+# ============================================================
 # CHAT INPUT
 # ============================================================
 
@@ -1472,6 +1581,7 @@ except TypeError:
 user_prompt = (
     user_prompt
     or suggestion_click_prompt
+    or mic_prompt
 )
 
 if uploaded_chat_files:
