@@ -715,7 +715,7 @@ def extract_text_from_upload(uploaded_file):
 
 def answer_from_file(prompt, file_text):
     """Answer a question using the active uploaded file as context,
-    via Snowflake Cortex COMPLETE. Returns (explanation, sql) to
+    via Snowflake Cortex AI_COMPLETE. Returns (explanation, sql) to
     match the shape used elsewhere in the app."""
 
     try:
@@ -730,7 +730,11 @@ def answer_from_file(prompt, file_text):
             f"QUESTION: {prompt}"
         )
 
-        sql = "SELECT SNOWFLAKE.CORTEX.COMPLETE(?, ?) AS RESPONSE"
+        # NOTE: SNOWFLAKE.CORTEX.COMPLETE is the legacy function and
+        # is blocked/limited on this trial account. AI_COMPLETE is
+        # the current, supported replacement with the same
+        # (model, prompt) positional signature.
+        sql = "SELECT AI_COMPLETE(?, ?) AS RESPONSE"
 
         result = session.sql(sql, params=["llama3-70b", cortex_prompt]).collect()
 
@@ -1187,24 +1191,19 @@ if st.session_state.sidebar_open:
                 "Inventory"
             ]
 
-            for module_name in module_options:
+            current_index = (
+                module_options.index(st.session_state.selected_module)
+                if st.session_state.selected_module in module_options
+                else 0
+            )
 
-                is_active_module = (
-                    module_name == st.session_state.selected_module
-                )
-
-                row_label = (
-                    f"{'✅ ' if is_active_module else '▫️ '}{module_name}"
-                )
-
-                if st.button(
-                    row_label,
-                    key=f"module_row_{module_name}",
-                    use_container_width=True
-                ):
-
-                    st.session_state.selected_module = module_name
-                    st.rerun()
+            st.session_state.selected_module = st.selectbox(
+                "Select module",
+                module_options,
+                index=current_index,
+                key="module_selectbox",
+                label_visibility="collapsed"
+            )
 
         st.write("")
 
