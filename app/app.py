@@ -715,33 +715,94 @@ def extract_text_from_upload(uploaded_file):
 
 def answer_from_file(prompt, file_text):
     """Answer a question using the active uploaded file as context,
-    via Snowflake Cortex AI_COMPLETE. Returns (explanation, sql) to
-    match the shape used elsewhere in the app."""
+    via the Groq API (free tier, no Snowflake Cortex dependency).
+    Returns (explanation, sql) to match the shape used elsewhere
+    in the app."""
 
     try:
 
+        groq_api_key = st.secrets.get("groq", {}).get("api_key", "")
+
+        if not groq_api_key:
+            return (
+                "File Q&A is not configured yet. Please add "
+                "`api_key` under a `[groq]` section in your "
+                "Streamlit secrets (get a free key at "
+                "console.groq.com).",
+                None
+            )
+
         context = file_text[:12000]
 
-        cortex_prompt = (
+        system_prompt = (
             "You are a helpful assistant. Use the document content "
-            "below to answer the question. If the answer is not in "
-            "the document, say so clearly.\n\n"
+            "provided by the user to answer their question. If the "
+            "answer is not in the document, say so clearly."
+        )
+
+        user_message = (
             f"DOCUMENT:\n{context}\n\n"
             f"QUESTION: {prompt}"
         )
 
-        # NOTE: SNOWFLAKE.CORTEX.COMPLETE is the legacy function and
-        # is blocked/limited on this trial account. AI_COMPLETE is
-        # the current, supported replacement with the same
-        # (model, prompt) positional signature.
-        sql = "SELECT AI_COMPLETE(?, ?) AS RESPONSE"
+        url = "https://api.groq.com/openai/v1/chat/completions"
 
-        result = session.sql(sql, params=["llama3-70b", cortex_prompt]).collect()
+        headers = {
+            "Authorization": f"Bearer {groq_api_key}",
+            "Content-Type": "application/json"
+        }
 
-        if result:
-            return result[0]["RESPONSE"], None
+        request_body = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ],
+            "temperature": 0.2
+        }
+
+        response = requests.post(
+            url,
+            headers=headers,
+            json=request_body,
+            timeout=60
+        )
+
+        if response.status_code != 200:
+            try:
+                error_json = response.json()
+                error_message = (
+                    error_json.get("error", {}).get("message")
+                    or response.text
+                )
+            except Exception:
+                error_message = response.text
+
+            return (
+                "Groq could not answer from the uploaded file.\n\n"
+                f"**Error:** {error_message}",
+                None
+            )
+
+        result = response.json()
+        answer = (
+            result.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+            .strip()
+        )
+
+        if answer:
+            return answer, None
 
         return "I couldn't generate an answer from the file.", None
+
+    except requests.exceptions.Timeout:
+
+        return (
+            "The request to Groq took too long. Please try again.",
+            None
+        )
 
     except Exception as e:
         return f"Error answering from the uploaded file.\n\n**Error:** {str(e)}", None
