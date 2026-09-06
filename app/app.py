@@ -1187,19 +1187,24 @@ if st.session_state.sidebar_open:
                 "Inventory"
             ]
 
-            current_index = (
-                module_options.index(st.session_state.selected_module)
-                if st.session_state.selected_module in module_options
-                else 0
-            )
+            for module_name in module_options:
 
-            st.session_state.selected_module = st.selectbox(
-                "Select module",
-                module_options,
-                index=current_index,
-                key="module_selectbox",
-                label_visibility="collapsed"
-            )
+                is_active_module = (
+                    module_name == st.session_state.selected_module
+                )
+
+                row_label = (
+                    f"{'✅ ' if is_active_module else '▫️ '}{module_name}"
+                )
+
+                if st.button(
+                    row_label,
+                    key=f"module_row_{module_name}",
+                    use_container_width=True
+                ):
+
+                    st.session_state.selected_module = module_name
+                    st.rerun()
 
         st.write("")
 
