@@ -190,70 +190,58 @@ st.markdown(
         font-size: 0.9rem;
     }
 
-    /* ---------- Floating toggle + account chip (top corners, screenshot style) ---------- */
-    .dily-toggle-fixed {
-        position: fixed;
-        top: 14px;
-        left: 18px;
-        width: 34px;
-        height: 34px;
-        border-radius: 9px;
-        background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000010;
-        box-shadow: 0 2px 10px rgba(45,212,191,0.25);
-    }
+    /* ---------- Floating toggle (plain icon, no box, no tooltip) ---------- */
     .st-key-floating_toggle {
         position: fixed !important;
-        top: 12px;
-        left: 16px;
+        top: 14px;
+        left: 18px;
         z-index: 1000010;
     }
     .st-key-floating_toggle div[data-testid="stButton"] > button {
-        width: 34px;
-        height: 34px;
-        padding: 0;
-        border-radius: 9px;
-        background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
-        color: #06231f;
-        border: none;
-        font-size: 1rem;
-        font-weight: 800;
-        box-shadow: 0 2px 10px rgba(45,212,191,0.25);
-    }
-    .st-key-floating_toggle div[data-testid="stButton"] > button:hover {
-        filter: brightness(1.08);
-        color: #06231f;
-    }
-
-    .dily-account {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    .dily-avatar {
         width: 30px;
         height: 30px;
-        border-radius: 50%;
-        background: rgba(45,212,191,0.15);
+        padding: 0;
+        border-radius: 6px;
+        background: transparent;
         color: #2dd4bf;
-        border: 1px solid rgba(45,212,191,0.4);
+        border: none;
+        box-shadow: none;
+        font-size: 1.15rem;
+        font-weight: 700;
+    }
+    .st-key-floating_toggle div[data-testid="stButton"] > button:hover {
+        color: #5eead4;
+        background: transparent;
+    }
+    /* Kill Streamlit's default tooltip bubble on hover (the white box) */
+    .st-key-floating_toggle [data-testid="stTooltipHoverTarget"] + div,
+    .st-key-floating_toggle div[role="tooltip"],
+    div[data-testid="stTooltipContent"] {
+        display: none !important;
+    }
+
+    /* ---------- Collapsed sidebar icon rail ---------- */
+    .dily-icon-rail div[data-testid="stButton"] > button {
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        margin: 0 auto 8px auto;
+        border-radius: 8px;
+        background: transparent;
+        border: 1px solid transparent;
+        color: #7a7a89;
+        font-size: 1.1rem;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 0.75rem;
-        font-weight: 700;
     }
-    .dily-account-name {
-        font-size: 0.85rem;
-        color: #f5f5f7;
-        font-weight: 500;
+    .dily-icon-rail div[data-testid="stButton"] > button:hover {
+        background: #1b1b22;
+        color: #2dd4bf;
     }
-    .dily-account-chevron {
-        color: #7a7a89;
-        font-size: 0.7rem;
+    .dily-icon-rail div[data-testid="column"] {
+        display: flex;
+        justify-content: center;
     }
 
     /* ---------- Sidebar collapse tabs ---------- */
@@ -270,78 +258,139 @@ st.markdown(
         visibility: hidden !important;
     }
 
-    /* ---------- Hero ---------- */
+    /* ---------- Hero (marketing-style banner) ---------- */
     .dily-hero {
-        text-align: left;
-        max-width: 900px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 40px;
+        max-width: 1000px;
         margin: 0 auto;
-        padding: 54px 0 6px 0;
+        padding: 46px 8px 34px 8px;
+        flex-wrap: wrap;
     }
-    .dily-hero .greet {
-        font-size: 1.05rem;
-        color: #9a9aa8;
-        margin-bottom: 2px;
-        font-weight: 500;
+    .dily-hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(45,212,191,0.10);
+        color: #2dd4bf;
+        border: 1px solid rgba(45,212,191,0.3);
+        border-radius: 20px;
+        padding: 4px 12px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        margin-bottom: 16px;
     }
-    .dily-hero h1 {
-        font-size: 2.4rem;
+    .dily-hero-copy { max-width: 480px; }
+    .dily-hero-copy h1 {
+        font-size: 2.1rem;
         font-weight: 700;
         color: #f5f5f7;
-        margin-bottom: 0;
+        line-height: 1.2;
+        margin-bottom: 14px;
         letter-spacing: -0.02em;
     }
-    .dily-hero p.sub {
-        color: #7a7a89;
-        font-size: 0.95rem;
-        margin-top: 10px;
-        margin-bottom: 26px;
+    .dily-hero-copy h1 span {
+        color: #2dd4bf;
     }
-
-    /* ---------- Hero description cards (screenshot style: colored title pill + copy) ---------- */
-    .dily-card {
-        background: #131318;
-        border: 1px solid #22222b;
-        border-radius: 14px;
-        padding: 14px 16px;
-        height: 100%;
+    .dily-hero-copy p.sub {
+        color: #9a9aa8;
+        font-size: 0.92rem;
+        line-height: 1.55;
+        margin-bottom: 20px;
     }
-    .dily-card-badge {
-        display: inline-block;
-        font-size: 0.72rem;
-        font-weight: 700;
-        padding: 3px 10px;
-        border-radius: 14px;
-        margin-bottom: 8px;
+    .dily-hero-checks {
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+        margin-top: 18px;
     }
-    .dily-card-desc {
+    .dily-hero-checks span {
         font-size: 0.78rem;
-        color: #8f8f9c;
-        line-height: 1.4;
+        color: #9a9aa8;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
     }
-    .dily-card-teal .dily-card-badge { background: rgba(45,212,191,0.15); color: #2dd4bf; }
-    .dily-card-pink .dily-card-badge { background: rgba(244,63,94,0.15); color: #fb7185; }
-    .dily-card-green .dily-card-badge { background: rgba(34,197,94,0.15); color: #4ade80; }
-    .dily-card-purple .dily-card-badge { background: rgba(168,85,247,0.15); color: #c084fc; }
+    .dily-hero-checks span::before {
+        content: "✓";
+        color: #2dd4bf;
+        font-weight: 700;
+    }
+    .dily-hero-graphic {
+        width: 220px;
+        height: 220px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 30%, #2dd4bf 0%, #0f766e 60%, #0b3a35 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        position: relative;
+    }
+    .dily-hero-graphic .bubble {
+        width: 90px;
+        height: 66px;
+        background: #0b0b0f;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+    .dily-hero-graphic .dot {
+        position: absolute;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: #14141a;
+        border: 1px solid rgba(45,212,191,0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+    }
+    .dily-hero-graphic .dot1 { top: -6px; right: 24px; }
+    .dily-hero-graphic .dot2 { top: 40px; right: -14px; }
+    .dily-hero-graphic .dot3 { bottom: 6px; right: 30px; }
 
-    .st-key-hero_pill_0 div[data-testid="stButton"] > button,
-    .st-key-hero_pill_1 div[data-testid="stButton"] > button,
-    .st-key-hero_pill_2 div[data-testid="stButton"] > button,
-    .st-key-hero_pill_3 div[data-testid="stButton"] > button {
+    /* ---------- Hero CTA buttons ---------- */
+    .st-key-hero_cta_primary div[data-testid="stButton"] > button {
+        background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
+        color: #06231f;
         border: none;
-        background: transparent;
-        color: #6b6b78;
-        font-size: 0.72rem;
-        font-weight: 500;
-        padding: 2px 0;
-        width: 100%;
-        text-align: left;
+        font-weight: 700;
+        border-radius: 10px;
+        padding: 10px 18px;
     }
-    .st-key-hero_pill_0 div[data-testid="stButton"] > button:hover { color: #2dd4bf; }
-    .st-key-hero_pill_1 div[data-testid="stButton"] > button:hover { color: #fb7185; }
-    .st-key-hero_pill_2 div[data-testid="stButton"] > button:hover { color: #4ade80; }
-    .st-key-hero_pill_3 div[data-testid="stButton"] > button:hover { color: #c084fc; }
+    .st-key-hero_cta_primary div[data-testid="stButton"] > button:hover {
+        filter: brightness(1.08);
+        color: #06231f;
+    }
+    .st-key-hero_cta_secondary div[data-testid="stButton"] > button {
+        background: transparent;
+        color: #f5f5f7;
+        border: 1px solid #2a2a34;
+        font-weight: 600;
+        border-radius: 10px;
+        padding: 10px 18px;
+    }
+    .st-key-hero_cta_secondary div[data-testid="stButton"] > button:hover {
+        border-color: #2dd4bf;
+        color: #2dd4bf;
+    }
 
     /* ---------- Chat input ---------- */
+    /* Kill the light background strip Streamlit renders behind the
+       chat input (the bottom-fixed container), across versions. */
+    div[data-testid="stBottom"],
+    div[data-testid="stBottomBlockContainer"],
+    .stBottomBlockContainer,
+    div[data-testid="stChatInput"] > div,
+    section[data-testid="stChatInputContainer"] {
+        background: #0b0b0f !important;
+    }
     div[data-testid="stChatInput"] {
         border-radius: 26px !important;
         border: 1px solid #26262f !important;
@@ -354,20 +403,35 @@ st.markdown(
         border-color: #2dd4bf !important;
         box-shadow: 0 0 0 3px rgba(45,212,191,0.15);
     }
-    div[data-testid="stChatInput"] textarea {
+    div[data-testid="stChatInput"] textarea,
+    div[data-testid="stChatInput"] [contenteditable="true"],
+    div[data-testid="stChatInput"] input {
         font-size: 0.92rem;
         color: #f5f5f7 !important;
+        -webkit-text-fill-color: #f5f5f7 !important;
         background: transparent !important;
+        caret-color: #2dd4bf !important;
     }
     div[data-testid="stChatInput"] textarea::placeholder {
         color: #6b6b78 !important;
+        -webkit-text-fill-color: #6b6b78 !important;
     }
+    div[data-testid="stChatInput"] button[kind="icon"],
     div[data-testid="stChatInput"] button {
         background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%) !important;
         border-radius: 50% !important;
+        border: none !important;
     }
     div[data-testid="stChatInput"] button svg {
         fill: #06231f !important;
+    }
+    /* File-attach icon button: no border/box, just the plus glyph */
+    div[data-testid="stChatInputFileUploaderButton"] button,
+    div[data-testid="stChatInput"] button[title*="attach" i] {
+        background: transparent !important;
+        color: #2dd4bf !important;
+        border: none !important;
+        box-shadow: none !important;
     }
 
     /* ---------- Chat messages ---------- */
@@ -904,28 +968,15 @@ against the supply chain semantic view.
 
 
 # ============================================================
-# TOP NAVBAR + FLOATING SIDEBAR TOGGLE + ACCOUNT CHIP
+# TOP NAVBAR + FLOATING SIDEBAR TOGGLE
 # ============================================================
-# Matches the reference screenshot: a small teal toggle pinned to
-# the top-left corner (independent of the navbar), and an
-# account chip (avatar + name) pinned to the top-right.
+# No username/account chip shown — just a plain teal toggle icon
+# pinned to the top-left, no border/box, no tooltip bubble.
 # ============================================================
-
-_display_name_raw = st.session_state.username or "User"
-_initials = "".join(
-    part[0].upper()
-    for part in _display_name_raw.replace(".", " ").replace("@", " ").split()[:2]
-) or "U"
 
 st.markdown(
-    f"""
-    <div class="dily-navbar">
-        <div class="dily-account">
-            <div class="dily-avatar">{_initials}</div>
-            <span class="dily-account-name">{_display_name_raw.split('@')[0]}</span>
-            <span class="dily-account-chevron">▾</span>
-        </div>
-    </div>
+    """
+    <div class="dily-navbar"></div>
     """,
     unsafe_allow_html=True
 )
@@ -934,7 +985,7 @@ with st.container(key="floating_toggle"):
 
     _toggle_label = "«" if st.session_state.sidebar_open else "»"
 
-    if st.button(_toggle_label, key="floating_toggle_btn", help="Toggle panel"):
+    if st.button(_toggle_label, key="floating_toggle_btn"):
 
         st.session_state.sidebar_open = not st.session_state.sidebar_open
         st.rerun()
@@ -1092,66 +1143,108 @@ if st.session_state.sidebar_open:
 
             st.rerun()
 
+else:
+
+    # Collapsed state: show a slim icon-only rail instead of an
+    # empty blank sidebar column, matching the reference screenshot.
+    st.markdown(
+        """
+        <style>
+        section[data-testid="stSidebar"] {
+            width: 64px !important;
+            min-width: 64px !important;
+        }
+        section[data-testid="stSidebar"] > div:first-child {
+            padding-top: 70px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    with st.sidebar:
+
+        st.markdown('<div class="dily-icon-rail">', unsafe_allow_html=True)
+
+        rail_icons = [
+            ("➕", "rail_new_chat"),
+            ("🕒", "rail_recent"),
+            ("🔗", "rail_links"),
+        ]
+
+        for icon, rail_key in rail_icons:
+
+            if st.button(icon, key=rail_key):
+
+                st.session_state.sidebar_open = True
+                st.rerun()
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
 # ============================================================
 # HERO SECTION  (only shown when the current chat is empty)
 # ============================================================
-# Redesigned to match the dark "assistant" style: short greeting,
-# large headline, and a row of colored quick-action pills — no
-# decorative background artwork.
+# Marketing-banner style: badge, two-tone headline, subtitle,
+# checklist, CTA buttons, and a flat circular graphic on the
+# right — no decorative background artwork.
 # ============================================================
 
 hero_quick_prompt = None
 
-# (badge_color_class, badge_label, description, sample_question)
-HERO_CARDS = [
-    ("teal", "Purchase Orders", "Track PO counts, open commitment, and status breakdowns.", "What is the total purchase order count?"),
-    ("pink", "Suppliers", "Spot high-risk, single-source, or under-performing suppliers.", "Which suppliers are high risk?"),
-    ("green", "Shipments", "Monitor in-transit shipments, delays, and delay reasons.", "How many shipments are currently in transit?"),
-]
-
 if len(messages) == 0:
 
-    display_name = (
-        st.session_state.username.split("@")[0].split(".")[0].title()
-        if st.session_state.username
-        else "there"
-    )
-
     st.markdown(
-        f"""
+        """
         <div class="dily-hero">
-            <div class="greet">Hey! {display_name}</div>
-            <h1>What can I help with?</h1>
+            <div class="dily-hero-copy">
+                <span class="dily-hero-badge">❄ Powered by Snowflake</span>
+                <h1>Chat with your supply chain<br>data using <span>Cortex AI</span></h1>
+                <p class="sub">
+                    Transform how your team interacts with supply chain data
+                    through natural language. Ask questions in plain English
+                    and get instant insights with Snowflake Cortex AI.
+                </p>
+            </div>
+            <div class="dily-hero-graphic">
+                <div class="bubble">💬</div>
+                <div class="dot dot1">🔍</div>
+                <div class="dot dot2">📦</div>
+                <div class="dot dot3">📈</div>
+            </div>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    card_cols = st.columns(len(HERO_CARDS))
+    cta_cols = st.columns([1, 1, 4])
 
-    for i, (color, label, desc, q_prompt) in enumerate(HERO_CARDS):
+    with cta_cols[0]:
 
-        with card_cols[i]:
+        with st.container(key="hero_cta_primary"):
 
-            st.markdown(
-                f"""
-                <div class="dily-card dily-card-{color}">
-                    <span class="dily-card-badge">{label}</span>
-                    <div class="dily-card-desc">{desc}</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+            if st.button("Start Asking →", key="hero_cta_primary_btn", use_container_width=True):
 
-            with st.container(key=f"hero_pill_{i}"):
+                hero_quick_prompt = "What is the total purchase order count?"
 
-                if st.button(
-                    "Ask this →",
-                    key=f"hero_pill_btn_{i}",
-                    use_container_width=True
-                ):
+    with cta_cols[1]:
 
-                    hero_quick_prompt = q_prompt
+        with st.container(key="hero_cta_secondary"):
+
+            if st.button("View Quick Links", key="hero_cta_secondary_btn", use_container_width=True):
+
+                st.session_state.sidebar_open = True
+                st.rerun()
+
+    st.markdown(
+        """
+        <div class="dily-hero-checks" style="max-width:1000px;margin:14px auto 0 auto;padding:0 8px;">
+            <span>No-Code Interface</span>
+            <span>Enterprise Ready</span>
+            <span>Secure &amp; Compliant</span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     st.write("")
 
