@@ -273,13 +273,14 @@ st.markdown(
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: rgba(45,212,191,0.10);
-        color: #2dd4bf;
-        border: 1px solid rgba(45,212,191,0.3);
-        border-radius: 20px;
-        padding: 4px 12px;
-        font-size: 0.72rem;
-        font-weight: 600;
+        background: #d6231c;
+        color: #ffffff;
+        border: none;
+        border-radius: 5px;
+        padding: 6px 14px;
+        font-size: 0.8rem;
+        font-weight: 800;
+        letter-spacing: 0.03em;
         margin-bottom: 16px;
     }
     .dily-hero-copy { max-width: 480px; }
@@ -1197,7 +1198,7 @@ if len(messages) == 0:
         """
         <div class="dily-hero">
             <div class="dily-hero-copy">
-                <span class="dily-hero-badge">❄ Powered by Snowflake</span>
+                <span class="dily-hero-badge">DILYTICS</span>
                 <h1>Chat with your supply chain<br>data using <span>Cortex AI</span></h1>
                 <p class="sub">
                     Transform how your team interacts with supply chain data
