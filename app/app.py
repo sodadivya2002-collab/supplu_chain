@@ -191,12 +191,11 @@ st.markdown(
         gap: 16px;
     }
     .dily-logo-box {
-        background: transparent;
-        color: #2dd4bf;
-        border: 1.5px solid #2dd4bf;
+        background: #d6231c;
+        color: #ffffff;
         font-weight: 800;
         letter-spacing: 1px;
-        padding: 6px 13px;
+        padding: 7px 14px;
         border-radius: 6px;
         font-size: 0.9rem;
     }
@@ -302,9 +301,9 @@ st.markdown(
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: transparent;
-        color: #2dd4bf;
-        border: 1.5px solid #2dd4bf;
+        background: #d6231c;
+        color: #ffffff;
+        border: none;
         border-radius: 5px;
         padding: 6px 14px;
         font-size: 0.8rem;
