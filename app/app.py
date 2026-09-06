@@ -63,7 +63,15 @@ st.markdown(
     /* ---------- Sidebar ---------- */
     section[data-testid="stSidebar"] {
         background: #0e0e13;
-        border-right: 1px solid #22222b;
+        border-right: none;
+        box-shadow: none;
+    }
+    /* Kill any other default Streamlit dividers between panes */
+    [data-testid="stSidebar"] ~ div,
+    [data-testid="stAppViewContainer"] > .main,
+    div[data-testid="stMainBlockContainer"] {
+        border-left: none !important;
+        box-shadow: none !important;
     }
     section[data-testid="stSidebar"] > div:first-child {
         padding-top: 78px;
@@ -168,7 +176,7 @@ st.markdown(
         right: 0;
         height: 62px;
         background: #0e0e13;
-        border-bottom: 1px solid #22222b;
+        border-bottom: none;
         display: flex;
         align-items: center;
         justify-content: flex-end;
@@ -258,6 +266,24 @@ st.markdown(
         visibility: hidden !important;
     }
 
+    /* ---------- Login page heading (block layout, unlike the flex hero banner) ---------- */
+    .dily-login-hero {
+        text-align: center;
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 20px 0 6px 0;
+    }
+    .dily-login-hero h1 {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #f5f5f7;
+        margin-bottom: 10px;
+    }
+    .dily-login-hero p.sub {
+        color: #9a9aa8;
+        font-size: 0.92rem;
+    }
+
     /* ---------- Hero (marketing-style banner) ---------- */
     .dily-hero {
         display: flex;
@@ -301,24 +327,6 @@ st.markdown(
         line-height: 1.55;
         margin-bottom: 20px;
     }
-    .dily-hero-checks {
-        display: flex;
-        gap: 18px;
-        flex-wrap: wrap;
-        margin-top: 18px;
-    }
-    .dily-hero-checks span {
-        font-size: 0.78rem;
-        color: #9a9aa8;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-    }
-    .dily-hero-checks span::before {
-        content: "✓";
-        color: #2dd4bf;
-        font-weight: 700;
-    }
     .dily-hero-graphic {
         width: 220px;
         height: 220px;
@@ -356,31 +364,6 @@ st.markdown(
     .dily-hero-graphic .dot2 { top: 40px; right: -14px; }
     .dily-hero-graphic .dot3 { bottom: 6px; right: 30px; }
 
-    /* ---------- Hero CTA buttons ---------- */
-    .st-key-hero_cta_primary div[data-testid="stButton"] > button {
-        background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
-        color: #06231f;
-        border: none;
-        font-weight: 700;
-        border-radius: 10px;
-        padding: 10px 18px;
-    }
-    .st-key-hero_cta_primary div[data-testid="stButton"] > button:hover {
-        filter: brightness(1.08);
-        color: #06231f;
-    }
-    .st-key-hero_cta_secondary div[data-testid="stButton"] > button {
-        background: transparent;
-        color: #f5f5f7;
-        border: 1px solid #2a2a34;
-        font-weight: 600;
-        border-radius: 10px;
-        padding: 10px 18px;
-    }
-    .st-key-hero_cta_secondary div[data-testid="stButton"] > button:hover {
-        border-color: #2dd4bf;
-        color: #2dd4bf;
-    }
 
     /* ---------- Chat input ---------- */
     /* Kill the light background strip Streamlit renders behind the
@@ -692,7 +675,7 @@ if not st.session_state.authenticated:
 
     st.markdown(
         """
-        <div class="dily-hero">
+        <div class="dily-login-hero">
             <h1>Welcome to Dilytics Supply Chain AI</h1>
             <p class="sub">Please log in to connect to your Snowflake data warehouse.</p>
         </div>
@@ -1185,9 +1168,10 @@ else:
 # ============================================================
 # HERO SECTION  (only shown when the current chat is empty)
 # ============================================================
-# Marketing-banner style: badge, two-tone headline, subtitle,
-# checklist, CTA buttons, and a flat circular graphic on the
-# right — no decorative background artwork.
+# Module-agnostic marketing banner: badge, headline, subtitle,
+# and a flat circular graphic — no supply-chain-specific wording
+# so this same shell works for other modules later. CTA buttons
+# and the checklist row were removed per request.
 # ============================================================
 
 hero_quick_prompt = None
@@ -1199,49 +1183,18 @@ if len(messages) == 0:
         <div class="dily-hero">
             <div class="dily-hero-copy">
                 <span class="dily-hero-badge">DILYTICS</span>
-                <h1>Chat with your supply chain<br>data using <span>Cortex AI</span></h1>
+                <h1>Chat with your data<br>using <span>Cortex AI</span></h1>
                 <p class="sub">
-                    Transform how your team interacts with supply chain data
-                    through natural language. Ask questions in plain English
-                    and get instant insights with Snowflake Cortex AI.
+                    Ask questions in plain English and get instant
+                    insights across your business data.
                 </p>
             </div>
             <div class="dily-hero-graphic">
                 <div class="bubble">💬</div>
                 <div class="dot dot1">🔍</div>
-                <div class="dot dot2">📦</div>
-                <div class="dot dot3">📈</div>
+                <div class="dot dot2">📁</div>
+                <div class="dot dot3">📊</div>
             </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    cta_cols = st.columns([1, 1, 4])
-
-    with cta_cols[0]:
-
-        with st.container(key="hero_cta_primary"):
-
-            if st.button("Start Asking →", key="hero_cta_primary_btn", use_container_width=True):
-
-                hero_quick_prompt = "What is the total purchase order count?"
-
-    with cta_cols[1]:
-
-        with st.container(key="hero_cta_secondary"):
-
-            if st.button("View Quick Links", key="hero_cta_secondary_btn", use_container_width=True):
-
-                st.session_state.sidebar_open = True
-                st.rerun()
-
-    st.markdown(
-        """
-        <div class="dily-hero-checks" style="max-width:1000px;margin:14px auto 0 auto;padding:0 8px;">
-            <span>No-Code Interface</span>
-            <span>Enterprise Ready</span>
-            <span>Secure &amp; Compliant</span>
         </div>
         """,
         unsafe_allow_html=True
@@ -1341,9 +1294,7 @@ for idx, msg in enumerate(messages):
 try:
 
     chat_result = st.chat_input(
-        "Ask me anything about suppliers, purchase orders, "
-        "shipments, deliveries, warehouses, carriers, or "
-        "inventory...",
+        "Ask me anything about your data...",
         accept_file="multiple",
         file_type=["pdf", "docx", "xlsx", "csv", "txt", "png", "jpg", "jpeg"]
     )
@@ -1359,9 +1310,7 @@ except TypeError:
 
     # Older Streamlit without accept_file support.
     user_prompt = st.chat_input(
-        "Ask me anything about suppliers, purchase orders, "
-        "shipments, deliveries, warehouses, carriers, or "
-        "inventory..."
+        "Ask me anything about your data..."
     )
     uploaded_chat_files = []
 
