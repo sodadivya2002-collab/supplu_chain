@@ -422,31 +422,31 @@ st.markdown(
         box-shadow: none !important;
     }
 
-    /* ---------- Mic / audio input ---------- */
-    /* ---------- Mic / audio input ---------- */
-    /* Overlays a real button on top of the native chat_input bar, */
-    /* positioned just left of the send arrow, so it reads as part */
-    /* of the input row even though Streamlit can't embed it there */
-    /* natively. Nudge "right" a little if it drifts on your screen. */
+    /* ---------- Mic / voice input ---------- */
+    /* Rendered in normal page flow (right-aligned above the chat  */
+    /* input), NOT fixed-positioned — fixed offsets from the      */
+    /* viewport edge break on different screen widths / toolbars, */
+    /* so this stays reliably visible everywhere.                 */
     .st-key-mic_inline_btn {
-        position: fixed !important;
-        bottom: 27px;
-        right: 105px;
-        z-index: 1000010;
+        max-width: 760px;
+        margin: 0 auto;
+        display: flex;
+        justify-content: flex-end;
     }
     .st-key-mic_inline_btn div[data-testid="stButton"] > button {
-        width: 30px;
-        height: 30px;
+        width: 34px;
+        height: 34px;
         padding: 0;
         border-radius: 50%;
         background: transparent;
-        border: none;
+        border: 1.5px solid #2dd4bf;
         color: #2dd4bf;
         font-size: 1.05rem;
         box-shadow: none;
     }
     .st-key-mic_inline_btn div[data-testid="stButton"] > button:hover {
         color: #5eead4;
+        border-color: #5eead4;
         background: transparent;
     }
 
@@ -1544,10 +1544,10 @@ if st.session_state.active_file:
 # ============================================================
 # MIC / VOICE INPUT
 # ============================================================
-# The mic icon is pinned with fixed CSS positioning so it sits
-# inside the chat input bar, just left of the send arrow —
-# Streamlit's native chat_input can't host a custom child icon,
-# so this overlays a real button on top of it in that spot.
+# A small circular button, right-aligned directly above the
+# chat input, so it reads as paired with the send button.
+# Kept in normal page flow (not fixed-positioned) so it stays
+# visible on any screen width.
 # ============================================================
 
 with st.container(key="mic_inline_btn"):
