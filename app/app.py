@@ -423,6 +423,33 @@ st.markdown(
     }
 
     /* ---------- Mic / audio input ---------- */
+    /* ---------- Mic / audio input ---------- */
+    /* Overlays a real button on top of the native chat_input bar, */
+    /* positioned just left of the send arrow, so it reads as part */
+    /* of the input row even though Streamlit can't embed it there */
+    /* natively. Nudge "right" a little if it drifts on your screen. */
+    .st-key-mic_inline_btn {
+        position: fixed !important;
+        bottom: 27px;
+        right: 105px;
+        z-index: 1000010;
+    }
+    .st-key-mic_inline_btn div[data-testid="stButton"] > button {
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        border-radius: 50%;
+        background: transparent;
+        border: none;
+        color: #2dd4bf;
+        font-size: 1.05rem;
+        box-shadow: none;
+    }
+    .st-key-mic_inline_btn div[data-testid="stButton"] > button:hover {
+        color: #5eead4;
+        background: transparent;
+    }
+
     div[data-testid="stAudioInput"] {
         max-width: 760px;
         margin: 6px auto 0 auto;
@@ -1287,11 +1314,19 @@ if st.session_state.sidebar_open:
         # ---------------- History ----------------
         if st.session_state.show_history_panel:
 
-            for s_id, s_data in reversed(
-                list(st.session_state.chat_sessions.items())
-            ):
+            past_sessions = [
+                (s_id, s_data)
+                for s_id, s_data in reversed(
+                    list(st.session_state.chat_sessions.items())
+                )
+                if s_id != st.session_state.current_session_id
+            ]
 
-                is_active = (s_id == st.session_state.current_session_id)
+            if not past_sessions:
+
+                st.caption("No past conversations yet.")
+
+            for s_id, s_data in past_sessions:
 
                 label = s_data["title"]
 
@@ -1299,7 +1334,7 @@ if st.session_state.sidebar_open:
                     label = label[:18] + "..."
 
                 if st.button(
-                    f"{'👉 ' if is_active else '🗨️ '}{label}",
+                    f"🗨️ {label}",
                     key=f"sess_{s_id}",
                     use_container_width=True
                 ):
@@ -1509,16 +1544,18 @@ if st.session_state.active_file:
 # ============================================================
 # MIC / VOICE INPUT
 # ============================================================
+# The mic icon is pinned with fixed CSS positioning so it sits
+# inside the chat input bar, just left of the send arrow —
+# Streamlit's native chat_input can't host a custom child icon,
+# so this overlays a real button on top of it in that spot.
+# ============================================================
 
-mic_col1, mic_col2, mic_col3 = st.columns([1, 0.12, 1])
-
-with mic_col2:
+with st.container(key="mic_inline_btn"):
 
     if st.button(
         "🎤",
         key="btn_mic_toggle",
-        help="Voice input",
-        use_container_width=True
+        help="Voice input"
     ):
 
         st.session_state.show_mic_input = not st.session_state.show_mic_input
