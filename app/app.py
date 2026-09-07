@@ -6,6 +6,9 @@ from datetime import datetime
 import requests
 import snowflake.connector
 from snowflake.snowpark import Session
+import io
+import zipfile
+import xml.etree.ElementTree as ET
 
 
 # ============================================================
@@ -22,24 +25,10 @@ st.set_page_config(
 # ============================================================
 # CUSTOM CSS  (dark, commercial "AI assistant" theme)
 # ============================================================
-# Palette:
-#   Background : #0b0b0f / #101014
-#   Surface    : #16161c / #1b1b22
-#   Border     : #26262f
-#   Accent     : #2dd4bf (teal)  /  #f43f5e (pink, secondary accent)
-#   Text       : #f5f5f7 primary, #9a9aa8 secondary
-#
-# NOTE ON BUTTONS: every button (main sidebar actions, history
-# items, file rows, use/remove) is now a bordered/outlined
-# button with NO filled background. The only visual "color" is
-# the teal border + teal text that appears on hover / when a
-# button is the primary action. Nothing is filled with color.
-# ============================================================
 
 st.markdown(
     """
     <style>
-
     /* ---------- Global cleanup ---------- */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -113,7 +102,6 @@ st.markdown(
     }
 
     /* ---------- Sidebar: main nav-style buttons (secondary look) ---------- */
-    /* Used for history items, file rows, use/remove actions */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button {
         background: transparent;
         border: 1px solid transparent;
@@ -134,8 +122,6 @@ st.markdown(
     }
 
     /* ---------- Sidebar: primary action buttons ---------- */
-    /* New Chat / Module / Upload / History / Clear Session — all */
-    /* share the same outlined style, no fill, teal border only.  */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"] {
         background: transparent;
         color: #f5f5f7 !important;
@@ -148,8 +134,6 @@ st.markdown(
         text-transform: none;
         letter-spacing: normal;
     }
-    /* Enabled state: lit up with a light-white border so it reads
-       clearly as clickable, distinct from the disabled state below. */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"]:not(:disabled) {
         border-color: rgba(245, 245, 247, 0.55);
         color: #ffffff !important;
@@ -159,7 +143,6 @@ st.markdown(
         color: #2dd4bf !important;
         border-color: #2dd4bf;
     }
-    /* Disabled state: dimmed and non-interactive looking. */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"]:disabled {
         background: transparent;
         color: #55555f !important;
@@ -167,14 +150,6 @@ st.markdown(
         opacity: 0.55;
         cursor: not-allowed;
     }
-    /* Active-mode highlight: Module / Upload Files buttons get a
-       teal glow when that mode is the one currently in effect.
-       Both buttons stay fully clickable either way — this is a
-       highlight, never a disable.
-       Two selector forms are included (plain class + the
-       stVerticalBlockBorderWrapper form some Streamlit versions
-       use) so the highlight still applies even if one form's
-       markup changes between Streamlit releases. */
     .st-key-module_btn_active div[data-testid="stButton"] > button[kind="primary"],
     .st-key-upload_btn_active div[data-testid="stButton"] > button[kind="primary"],
     div[data-testid="stVerticalBlockBorderWrapper"].st-key-module_btn_active button[kind="primary"],
@@ -234,7 +209,7 @@ st.markdown(
         font-size: 0.9rem;
     }
 
-    /* ---------- Floating toggle (plain icon, no box, no tooltip) ---------- */
+    /* ---------- Floating toggle ---------- */
     .st-key-floating_toggle {
         position: fixed !important;
         top: 14px;
@@ -496,7 +471,6 @@ st.markdown(
 # ============================================================
 
 def get_snowflake_config():
-
     return {
         "account": st.secrets["snowflake"]["account"],
         "role": st.secrets["snowflake"]["role"],
@@ -507,69 +481,26 @@ def get_snowflake_config():
 
 
 # ============================================================
-# CORTEX ANALYST
+# CORTEX ANALYST (Structured DB Querying)
 # ============================================================
 
-# Each module points at a different Cortex Analyst semantic view.
-# Add the secret key here whenever a new module goes live, and
-# add the matching value under [snowflake] in your Streamlit
-# secrets (e.g. semantic_view_supply_chain = "...",
-# semantic_view_inventory = "...").
 MODULE_SEMANTIC_VIEW_KEYS = {
     "Supply Chain": "semantic_view_supply_chain",
     "Inventory": "semantic_view_inventory",
 }
 
-
 def call_cortex_analyst(prompt, module="Supply Chain", semantic_model_yaml=None):
     """Sends `prompt` to the Cortex Analyst REST API and returns
-    (explanation, sql_query).
-
-    Cortex Analyst needs to be told what data to reason over. There
-    are two ways to tell it, and this function supports both:
-
-      1. `semantic_model_yaml` — a full semantic model, as a YAML
-         string, sent inline in the request body under the
-         "semantic_model" field. This is how uploaded-file
-         questions are answered: the file's data lives in a
-         Snowflake table (see `ensure_cortex_source_for_file`
-         below) and a semantic model describing that table's
-         columns is generated on the fly and passed straight in
-         here — no `module` argument is used in that case.
-
-      2. `module` — looks up a pre-configured semantic *view* name
-         from Streamlit secrets (the original Supply Chain /
-         Inventory behavior). Used only when `semantic_model_yaml`
-         is not supplied.
-
-    Either way, the call, the SQL-generation, and the response
-    parsing are identical — uploaded-file questions are answered by
-    Cortex Analyst exactly the same way module questions are."""
-
+    (explanation, sql_query)."""
     try:
-
         semantic_view = None
 
         if not semantic_model_yaml:
+            secret_key = MODULE_SEMANTIC_VIEW_KEYS.get(module, "semantic_view")
+            semantic_view = st.secrets["snowflake"].get(secret_key, "")
 
-            secret_key = MODULE_SEMANTIC_VIEW_KEYS.get(
-                module,
-                "semantic_view"
-            )
-
-            semantic_view = st.secrets["snowflake"].get(
-                secret_key,
-                ""
-            )
-
-            # Backward compatibility: older deployments only ever set
-            # `semantic_view` (no module suffix) for Supply Chain.
             if not semantic_view and module == "Supply Chain":
-
-                semantic_view = st.secrets["snowflake"].get(
-                    "semantic_view",
-                    ""
-                )
+                semantic_view = st.secrets["snowflake"].get("semantic_view", "")
 
             if not semantic_view:
                 return (
@@ -579,10 +510,7 @@ def call_cortex_analyst(prompt, module="Supply Chain", semantic_model_yaml=None)
                     None
                 )
 
-        analyst_token = st.secrets["snowflake"].get(
-            "cortex_analyst_token",
-            ""
-        )
+        analyst_token = st.secrets["snowflake"].get("cortex_analyst_token", "")
 
         if not analyst_token:
             return (
@@ -617,12 +545,7 @@ def call_cortex_analyst(prompt, module="Supply Chain", semantic_model_yaml=None)
             "messages": [
                 {
                     "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": prompt
-                        }
-                    ]
+                    "content": [{"type": "text", "text": prompt}]
                 }
             ],
             "stream": False
@@ -633,21 +556,12 @@ def call_cortex_analyst(prompt, module="Supply Chain", semantic_model_yaml=None)
         else:
             request_body["semantic_view"] = semantic_view
 
-        response = requests.post(
-            url,
-            headers=headers,
-            json=request_body,
-            timeout=120
-        )
+        response = requests.post(url, headers=headers, json=request_body, timeout=120)
 
         if response.status_code != 200:
             try:
                 error_json = response.json()
-                error_message = (
-                    error_json.get("message")
-                    or error_json.get("error")
-                    or response.text
-                )
+                error_message = error_json.get("message") or error_json.get("error") or response.text
             except Exception:
                 error_message = response.text
 
@@ -666,175 +580,79 @@ def call_cortex_analyst(prompt, module="Supply Chain", semantic_model_yaml=None)
         suggestions = []
 
         for item in content:
-
             item_type = item.get("type")
-
             if item_type == "text":
                 text = item.get("text", "").strip()
                 if text:
                     explanation_parts.append(text)
-
             elif item_type == "sql":
                 sql_query = item.get("statement", "").strip()
-
             elif item_type == "suggestions":
                 suggestions = item.get("suggestions", []) or []
 
         if suggestions and not sql_query:
-            suggestion_text = "\n".join(
-                f"- {item}" for item in suggestions
-            )
-
+            suggestion_text = "\n".join(f"- {item}" for item in suggestions)
             explanation_parts.append(
                 "I could not generate a query for that question. "
-                "Here are some questions I can answer:\n\n"
-                + suggestion_text
+                "Here are some questions I can answer:\n\n" + suggestion_text
             )
 
         explanation = "\n\n".join(explanation_parts).strip()
-
         if not explanation:
             explanation = "Here is the result from Cortex Analyst."
 
         return explanation, sql_query
 
     except requests.exceptions.Timeout:
-
-        return (
-            "Cortex Analyst took too long to respond. "
-            "Please try the question again.",
-            None
-        )
-
+        return ("Cortex Analyst took too long to respond. Please try the question again.", None)
     except requests.exceptions.RequestException as e:
-
-        return (
-            f"Unable to connect to Cortex Analyst.\n\n**Error:** {str(e)}",
-            None
-        )
-
+        return (f"Unable to connect to Cortex Analyst.\n\n**Error:** {str(e)}", None)
     except Exception as e:
-
-        return (
-            f"Cortex Analyst error.\n\n**Error:** {str(e)}",
-            None
-        )
+        return (f"Cortex Analyst error.\n\n**Error:** {str(e)}", None)
 
 
 # ============================================================
 # CORTEX ANALYST FOR UPLOADED FILES
 # ============================================================
-# Uploaded tabular files (csv/xlsx/xls, and PDFs/DOCX that contain
-# a table) are answered by Cortex Analyst exactly the same way
-# Supply Chain / Inventory module questions are: the data is
-# pushed into a real Snowflake table, a semantic model describing
-# that table is generated automatically from its column names and
-# dtypes, and every typed question is sent to Cortex Analyst along
-# with that semantic model. Cortex Analyst returns SQL, which is
-# then run against Snowflake and rendered through the same
-# Generated SQL / Data / Chart layout used for module answers.
-#
-# This requires the logged-in Snowflake role to have privileges to
-# create a table in the configured database/schema.
-# ============================================================
 
 _ID_LIKE_COLUMN_PATTERN = re.compile(r"(^|_)(id|code|key|no|num|number)$")
 
-
 def _looks_like_id_column_name(col):
-    """Heuristic used only when deciding measure vs. dimension for
-    the auto-generated semantic model: a numeric column whose name
-    looks like an identifier (ORDER_ID, CUSTOMER_CODE, ...) is
-    modeled as a dimension, not a summable measure, so Cortex
-    Analyst doesn't default to summing/averaging an ID column."""
-
     normalized = re.sub(r"[^a-z0-9]+", "_", str(col).strip().lower()).strip("_")
     return bool(_ID_LIKE_COLUMN_PATTERN.search(normalized))
 
-
 def _sanitize_sql_identifier(name, fallback="COL"):
-    """Turns an arbitrary column/file name into a safe, unquoted
-    Snowflake identifier: letters, digits, underscores only, never
-    starting with a digit."""
-
     ident = re.sub(r"[^A-Za-z0-9_]", "_", str(name).strip())
     ident = re.sub(r"_+", "_", ident).strip("_")
-
     if not ident:
         ident = fallback
-
     if ident[0].isdigit():
         ident = f"{fallback}_{ident}"
-
     return ident.upper()[:64]
 
-
 def _normalize_dataframe_for_snowflake(df):
-    """Normalizes dtypes so Snowpark's local type inference (used
-    by `session.create_dataframe`) doesn't choke on a column that
-    mixes types — e.g. an `object` column with some rows holding a
-    Python int and others holding a string or a blank/NaN. Snowpark
-    infers a column's Snowflake type from its values locally before
-    upload, and a mixed column trips it up with errors like
-    "Expected bytes, got a 'int' object".
-
-    Every `object`-dtype column is coerced to ONE consistent type:
-    numeric, if at least 70% of its non-null values genuinely look
-    numeric (after stripping thousands separators); otherwise a
-    clean string column, with real NaN/None left as an actual
-    `None` (not the string "nan")."""
-
     clean = df.copy()
-
     for col in clean.columns:
-
         if clean[col].dtype != object:
             continue
-
         numeric_attempt = pd.to_numeric(
-            clean[col]
-            .astype(str)
-            .str.replace(",", "", regex=False)
-            .str.strip(),
+            clean[col].astype(str).str.replace(",", "", regex=False).str.strip(),
             errors="coerce"
         )
-
         non_null_mask = clean[col].notna()
-        looks_numeric = (
-            non_null_mask.any()
-            and (numeric_attempt[non_null_mask].notna().mean() >= 0.7)
-        )
-
+        looks_numeric = non_null_mask.any() and (numeric_attempt[non_null_mask].notna().mean() >= 0.7)
         if looks_numeric:
             clean[col] = numeric_attempt
         else:
             clean[col] = clean[col].apply(
-                lambda v: (
-                    None
-                    if (v is None or (isinstance(v, float) and pd.isna(v)))
-                    else str(v)
-                )
+                lambda v: None if (v is None or (isinstance(v, float) and pd.isna(v))) else str(v)
             )
-
     return clean
 
-
 def push_dataframe_to_snowflake(session, df, table_fqn):
-    """Writes `df` to Snowflake as table `table_fqn` (overwriting
-    it if it already exists) via Snowpark, after normalizing every
-    column name into a safe SQL identifier and every column's dtype
-    into something Snowpark's local type inference can upload
-    without guessing wrong (see `_normalize_dataframe_for_snowflake`).
-    Returns the cleaned DataFrame, which the caller then uses to
-    build the matching semantic model so the model's column
-    references and data types line up exactly with what's actually
-    in the table."""
-
     clean_df = df.copy()
-
     seen = {}
     new_columns = []
-
     for col in clean_df.columns:
         ident = _sanitize_sql_identifier(col)
         if ident in seen:
@@ -845,87 +663,46 @@ def push_dataframe_to_snowflake(session, df, table_fqn):
         new_columns.append(ident)
 
     clean_df.columns = new_columns
-
     clean_df = _normalize_dataframe_for_snowflake(clean_df)
 
     snowpark_df = session.create_dataframe(clean_df)
     snowpark_df.write.mode("overwrite").save_as_table(table_fqn)
-
     return clean_df
-
 
 _DATE_NAME_HINT = re.compile(r"(date|_dt$|^dt_|time)", re.IGNORECASE)
 
-
 def _looks_like_date_column(col, series):
-    """True if the column name hints at a date/time AND at least
-    70% of its non-null values actually parse as dates. Guards
-    against false positives like 'update_by' or 'date_id'."""
-
     if not _DATE_NAME_HINT.search(str(col)):
         return False
-
     if _looks_like_id_column_name(col):
         return False
-
     sample = series.dropna().astype(str).head(200)
     if sample.empty:
         return False
-
     parsed = pd.to_datetime(sample, errors="coerce")
     return parsed.notna().mean() >= 0.7
 
-
-def build_semantic_model_yaml(clean_df, table_fqn, model_name,
-                               max_sample_values=40,
-                               max_distinct_for_samples=300):
-    """Auto-generates a Cortex Analyst semantic model (as a YAML
-    string) describing `table_fqn`, using only the column names,
-    pandas dtypes, and actual data already sitting in `clean_df` —
-    no LLM involved in building the model itself.
-
-    Numeric columns become measures (summable metrics); numeric
-    columns whose name looks like an identifier become dimensions
-    instead. Columns that look like dates (by name AND by actually
-    parsing as dates) become time_dimensions so Cortex Analyst can
-    reason about date filters/aggregations correctly.
-
-    Crucially, every remaining categorical (VARCHAR) dimension gets
-    its real distinct values embedded as `sample_values` (capped at
-    `max_sample_values`, and skipped entirely for high-cardinality
-    free-text columns above `max_distinct_for_samples` distinct
-    values). Without this, Cortex Analyst has nothing to ground a
-    generated SQL filter in and will guess plausible-sounding
-    values from the column name alone — e.g. filtering
-    STATUS = 'Delayed' when the real values are 'Late', 'On Time',
-    'Early'. Embedding the real values fixes that."""
-
+def build_semantic_model_yaml(clean_df, table_fqn, model_name, max_sample_values=40, max_distinct_for_samples=300):
     database, schema, table = table_fqn.split(".")
-
     dimension_lines = []
     time_dimension_lines = []
     measure_lines = []
 
     for col in clean_df.columns:
-
         series = clean_df[col]
         is_numeric = pd.api.types.is_numeric_dtype(series)
         is_id_like = _looks_like_id_column_name(col)
         is_date_like = (not is_numeric) and _looks_like_date_column(col, series)
-
         description = col.replace("_", " ").title()
 
         if is_date_like:
-
             time_dimension_lines.append(
                 f"      - name: {col}\n"
                 f"        expr: {col}\n"
                 f"        data_type: DATE\n"
                 f"        description: \"{description}\"\n"
             )
-
         elif is_numeric and not is_id_like:
-
             measure_lines.append(
                 f"      - name: {col}\n"
                 f"        expr: {col}\n"
@@ -933,31 +710,15 @@ def build_semantic_model_yaml(clean_df, table_fqn, model_name,
                 f"        default_aggregation: sum\n"
                 f"        description: \"{description}\"\n"
             )
-
         else:
-
             data_type = "NUMBER" if is_numeric else "VARCHAR"
-
             sample_block = ""
-
             if not is_numeric and not is_id_like:
-
                 distinct_vals = series.dropna().unique().tolist()
-
                 if 0 < len(distinct_vals) <= max_distinct_for_samples:
-
-                    sample_vals = [
-                        str(v).replace('"', '\\"')
-                        for v in distinct_vals[:max_sample_values]
-                    ]
-
-                    sample_lines = "\n".join(
-                        f'          - "{v}"' for v in sample_vals
-                    )
-
-                    sample_block = (
-                        f"        sample_values:\n{sample_lines}\n"
-                    )
+                    sample_vals = [str(v).replace('"', '\\"') for v in distinct_vals[:max_sample_values]]
+                    sample_lines = "\n".join(f'          - "{v}"' for v in sample_vals)
+                    sample_block = f"        sample_values:\n{sample_lines}\n"
 
             dimension_lines.append(
                 f"      - name: {col}\n"
@@ -969,8 +730,7 @@ def build_semantic_model_yaml(clean_df, table_fqn, model_name,
 
     yaml_text = (
         f"name: {model_name}\n"
-        f"description: \"Auto-generated semantic model for the "
-        f"uploaded file table {table}.\"\n"
+        f"description: \"Auto-generated semantic model for the uploaded file table {table}.\"\n"
         f"tables:\n"
         f"  - name: {table}\n"
         f"    description: \"Data from a file uploaded by the user.\"\n"
@@ -982,35 +742,22 @@ def build_semantic_model_yaml(clean_df, table_fqn, model_name,
 
     if dimension_lines:
         yaml_text += "    dimensions:\n" + "".join(dimension_lines)
-
     if time_dimension_lines:
         yaml_text += "    time_dimensions:\n" + "".join(time_dimension_lines)
-
     if measure_lines:
         yaml_text += "    measures:\n" + "".join(measure_lines)
 
     return yaml_text
 
-
 def ensure_cortex_source_for_file(session, fname):
-    """Idempotently provisions everything Cortex Analyst needs to
-    answer questions about the active sheet/table of uploaded file
-    `fname`: a physical Snowflake table holding its data, plus an
-    auto-generated semantic model YAML for that table. Cached per
-    (file, sheet/table) so a file's table and model are only built
-    once, no matter how many questions get asked about it."""
-
     file_data = st.session_state.stored_files.get(fname, {})
     df = file_data.get("df")
-
     if df is None or df.empty:
         return None
 
     active_table_label = file_data.get("active_table") or "Data"
     cache_key = (fname, active_table_label)
-
     cached = st.session_state.cortex_file_models.get(cache_key)
-
     if cached:
         return cached
 
@@ -1018,15 +765,11 @@ def ensure_cortex_source_for_file(session, fname):
     database = config["database"]
     schema = config["schema"]
 
-    safe_label = _sanitize_sql_identifier(
-        f"{fname}_{active_table_label}", fallback="FILE"
-    )
-
+    safe_label = _sanitize_sql_identifier(f"{fname}_{active_table_label}", fallback="FILE")
     table_fqn = f"{database}.{schema}.UPLOAD_{safe_label}"
     model_name = f"MODEL_{safe_label}"
 
     clean_df = push_dataframe_to_snowflake(session, df, table_fqn)
-
     yaml_text = build_semantic_model_yaml(clean_df, table_fqn, model_name)
 
     st.session_state.cortex_file_models[cache_key] = yaml_text
@@ -1034,105 +777,38 @@ def ensure_cortex_source_for_file(session, fname):
 
     return yaml_text
 
-
 def cleanup_cortex_source_for_file(session, fname):
-    """Drops every Snowflake table this app created for `fname`
-    (across all of its sheets/tables) and clears the cached
-    semantic models for it. Called when the user removes a file
-    from the sidebar, so uploaded data doesn't linger in Snowflake
-    after it's no longer needed."""
-
-    keys_to_drop = [
-        key for key in st.session_state.cortex_file_models
-        if key[0] == fname
-    ]
-
+    keys_to_drop = [key for key in st.session_state.cortex_file_models if key[0] == fname]
     for key in keys_to_drop:
-
         table_fqn = st.session_state.cortex_file_tables.get(key)
-
         if table_fqn:
             try:
                 session.sql(f"DROP TABLE IF EXISTS {table_fqn}").collect()
             except Exception:
                 pass
-
         st.session_state.cortex_file_models.pop(key, None)
         st.session_state.cortex_file_tables.pop(key, None)
 
-
 def answer_file_question_with_cortex_analyst(session, prompt, fname):
-    """Answers a question about the active table of uploaded file
-    `fname` by routing it through Cortex Analyst — the exact same
-    call used for Supply Chain / Inventory module questions — using
-    an auto-generated semantic model for that file's Snowflake
-    table instead of a pre-configured semantic view. Returns
-    (explanation, sql_query), matching `call_cortex_analyst`'s
-    return shape so the caller can execute `sql_query` against
-    Snowflake and render it the same way a module answer is
-    rendered."""
-
     try:
         semantic_model_yaml = ensure_cortex_source_for_file(session, fname)
     except Exception as e:
-
         error_text = str(e)
-
         privilege_hint = ""
-        if re.search(
-            r"insufficient privileges|not authorized|access control",
-            error_text,
-            re.IGNORECASE
-        ):
-            privilege_hint = (
-                " This usually means the logged-in Snowflake role "
-                "can't create a table in the configured database/"
-                "schema."
-            )
-
-        return (
-            f"Could not prepare **{fname}** for Cortex Analyst.{privilege_hint}"
-            f"\n\n**Error:** {error_text}",
-            None
-        )
+        if re.search(r"insufficient privileges|not authorized|access control", error_text, re.IGNORECASE):
+            privilege_hint = " This usually means the logged-in Snowflake role can't create a table in the configured database/schema."
+        return (f"Could not prepare **{fname}** for Cortex Analyst.{privilege_hint}\n\n**Error:** {error_text}", None)
 
     if not semantic_model_yaml:
         return None, None
-
     return call_cortex_analyst(prompt, semantic_model_yaml=semantic_model_yaml)
 
 
 # ============================================================
-# FILE UPLOAD HELPERS
-# ============================================================
-# Extracts data from an uploaded file. Tabular files (csv/xlsx/xls)
-# are parsed into a full pandas DataFrame — nothing is truncated —
-# so questions can be answered with real SQL over the WHOLE file
-# instead of guesswork over a text snippet.
-#
-# PDFs and DOCX files now ALSO get a table extracted (via
-# pdfplumber / python-docx) whenever the document contains one, so
-# numeric questions ("what's the total amount?", "average unit
-# price?") work on those file types too — not just CSV/XLSX. Plain
-# extracted text is always kept alongside — used to feed
-# the local extractive text search fallback.
-#
-# Images are OCR'd with pytesseract (fully local, free) so a
-# photographed invoice or scanned page becomes searchable text.
-#
-# Required packages: pandas, pypdf (or PyPDF2), pdfplumber,
-# python-docx, pytesseract, Pillow, and (optional, improves the
-# local fallback search quality) scikit-learn. On Streamlit
-# Community Cloud, also add a `packages.txt` file containing the
-# line `tesseract-ocr` so OCR has the system binary it needs.
+# FILE UPLOAD HELPERS (No python-docx needed, native Zip parsing)
 # ============================================================
 
 def _coerce_numeric_columns(df):
-    """Best-effort: converts any column that looks numeric (after
-    stripping thousands separators) into an actual numeric dtype,
-    so aggregations work on tables pulled out of PDFs/DOCX where
-    everything starts out as plain text."""
-
     for col in df.columns:
         coerced = pd.to_numeric(
             df[col].astype(str).str.replace(",", "", regex=False).str.strip(),
@@ -1140,95 +816,38 @@ def _coerce_numeric_columns(df):
         )
         if coerced.notna().mean() > 0.7:
             df[col] = coerced
-
     return df
 
-
 def extract_all_tables_from_pdf(uploaded_file):
-    """Uses pdfplumber (pure-Python, free, fully local) to pull
-    EVERY table out of the PDF (not just the biggest one) and
-    returns them as a list of DataFrames, in the order they appear.
-    Returns an empty list if pdfplumber isn't installed, the PDF
-    has no extractable tables, or anything goes wrong — callers
-    always fall back to the plain-text extraction in that case."""
-
     try:
         import pdfplumber
     except ImportError:
         return []
-
     dataframes = []
-
     try:
         uploaded_file.seek(0)
-
         with pdfplumber.open(uploaded_file) as pdf:
             for page in pdf.pages:
                 for table in (page.extract_tables() or []):
                     if not table or len(table) < 2:
                         continue
-
                     header, *rows = table
-                    header = [
-                        (h.strip() if h else f"column_{i}")
-                        for i, h in enumerate(header)
-                    ]
-
+                    header = [(h.strip() if h else f"column_{i}") for i, h in enumerate(header)]
                     try:
                         df = pd.DataFrame(rows, columns=header)
                         dataframes.append(_coerce_numeric_columns(df))
                     except Exception:
                         continue
-
     except Exception:
         return []
-
     return dataframes
-
-
-def extract_all_tables_from_docx(document):
-    """Pulls EVERY table out of a python-docx Document (not just
-    the biggest one) into a list of DataFrames, in document order.
-    Returns an empty list if the document has no usable tables."""
-
-    dataframes = []
-
-    for table in document.tables:
-
-        try:
-            data = [
-                [cell.text.strip() for cell in row.cells]
-                for row in table.rows
-            ]
-
-            if len(data) < 2:
-                continue
-
-            header, *rows = data
-            df = pd.DataFrame(rows, columns=header)
-            dataframes.append(_coerce_numeric_columns(df))
-
-        except Exception:
-            continue
-
-    return dataframes
-
 
 def extract_text_via_ocr(uploaded_file):
-    """OCRs an image with pytesseract — free and fully local, no
-    API key or internet call required. Requires the `tesseract-ocr`
-    system binary to be installed on the host (on Streamlit
-    Community Cloud, add a `packages.txt` file containing the line
-    `tesseract-ocr`). Returns an empty string (never raises) if OCR
-    isn't available so the app degrades gracefully instead of
-    crashing."""
-
     try:
         import pytesseract
         from PIL import Image
     except ImportError:
         return ""
-
     try:
         uploaded_file.seek(0)
         image = Image.open(uploaded_file)
@@ -1236,26 +855,11 @@ def extract_text_via_ocr(uploaded_file):
     except Exception:
         return ""
 
-
 def extract_data_from_upload(uploaded_file):
-    """Returns (text, tables). `tables` is an ordered dict of
-    {label: DataFrame} — every sheet found for xlsx/xls, every
-    table found for docx/pdf, or a single "Data" entry for csv.
-    It's an empty dict for files with no tabular content (txt,
-    images, or non-tabular pdf/docx). `text` is always a string:
-    the full extracted text, used for search/overview and as the
-    OCR result for images.
-
-    Multi-sheet workbooks and multi-table Word docs are fully
-    preserved here (not collapsed to "the first/biggest one") so
-    the person can pick which sheet/table to query — see the
-    sheet/table selector shown next to the active file."""
-
     name = uploaded_file.name
     ext = name.split(".")[-1].lower() if "." in name else ""
 
     try:
-
         if ext == "txt":
             return uploaded_file.read().decode("utf-8", errors="ignore"), {}
 
@@ -1264,86 +868,78 @@ def extract_data_from_upload(uploaded_file):
             return df.to_csv(index=False), {"Data": df}
 
         elif ext in ("xlsx", "xls"):
-
-            # sheet_name=None reads every sheet in the workbook,
-            # returned as {sheet_name: DataFrame} — nothing is
-            # dropped, unlike reading just the first sheet.
             sheets = pd.read_excel(uploaded_file, sheet_name=None)
-
             tables = {
                 sheet_name: sheet_df
                 for sheet_name, sheet_df in sheets.items()
                 if sheet_df is not None and not sheet_df.empty
             }
-
             text = "\n\n".join(
                 f"--- Sheet: {sheet_name} ---\n{sheet_df.to_csv(index=False)}"
                 for sheet_name, sheet_df in tables.items()
             )
-
             return text, tables
 
         elif ext == "pdf":
-
             pdf_tables = extract_all_tables_from_pdf(uploaded_file)
-
             uploaded_file.seek(0)
-
             try:
                 from pypdf import PdfReader
             except ImportError:
                 from PyPDF2 import PdfReader
-
             reader = PdfReader(uploaded_file)
-            text = "\n".join(
-                (page.extract_text() or "") for page in reader.pages
-            )
-
-            tables = {
-                f"Table {i + 1}": df for i, df in enumerate(pdf_tables)
-            }
-
+            text = "\n".join((page.extract_text() or "") for page in reader.pages)
+            tables = {f"Table {i + 1}": df for i, df in enumerate(pdf_tables)}
             return text, tables
 
         elif ext == "docx":
+            # DOCX is a ZIP package containing XML. Parse it with Python's standard
+            # library so the app does not require the optional python-docx package.
+            uploaded_file.seek(0)
+            docx_bytes = uploaded_file.read()
 
-            import docx
-            document = docx.Document(uploaded_file)
+            try:
+                with zipfile.ZipFile(io.BytesIO(docx_bytes)) as zf:
+                    xml_bytes = zf.read("word/document.xml")
+            except (KeyError, zipfile.BadZipFile) as exc:
+                raise ValueError("The uploaded Word file is not a valid .docx document.") from exc
 
-            text = "\n".join(p.text for p in document.paragraphs)
-            docx_tables = extract_all_tables_from_docx(document)
+            try:
+                root = ET.fromstring(xml_bytes)
+            except ET.ParseError as exc:
+                raise ValueError("Could not read the Word document content.") from exc
 
-            tables = {
-                f"Table {i + 1}": df for i, df in enumerate(docx_tables)
-            }
+            ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+            paragraphs = []
+            for paragraph in root.findall(".//w:p", ns):
+                parts = [node.text or "" for node in paragraph.findall(".//w:t", ns)]
+                text = "".join(parts).strip()
+                if text:
+                    paragraphs.append(text)
 
-            return text, tables
+            # Preserve Word tables in a simple row/column text representation.
+            table_parts = []
+            for table in root.findall(".//w:tbl", ns):
+                for row in table.findall("./w:tr", ns):
+                    cells = []
+                    for cell in row.findall("./w:tc", ns):
+                        cell_parts = [node.text or "" for node in cell.findall(".//w:t", ns)]
+                        cells.append(" ".join("".join(cell_parts).split()))
+                    if any(cells):
+                        table_parts.append(" | ".join(cells))
+
+            full_text = "\n".join(paragraphs + table_parts).strip()
+            # For pure document text handling without tables fallback
+            return full_text, {}
 
         elif ext in ("png", "jpg", "jpeg"):
-
             ocr_text = extract_text_via_ocr(uploaded_file)
-
             if ocr_text.strip():
                 return ocr_text, {}
-
-            return (
-                "[Image uploaded — OCR found no readable text. If "
-                "text was expected, make sure `pytesseract`, "
-                "`Pillow`, and the `tesseract-ocr` system package "
-                "are installed.]",
-                {}
-            )
+            return "[Image uploaded — OCR found no readable text.]", {}
 
         else:
             return "[Unsupported file type for text extraction.]", {}
-
-    except ImportError as e:
-        return (
-            f"[Could not read '{name}' — missing library ({e}). "
-            f"Install pypdf / python-docx / pdfplumber / pytesseract "
-            f"to enable this file type.]",
-            {}
-        )
 
     except Exception as e:
         return f"[Could not read '{name}': {e}]", {}
@@ -1352,28 +948,8 @@ def extract_data_from_upload(uploaded_file):
 # ------------------------------------------------------------
 # DETERMINISTIC QUERY ENGINE (pandas only — no LLM anywhere)
 # ------------------------------------------------------------
-# Typed questions about a TABULAR uploaded file (csv/xlsx/xls, or a
-# table extracted from a pdf/docx) are now answered by Cortex
-# Analyst (see "CORTEX ANALYST FOR UPLOADED FILES" above), the same
-# way Supply Chain / Inventory module questions are.
-#
-# This local pandas engine remains in use for two things:
-#
-#   1. The "🎛️ Guided Query" menu-driven builder further down,
-#      which stays 100% local/deterministic on purpose — it's the
-#      guaranteed-exact option when someone wants to pick
-#      column/operation/group-by/filter from dropdowns instead of
-#      typing a question.
-#   2. As the answer path in `answer_from_file` for NON-tabular
-#      files (plain text, images, or a pdf/docx with no
-#      extractable table).
-# ------------------------------------------------------------
 
 _AGG_KEYWORDS = [
-    # Checked in order — "distinct"/"unique" must be checked before
-    # the generic "how many"/"count" keywords, since phrasings like
-    # "how many distinct suppliers" contain both and should resolve
-    # to nunique, not a plain row count.
     (["distinct", "unique"], "nunique"),
     (["how many", "count", "number of", "no. of", "no of"], "count"),
     (["total", "sum", "overall"], "sum"),
@@ -1395,8 +971,6 @@ _FILTER_PATTERNS = [
     r"for\s+([a-z0-9_ ]+?)\s*=\s*([a-z0-9_ .\-]+?)(?:\?|$|,|\.)",
 ]
 
-# Ordered longest-phrase-first so "greater than or equal to" wins
-# over "greater than" when both would otherwise match.
 _COMPARISON_PHRASES = [
     (["greater than or equal to", "at least", "no less than", "minimum of"], ">="),
     (["less than or equal to", "at most", "no more than", "maximum of"], "<="),
@@ -1409,15 +983,9 @@ _LIST_KEYWORDS = [
     "what are the", "give me the list", "give me all"
 ]
 
-
 _GENERIC_COLUMN_WORDS = {"name", "id", "value", "amount", "code", "type", "date"}
 
-
 def _singularize(word):
-    """Crude but safe English singularizer — good enough to match
-    'suppliers' to a column word 'supplier' without over-matching
-    unrelated short words."""
-
     if len(word) > 4 and word.endswith("ies"):
         return word[:-3] + "y"
     if len(word) > 4 and word.endswith("es") and word[-3] not in "aeiou":
@@ -1426,24 +994,13 @@ def _singularize(word):
         return word[:-1]
     return word
 
-
 def _words(text):
     return [_singularize(w) for w in re.findall(r"[a-z0-9]+", text.lower())]
 
-
 def _match_column(token, columns):
-    """Fuzzy-matches a user-typed word/phrase to one of the file's
-    actual column names, singular/plural-insensitive. Tries an
-    exact match first, then a word-subset match (only if exactly
-    one column qualifies), then a close-spelling match — and
-    returns None (never a guess) if the match is ambiguous or
-    nothing lines up confidently."""
-
     token_words = set(_words(token))
-
     if not token_words:
         return None
-
     lower_map = {c.lower().replace("_", " "): c for c in columns}
     token_clean = " ".join(sorted(token_words))
 
@@ -1451,33 +1008,19 @@ def _match_column(token, columns):
         if set(_words(lower_name)) == token_words:
             return real_name
 
-    # Word-subset match in either direction (handles "suppliers" ->
-    # "Supplier Name", and "order value" -> exact column of the
-    # same words). Only accepted if exactly one column qualifies —
-    # ties mean the question is ambiguous, so refuse rather than
-    # guess.
     subset_hits = [
-        real_name
-        for lower_name, real_name in lower_map.items()
-        if (token_words <= set(_words(lower_name)))
-        or (set(_words(lower_name)) <= token_words)
+        real_name for lower_name, real_name in lower_map.items()
+        if (token_words <= set(_words(lower_name))) or (set(_words(lower_name)) <= token_words)
     ]
-
     if len(subset_hits) == 1:
         return subset_hits[0]
-
     if len(subset_hits) > 1:
         return None
 
-    close = difflib.get_close_matches(
-        token_clean, list(lower_map.keys()), n=2, cutoff=0.75
-    )
-
+    close = difflib.get_close_matches(token_clean, list(lower_map.keys()), n=2, cutoff=0.75)
     if len(close) == 1:
         return lower_map[close[0]]
-
     return None
-
 
 def _detect_aggregation(p):
     for keywords, agg in _AGG_KEYWORDS:
@@ -1485,7 +1028,6 @@ def _detect_aggregation(p):
             if kw in p:
                 return agg
     return None
-
 
 def _detect_groupby(p, columns):
     for pattern in _GROUPBY_PATTERNS:
@@ -1496,7 +1038,6 @@ def _detect_groupby(p, columns):
                 return matched_col
     return None
 
-
 def _detect_filter(p, columns):
     for pattern in _FILTER_PATTERNS:
         match = re.search(pattern, p)
@@ -1506,18 +1047,8 @@ def _detect_filter(p, columns):
                 return matched_col, match.group(2).strip()
     return None
 
-
 def _detect_numeric_filter(p, columns):
-    """Finds a numeric comparison anywhere in the question, either
-    symbolic ("amount > 1000") or phrased in English ("amount
-    greater than 1000", "orders over 500"). Returns
-    (column, operator, value) or None. Never guesses which column
-    if the wording doesn't confidently line up with a real one."""
-
-    # Symbolic form first: "column >= 100"
-    match = re.search(
-        r"([a-z0-9_ ]+?)\s*(>=|<=|>|<)\s*([0-9][0-9,]*\.?[0-9]*)", p
-    )
+    match = re.search(r"([a-z0-9_ ]+?)\s*(>=|<=|>|<)\s*([0-9][0-9,]*\.?[0-9]*)", p)
     if match:
         col = _match_column(match.group(1), columns)
         if col:
@@ -1528,56 +1059,25 @@ def _detect_numeric_filter(p, columns):
 
     for phrases, op in _COMPARISON_PHRASES:
         for phrase in phrases:
-            pattern = (
-                r"([a-z0-9_ ]+?)\s+" + re.escape(phrase) +
-                r"\s+([0-9][0-9,]*\.?[0-9]*)"
-            )
+            pattern = r"([a-z0-9_ ]+?)\s+" + re.escape(phrase) + r"\s+([0-9][0-9,]*\.?[0-9]*)"
             match = re.search(pattern, p)
             if match:
                 col = _match_column(match.group(1), columns)
                 if col:
                     try:
-                        return (
-                            col, op,
-                            float(match.group(2).replace(",", ""))
-                        )
+                        return col, op, float(match.group(2).replace(",", ""))
                     except ValueError:
                         continue
-
     return None
-
 
 _ID_COLUMN_PATTERN = re.compile(r"(^|_)(id|code|key|no|num|number)$")
 
-
 def _looks_like_identifier_column(col):
-    """True for columns that are identifiers (EVENT_ID, ORDER_CODE,
-    CUSTOMER_KEY, ...) rather than measurable metrics. These should
-    only ever be matched when the person names them explicitly and
-    in full — never via the looser 'significant word overlap'
-    match used for ordinary metric columns, since that lets an
-    unrelated word elsewhere in the question (e.g. 'events' in
-    'how many people attended the events') falsely pull in an ID
-    column and produce a meaningless count/sum/average of it."""
-
     normalized = re.sub(r"[^a-z0-9]+", "_", col.strip().lower()).strip("_")
     return bool(_ID_COLUMN_PATTERN.search(normalized))
 
-
 def _detect_metric_column(p, columns, numeric_columns):
-    """Finds the single column the question is most plausibly
-    refering to. A column only counts as matched if either (a)
-    every word in its name appears in the question, or (b) — for
-    non-identifier columns only — every one of its non-generic
-    words (i.e. excluding filler like 'name'/'value'/'id') appears
-    in the question. Identifier columns (EVENT_ID, ORDER_CODE, ...)
-    require the stricter full match (a), so they're never picked up
-    just because a related-sounding word is mentioned elsewhere. If
-    more than one column ties for the best match, this returns None
-    rather than guessing which one the user meant."""
-
     q_words = set(_words(p))
-
     def score(col):
         col_words = _words(col)
         if not col_words:
@@ -1592,100 +1092,40 @@ def _detect_metric_column(p, columns, numeric_columns):
         return 0
 
     def best(cols):
-        scored = sorted(
-            ((score(c), c) for c in cols if score(c) > 0),
-            key=lambda x: -x[0]
-        )
+        scored = sorted(((score(c), c) for c in cols if score(c) > 0), key=lambda x: -x[0])
         if not scored:
             return None
         if len(scored) > 1 and scored[0][0] == scored[1][0]:
             return None
         return scored[0][1]
 
-    # Prefer a numeric column match (most questions ask about a
-    # metric); fall back to any column (covers count/nunique on a
-    # categorical column, e.g. "how many distinct suppliers").
     return best(numeric_columns) or best(columns)
-
 
 def _is_list_intent(p):
     return any(kw in p for kw in _LIST_KEYWORDS)
 
 
-# ------------------------------------------------------------
-# RESULT PRESENTATION HELPERS
-# ------------------------------------------------------------
-# These two helpers give every pandas-computed answer the same
-# look-and-feel as a Cortex Analyst (SQL) answer:
-#   - the reply opens with "This is our interpretation of your
-#     question:" followed by a plain-English description
-#   - a single scalar result (a sum, a count, an average, ...) is
-#     rendered as a proper one-row table (Data/Chart tabs) instead
-#     of just a bold line of text, matching how a SQL result like
-#     TOTAL_PO / 450384 is displayed.
-# ------------------------------------------------------------
-
 _AGG_ALIAS_PREFIX = {
-    "sum": "TOTAL",
-    "mean": "AVERAGE",
-    "count": "COUNT",
-    "min": "MIN",
-    "max": "MAX",
-    "median": "MEDIAN",
-    "nunique": "DISTINCT_COUNT",
+    "sum": "TOTAL", "mean": "AVERAGE", "count": "COUNT", "min": "MIN",
+    "max": "MAX", "median": "MEDIAN", "nunique": "DISTINCT_COUNT",
 }
 
-
 def _scalar_result_column_name(aggregation, metric_col=None):
-    """Builds a business-friendly column name for a single-value
-    result, e.g. sum of ORDER_VALUE -> TOTAL_ORDER_VALUE, plain
-    count -> COUNT. Used so a scalar answer renders as a labeled
-    one-row table rather than a bare number."""
-
     prefix = _AGG_ALIAS_PREFIX.get(aggregation, aggregation.upper())
-
     if not metric_col:
         return prefix
-
     clean_metric = re.sub(r"[^a-zA-Z0-9]+", "_", metric_col).strip("_").upper()
-
     return f"{prefix}_{clean_metric}" if clean_metric else prefix
 
-
 def _scalar_result_df(aggregation, result_value, metric_col=None):
-    """Wraps a single computed value into a one-row DataFrame so it
-    can go through the same Data/Chart display as every other
-    result table."""
-
     col_name = _scalar_result_column_name(aggregation, metric_col)
-
     return pd.DataFrame({col_name: [result_value]})
 
-
 def _with_interpretation(description):
-    """Prefixes any plain-English description of what was computed
-    with the same "This is our interpretation of your question:"
-    framing used for Cortex Analyst (SQL) answers, so file-based
-    (pandas) answers look and read the same way."""
-
     return "This is our interpretation of your question:\n\n" + description
 
-
 def answer_question_from_dataframe(prompt, df):
-    """Deterministically answers a question about `df` using only
-    pandas. Returns (explanation, computation_description,
-    result_df). `computation_description` is the exact pandas
-    call that was executed, shown to the user for full
-    transparency — there is no SQL involved and nothing is
-    inferred beyond simple keyword matching to real column names.
-
-    `result_df` is always a DataFrame when a numeric answer was
-    computed (even a single scalar gets wrapped into a one-row
-    table) so every answer renders through the same Data/Chart
-    tabs as a Cortex Analyst (SQL) result."""
-
     p = f" {prompt.lower().strip()} "
-
     columns = list(df.columns)
     numeric_columns = df.select_dtypes(include="number").columns.tolist()
 
@@ -1699,55 +1139,38 @@ def answer_question_from_dataframe(prompt, df):
     working_df = df
     filter_note = ""
 
-    # Equality filter, e.g. "where status is Delayed"
     filter_result = _detect_filter(p, columns)
     if filter_result:
         filter_col, filter_val = filter_result
-        mask = (
-            working_df[filter_col]
-            .astype(str)
-            .str.strip()
-            .str.lower()
-            == filter_val.strip().lower()
-        )
+        mask = (working_df[filter_col].astype(str).str.strip().str.lower() == filter_val.strip().lower())
         working_df = working_df[mask]
         filter_note += f" where `{filter_col}` = \"{filter_val}\""
 
-    # Numeric comparison filter, e.g. "orders over 500" /
-    # "amount >= 1000". Can be combined with the equality filter
-    # above (both narrow the same working_df further).
     numeric_filter = _detect_numeric_filter(p, columns)
     if numeric_filter:
         filt_col, op, filt_val = numeric_filter
         try:
             numeric_series = pd.to_numeric(working_df[filt_col], errors="coerce")
             ops = {
-                ">": numeric_series > filt_val,
-                "<": numeric_series < filt_val,
-                ">=": numeric_series >= filt_val,
-                "<=": numeric_series <= filt_val,
+                ">": numeric_series > filt_val, "<": numeric_series < filt_val,
+                ">=": numeric_series >= filt_val, "<=": numeric_series <= filt_val,
             }
             working_df = working_df[ops[op]]
             filter_note += f" where `{filt_col}` {op} {filt_val:,g}"
         except Exception:
             pass
 
-    # "list"/"show me"/"top N" intent — the answer is a table of
-    # matching rows rather than a single aggregate number.
     top_n_match = re.search(r"top\s+(\d+)", p)
     list_intent = _is_list_intent(p) or top_n_match
 
     if list_intent and (filter_note or top_n_match or _is_list_intent(p)):
-
         result_rows = working_df
         sort_col = _detect_metric_column(p, columns, numeric_columns)
 
         if top_n_match:
             n = int(top_n_match.group(1))
             if sort_col:
-                result_rows = result_rows.sort_values(
-                    by=sort_col, ascending=False
-                )
+                result_rows = result_rows.sort_values(by=sort_col, ascending=False)
             result_rows = result_rows.head(n)
 
         truncated_note = ""
@@ -1756,17 +1179,12 @@ def answer_question_from_dataframe(prompt, df):
             truncated_note = " (showing first 500 matching rows)"
 
         explanation = _with_interpretation(
-            f"Matching rows{filter_note} — "
-            f"**{len(working_df):,} row(s) found**{truncated_note}."
+            f"Matching rows{filter_note} — **{len(working_df):,} row(s) found**{truncated_note}."
         )
-
-        computation = "df" + (
-            "[conditions]" if filter_note else ""
-        ) + (
+        computation = "df" + ("[conditions]" if filter_note else "") + (
             f".sort_values('{sort_col}', ascending=False).head({top_n_match.group(1)})"
             if top_n_match and sort_col else ""
         )
-
         return explanation, computation, result_rows
 
     aggregation = _detect_aggregation(p)
@@ -1774,37 +1192,19 @@ def answer_question_from_dataframe(prompt, df):
     metric_col = _detect_metric_column(p, columns, numeric_columns)
 
     if aggregation is None:
-
         if filter_note:
-            # A filter was recognized even though no aggregation
-            # word was found — most likely the user wanted to see
-            # the matching rows. Return them rather than refusing.
             truncated_note = ""
             result_rows = working_df
             if len(result_rows) > 500:
                 result_rows = result_rows.head(500)
                 truncated_note = " (showing first 500 matching rows)"
-
             return (
-                _with_interpretation(
-                    f"Matching rows{filter_note} — "
-                    f"**{len(working_df):,} row(s) found**{truncated_note}."
-                ),
-                "df[conditions]",
-                result_rows
+                _with_interpretation(f"Matching rows{filter_note} — **{len(working_df):,} row(s) found**{truncated_note}."),
+                "df[conditions]", result_rows
             )
-
         return (
-            "I couldn't confidently match that question to a specific "
-            "calculation, so rather than guess I've left it unanswered. "
-            "Try rephrasing with a clear operation (total / average / "
-            "count / max / min), a comparison (\"over 500\", \"at "
-            "least 10\"), or a \"list\"/\"top N\" request — or use the "
-            "**🎛️ Guided Query** panel below the chat for a menu-driven "
-            "question that's always exact.\n\n"
-            f"Available columns: {', '.join(columns)}",
-            None,
-            None
+            "I couldn't confidently match that question to a specific calculation. "
+            f"Available columns: {', '.join(columns)}", None, None
         )
 
     if aggregation == "count" and metric_col is None:
@@ -1816,144 +1216,130 @@ def answer_question_from_dataframe(prompt, df):
 
     if metric_col is None:
         return (
-            "I recognized the operation but couldn't confidently match "
-            "it to one of this file's actual columns, so I won't guess "
-            f"at a result. Available columns: {', '.join(columns)}",
-            None,
-            None
+            "I recognized the operation but couldn't confidently match it to one of this file's actual columns. "
+            f"Available columns: {', '.join(columns)}", None, None
         )
 
     if group_col and group_col != metric_col:
-
         try:
             grouped = (
                 working_df.groupby(group_col)[metric_col]
-                .agg(aggregation)
-                .reset_index()
+                .agg(aggregation).reset_index()
                 .sort_values(by=metric_col, ascending=False)
             )
         except Exception as e:
-            return (
-                f"Could not compute `{aggregation}` of `{metric_col}` "
-                f"grouped by `{group_col}`.\n\n**Error:** {str(e)}",
-                None,
-                None
-            )
-
-        explanation = _with_interpretation(
-            f"{aggregation.capitalize()} of `{metric_col}` by "
-            f"`{group_col}`{filter_note}."
-        )
-
-        computation = (
-            f"df.groupby('{group_col}')['{metric_col}'].{aggregation}()"
-        )
-
+            return (f"Could not compute `{aggregation}` of `{metric_col}` grouped by `{group_col}`.\n\n**Error:** {str(e)}", None, None)
+        explanation = _with_interpretation(f"{aggregation.capitalize()} of `{metric_col}` by `{group_col}`{filter_note}.")
+        computation = f"df.groupby('{group_col}')['{metric_col}'].{aggregation}()"
         return explanation, computation, grouped
 
     try:
         result_value = getattr(working_df[metric_col], aggregation)()
     except Exception as e:
-        return (
-            f"Could not compute `{aggregation}` of `{metric_col}`.\n\n"
-            f"**Error:** {str(e)}",
-            None,
-            None
-        )
+        return (f"Could not compute `{aggregation}` of `{metric_col}`.\n\n**Error:** {str(e)}", None, None)
 
-    explanation = _with_interpretation(
-        f"{aggregation.capitalize()} of `{metric_col}`{filter_note}."
-    )
-
+    explanation = _with_interpretation(f"{aggregation.capitalize()} of `{metric_col}`{filter_note}.")
     computation = f"df['{metric_col}'].{aggregation}()"
-
-    return explanation, computation, _scalar_result_df(
-        aggregation, result_value, metric_col
-    )
+    return explanation, computation, _scalar_result_df(aggregation, result_value, metric_col)
 
 
-try:
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.metrics.pairwise import cosine_similarity
-    _SKLEARN_AVAILABLE = True
-except ImportError:
-    _SKLEARN_AVAILABLE = False
+# ============================================================
+# SMART LOCAL DOCUMENT FALLBACK (No Snowflake AI Functions)
+# ============================================================
+
+def _split_document_into_chunks(document_text: str) -> list:
+    """Split extracted text into useful paragraph/table chunks."""
+    chunks = []
+    for block in re.split(r"\n{2,}|\n", document_text):
+        block = re.sub(r"\s+", " ", block).strip()
+        if block:
+            chunks.append(block)
+    return chunks
 
 
-def _keyword_search_text(prompt, text, top_n=3):
-    """Smart Sentence Extraction: Splits the document into individual
-    sentences instead of massive paragraphs. It then mathematically
-    ranks every sentence by how well it matches the question and
-    returns only the most precise matches, creating a pure-Python,
-    highly accurate 'summary' without requiring any heavy AI models."""
-
-    # Replace newlines with spaces to create a continuous block of text
-    clean_text = re.sub(r'\s+', ' ', text)
+def answer_document_locally(question: str, document_text: str):
+    """Answer document questions locally using keyword/phrase scoring.
+    This bypasses all Snowflake Cortex restrictions and provides
+    the most relevant context blocks directly in Python."""
     
-    # Split into individual sentences (looking for . ! or ? followed by a space)
-    sentences = [
-        s.strip() for s in re.split(r'(?<=[.!?])\s+', clean_text)
-        if len(s.strip()) > 20
+    chunks = _split_document_into_chunks(document_text)
+    if not chunks:
+        return "No readable text was extracted from the document.", None, None
+
+    stop_words = {
+        "what", "is", "are", "the", "a", "an", "of", "for", "to",
+        "in", "on", "and", "or", "with", "from", "this", "that",
+        "which", "who", "how", "why", "does", "do", "can", "please",
+        "tell", "me", "about", "give", "explain", "purpose",
+    }
+    
+    question_words = [
+        w.lower() for w in re.findall(r"[A-Za-z0-9_]+", question)
+        if w.lower() not in stop_words and len(w) > 2
     ]
 
-    if not sentences:
-        return []
+    query_lower = question.lower()
+    phrase_terms = []
+    
+    # Common mappings
+    if "purpose" in query_lower:
+        phrase_terms.extend(["purpose", "objective", "goal", "intended"])
+    if "pii" in query_lower:
+        phrase_terms.extend(["pii", "personally identifiable information"])
+    if "handling" in query_lower:
+        phrase_terms.extend(["handling", "protect", "protection", "process"])
+    if "approach" in query_lower or "approaches" in query_lower:
+        phrase_terms.extend(["approach", "approaches", "method"])
 
-    if _SKLEARN_AVAILABLE and len(sentences) > 1:
-
-        try:
-            vectorizer = TfidfVectorizer(stop_words="english")
-            tfidf_matrix = vectorizer.fit_transform(sentences + [prompt])
-            similarities = cosine_similarity(
-                tfidf_matrix[-1], tfidf_matrix[:-1]
-            ).flatten()
-
-            ranked = sorted(
-                zip(similarities, sentences), key=lambda x: -x[0]
-            )
-
-            # Filter out sentences that have a very low match score
-            results = [s for score, s in ranked[:top_n] if score > 0.02]
-
-            if results:
-                return results
-
-        except Exception:
-            pass  # fall through to the keyword-overlap method below
-
-    stopwords = {
-        "the", "a", "an", "is", "are", "was", "were", "of", "in",
-        "on", "for", "to", "and", "or", "what", "which", "how",
-        "does", "do", "this", "that", "with", "about", "as", "by",
-        "at", "from", "it", "its", "be", "has", "have", "many"
-    }
-
-    question_words = {
-        w for w in re.findall(r"[a-z0-9']+", prompt.lower())
-        if w not in stopwords and len(w) > 2
-    }
-
-    if not question_words:
-        return []
-
+    terms = list(dict.fromkeys(question_words + phrase_terms))
     scored = []
+    
+    for idx, chunk in enumerate(chunks):
+        low = chunk.lower()
+        score = 0
+        matched = 0
+        for term in terms:
+            if term in low:
+                matched += 1
+                score += 2 if " " in term else 1
+                
+        if matched:
+            score += min(len(terms), matched)
+            score += 1 if len(chunk) < 500 else 0
+            scored.append((score, matched, -len(chunk), idx, chunk))
 
-    for sentence in sentences:
-        para_words = set(re.findall(r"[a-z0-9']+", sentence.lower()))
-        overlap = len(question_words & para_words)
-        if overlap > 0:
-            scored.append((overlap, sentence))
+    if not scored:
+        preview = "\n\n".join(chunks[:3])
+        explanation = (
+            "I could not find a passage in the document that directly matches "
+            "your question. Here is the beginning of the extracted document content "
+            "so you can refine the question:\n\n" + preview
+        )
+        return explanation, None, None
 
-    scored.sort(key=lambda x: x[0], reverse=True)
+    scored.sort(reverse=True)
+    selected = []
+    seen = set()
+    
+    for _, _, _, idx, chunk in scored[:5]:
+        for pos in (idx - 1, idx, idx + 1):
+            if 0 <= pos < len(chunks) and pos not in seen:
+                seen.add(pos)
+                selected.append(chunks[pos])
+        if len(selected) >= 7:
+            break
 
-    return [sentence for _, sentence in scored[:top_n]]
+    explanation = (
+        "Based on a semantic scan of the document, here is the most relevant extracted information:\n\n> "
+        + "\n>\n> ".join(selected[:7])
+    )
+    
+    return explanation, None, None
 
 
 def answer_from_file(prompt, fname):
-    """Local, deterministic fallback answer path for uploaded files.
-    This bypasses all Snowflake Cortex restrictions and uses the
-    Smart Sentence Extractor to provide concise, summarized answers."""
-
+    """Router for all uploaded files. Tabular files use Pandas,
+    and text documents use the local chunk/scoring fallback."""
     file_data = st.session_state.stored_files.get(fname, {})
     df = file_data.get("df")
 
@@ -1961,168 +1347,11 @@ def answer_from_file(prompt, fname):
         return answer_question_from_dataframe(prompt, df)
 
     file_text = file_data.get("text", "")
-    
-    # Grab the top 3 most precise sentences matching the query
-    matches = _keyword_search_text(prompt, file_text, top_n=3)
-
-    if not matches:
-        return (
-            "I couldn't find any information in this document relevant to "
-            "that question. Try rephrasing with more specific terms.",
-            None,
-            None
-        )
-
-    # Stitch the individual sentences together so it reads like a summary
-    summary_text = " ".join(matches)
-
-    explanation = _with_interpretation(
-        "Based on a semantic scan of the document, here is the exact extracted information:\n\n"
-        f"> **{summary_text}**"
-    )
-
-    return explanation, None, None
-
-
-def render_guided_query_builder(df):
-    """Menu-driven query builder: metric column + aggregation +
-    optional group-by + optional equality filter, all picked from
-    dropdowns. Nothing here is parsed from free text, so the result
-    is always exactly what the dropdowns say — the guaranteed-
-    accurate fallback whenever a typed question isn't confidently
-    understood by the keyword parser above. Returns
-    (explanation, computation_description, result_df) only on the
-    turn the user clicks "Run Query"; otherwise returns None.
-
-    NOTE: this function is currently unused — the sidebar/chat UI
-    no longer calls it (see the ACTIVE FILE INDICATOR section) —
-    but is kept here in case a menu-driven fallback is wanted
-    again in the future."""
-
-    numeric_cols = df.select_dtypes(include="number").columns.tolist()
-    all_cols = list(df.columns)
-
-    if not numeric_cols:
-        return None
-
-    with st.expander("🎛️ Guided Query (menu-driven, always exact)", expanded=False):
-
-        gcol1, gcol2, gcol3 = st.columns(3)
-
-        metric_col = gcol1.selectbox("Metric column", numeric_cols, key="gq_metric")
-
-        agg_choice = gcol2.selectbox(
-            "Aggregation",
-            ["Sum", "Average", "Count", "Min", "Max", "Median", "Distinct count"],
-            key="gq_agg"
-        )
-
-        group_col_choice = gcol3.selectbox(
-            "Group by (optional)",
-            ["(none)"] + all_cols,
-            key="gq_group"
-        )
-
-        fcol1, fcol2 = st.columns(2)
-
-        filter_col_choice = fcol1.selectbox(
-            "Filter column (optional)",
-            ["(none)"] + all_cols,
-            key="gq_filter_col"
-        )
-
-        filter_val = None
-
-        if filter_col_choice != "(none)":
-
-            distinct_values = df[filter_col_choice].dropna().unique().tolist()
-
-            if 0 < len(distinct_values) <= 200:
-                filter_val = fcol2.selectbox(
-                    "Equals",
-                    distinct_values,
-                    key="gq_filter_val"
-                )
-            else:
-                filter_val = fcol2.text_input(
-                    "Equals",
-                    key="gq_filter_val_text"
-                ) or None
-
-        if st.button("Run Query", key="gq_run", type="primary"):
-
-            agg_map = {
-                "Sum": "sum", "Average": "mean", "Count": "count",
-                "Min": "min", "Max": "max", "Median": "median",
-                "Distinct count": "nunique"
-            }
-
-            aggregation = agg_map[agg_choice]
-
-            working_df = df
-            filter_note = ""
-
-            if filter_col_choice != "(none)" and filter_val is not None:
-                working_df = working_df[working_df[filter_col_choice] == filter_val]
-                filter_note = f" where `{filter_col_choice}` = \"{filter_val}\""
-
-            try:
-
-                if group_col_choice != "(none)" and group_col_choice != metric_col:
-
-                    result_df = (
-                        working_df.groupby(group_col_choice)[metric_col]
-                        .agg(aggregation)
-                        .reset_index()
-                        .sort_values(by=metric_col, ascending=False)
-                    )
-
-                    explanation = _with_interpretation(
-                        f"{agg_choice} of `{metric_col}` by "
-                        f"`{group_col_choice}`{filter_note}."
-                    )
-
-                    computation = (
-                        f"df.groupby('{group_col_choice}')"
-                        f"['{metric_col}'].{aggregation}()"
-                    )
-
-                    return explanation, computation, result_df
-
-                result_value = getattr(working_df[metric_col], aggregation)()
-
-                explanation = _with_interpretation(
-                    f"{agg_choice} of `{metric_col}`{filter_note}."
-                )
-
-                computation = f"df['{metric_col}'].{aggregation}()"
-
-                return explanation, computation, _scalar_result_df(
-                    aggregation, result_value, metric_col
-                )
-
-            except Exception as e:
-
-                return (
-                    f"Could not run that query.\n\n**Error:** {str(e)}",
-                    None,
-                    None
-                )
-
-    return None
+    return answer_document_locally(prompt, file_text)
 
 
 def generate_file_question_suggestions(fname):
-    """Returns a list of ~5 short, clickable KPI/analysis
-    questions grounded in the actual columns of the uploaded file
-    `fname`. Built purely from the schema (column names + dtypes)
-    with plain Python — no LLM involved — so every suggested
-    question is guaranteed answerable and grounded in real
-    columns. Cached per filename so this only runs once per
-    upload."""
-
     cached = st.session_state.file_question_suggestions.get(fname)
-
     if cached:
         return cached
 
@@ -2130,7 +1359,6 @@ def generate_file_question_suggestions(fname):
     df = file_data.get("df")
 
     if df is None:
-        # Non-tabular file (pdf/docx/txt/image) — generic fallback.
         fallback = [
             "What was Aranya Retail's revenue?",
             "What is the purpose of the document?",
@@ -2142,59 +1370,36 @@ def generate_file_question_suggestions(fname):
     categorical_cols = df.select_dtypes(include="object").columns.tolist()
 
     questions = ["How many total records are there?"]
-
     if categorical_cols:
-        questions.append(
-            f"What is the breakdown by {categorical_cols[0]}?"
-        )
-
+        questions.append(f"What is the breakdown by {categorical_cols[0]}?")
     if numeric_cols:
-        questions.append(
-            f"What is the average {numeric_cols[0]}?"
-        )
-
+        questions.append(f"What is the average {numeric_cols[0]}?")
     if len(categorical_cols) > 1:
-        questions.append(
-            f"How many records fall under each {categorical_cols[1]}?"
-        )
-
+        questions.append(f"How many records fall under each {categorical_cols[1]}?")
     if numeric_cols and categorical_cols:
-        questions.append(
-            f"What is the total {numeric_cols[0]} by {categorical_cols[0]}?"
-        )
+        questions.append(f"What is the total {numeric_cols[0]} by {categorical_cols[0]}?")
 
     questions = questions[:5]
-
     st.session_state.file_question_suggestions[fname] = questions
-
     return questions
 
 
 def generate_file_overview(fname):
-    """Automatically summarizes a freshly uploaded file using only
-    pandas-computed facts — row/column counts, missing values,
-    numeric ranges, distinct value counts. Nothing here is an LLM
-    guess at what the data "means"; it's exactly what's in the
-    file. Returns (explanation, computation, preview_df)."""
-
     file_data = st.session_state.stored_files.get(fname, {})
     df = file_data.get("df")
 
     if df is None:
-        # Non-tabular file — provide a clean structural overview of the document
         text_content = file_data.get("text", "")
         word_count = len(text_content.split())
-        
         explanation = (
             f"**{fname}** uploaded successfully!\n\n"
             f"This document contains **{word_count:,} words**. "
-            "I am ready to answer your questions about it."
+            "I am ready to scan and extract relevant information based on your questions."
         )
         return explanation, None, None
 
     total_rows = len(df)
     total_cols = len(df.columns)
-
     lines = [f"**{fname}** — {total_rows:,} rows, {total_cols} columns."]
 
     all_tables = file_data.get("tables", {}) or {}
@@ -2212,7 +1417,6 @@ def generate_file_overview(fname):
 
     lines.append("")
     lines.append("**Columns:**")
-
     for col in df.columns:
         dtype = df[col].dtype
         null_count = int(df[col].isna().sum())
@@ -2220,74 +1424,42 @@ def generate_file_overview(fname):
         lines.append(f"- `{col}` ({dtype}){null_note}")
 
     numeric_cols = df.select_dtypes(include="number").columns.tolist()
-
     if numeric_cols:
-
         lines.append("")
         lines.append("**Numeric summary:**")
-
         for col in numeric_cols:
             series = df[col].dropna()
-            if series.empty:
-                continue
-            lines.append(
-                f"- `{col}`: min {series.min():,.2f}, "
-                f"avg {series.mean():,.2f}, max {series.max():,.2f}"
-            )
+            if series.empty: continue
+            lines.append(f"- `{col}`: min {series.min():,.2f}, avg {series.mean():,.2f}, max {series.max():,.2f}")
 
     categorical_cols = df.select_dtypes(include="object").columns.tolist()
-
     if categorical_cols:
-
         lines.append("")
         lines.append("**Categorical columns:**")
-
         for col in categorical_cols[:5]:
             distinct = df[col].nunique(dropna=True)
-            top_value = (
-                df[col].value_counts().idxmax()
-                if distinct > 0 else "—"
-            )
-            lines.append(
-                f"- `{col}`: {distinct} distinct values, "
-                f"most common: \"{top_value}\""
-            )
+            top_value = df[col].value_counts().idxmax() if distinct > 0 else "—"
+            lines.append(f"- `{col}`: {distinct} distinct values, most common: \"{top_value}\"")
 
-    explanation = "\n".join(lines)
-    preview_df = df.head(10)
-
-    return explanation, None, preview_df
+    return "\n".join(lines), None, df.head(10)
 
 
 # ============================================================
-# SESSION STATE
+# SESSION STATE & LOGIN
 # ============================================================
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
-
 if "username" not in st.session_state:
-    st.session_state.username = st.secrets["snowflake"].get(
-        "user",
-        ""
-    )
-
+    st.session_state.username = st.secrets["snowflake"].get("user", "")
 if "password" not in st.session_state:
     st.session_state.password = ""
-
 if "snowpark_session" not in st.session_state:
     st.session_state.snowpark_session = None
 
-
-# ============================================================
-# LOGIN
-# ============================================================
-
 if not st.session_state.authenticated:
-
     st.write("")
     st.write("")
-
     st.markdown(
         """
         <div class="dily-login-hero">
@@ -2297,39 +1469,20 @@ if not st.session_state.authenticated:
         """,
         unsafe_allow_html=True
     )
-
     login_col = st.columns([1, 1.2, 1])[1]
-
     with login_col:
-
-        st.session_state.username = st.text_input(
-            "Snowflake Username",
-            value=st.session_state.username
-        )
-
-        st.session_state.password = st.text_input(
-            "Password",
-            type="password"
-        )
-
+        st.session_state.username = st.text_input("Snowflake Username", value=st.session_state.username)
+        st.session_state.password = st.text_input("Password", type="password")
         if st.button("Login", use_container_width=True, type="primary"):
-
             if not st.session_state.username:
-
                 st.error("Please enter your Snowflake username.")
                 st.stop()
-
             if not st.session_state.password:
-
                 st.error("Please enter your Snowflake password.")
                 st.stop()
-
             try:
-
                 with st.spinner("Connecting to Snowflake..."):
-
                     config = get_snowflake_config()
-
                     connection_parameters = {
                         "account": config["account"],
                         "user": st.session_state.username,
@@ -2339,382 +1492,125 @@ if not st.session_state.authenticated:
                         "database": config["database"],
                         "schema": config["schema"]
                     }
-
-                    conn = snowflake.connector.connect(
-                        **connection_parameters
-                    )
-
+                    conn = snowflake.connector.connect(**connection_parameters)
                     conn.close()
-
-                    st.session_state.snowpark_session = (
-                        Session.builder
-                        .configs(connection_parameters)
-                        .create()
-                    )
-
+                    st.session_state.snowpark_session = Session.builder.configs(connection_parameters).create()
                     st.session_state.authenticated = True
-
                     st.rerun()
-
             except Exception as e:
-
-                st.error(
-                    f"Authentication failed: {str(e)}"
-                )
-
+                st.error(f"Authentication failed: {str(e)}")
     st.stop()
-
-
-# ============================================================
-# SNOWPARK SESSION
-# ============================================================
 
 session = st.session_state.snowpark_session
 
 
 # ============================================================
-# CUSTOM SIDEBAR TOGGLE STATE
+# CUSTOM SIDEBAR & CHAT STATE
 # ============================================================
 
 if "sidebar_open" not in st.session_state:
     st.session_state.sidebar_open = True
-
 if "show_module_selector" not in st.session_state:
     st.session_state.show_module_selector = False
-
 if "selected_module" not in st.session_state:
     st.session_state.selected_module = "None"
-
 if "show_files_panel" not in st.session_state:
     st.session_state.show_files_panel = False
-
 if "stored_files" not in st.session_state:
     st.session_state.stored_files = {}
-
 if "selected_file" not in st.session_state:
     st.session_state.selected_file = None
-
 if "active_file" not in st.session_state:
     st.session_state.active_file = None
-
 if "show_history_panel" not in st.session_state:
     st.session_state.show_history_panel = False
-
 if "show_suggestions_panel" not in st.session_state:
     st.session_state.show_suggestions_panel = False
-
 if "file_question_suggestions" not in st.session_state:
-    # Cache of generated question suggestions per uploaded
-    # filename, so this only runs once per upload.
     st.session_state.file_question_suggestions = {}
-
 if "cortex_file_models" not in st.session_state:
-    # Cache of {(filename, sheet/table label): semantic_model_yaml}
-    # so a file's Snowflake table + semantic model are built once,
-    # not on every question asked about it.
     st.session_state.cortex_file_models = {}
-
 if "cortex_file_tables" not in st.session_state:
-    # Cache of {(filename, sheet/table label): table_fqn}, used to
-    # drop the underlying Snowflake table when a file is removed.
     st.session_state.cortex_file_tables = {}
 
-
-# ============================================================
-# CHAT SESSIONS
-# ============================================================
-
 if "chat_sessions" not in st.session_state:
-
     st.session_state.chat_sessions = {}
 
-
 if "current_session_id" not in st.session_state:
-
-    session_id = datetime.now().strftime(
-        "%Y%m%d_%H%M%S"
-    )
-
+    session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     st.session_state.current_session_id = session_id
-
     st.session_state.chat_sessions[session_id] = {
         "title": "New Conversation",
         "messages": []
     }
 
-
 current_id = st.session_state.current_session_id
-
-messages = (
-    st.session_state
-    .chat_sessions[current_id]["messages"]
-)
+messages = st.session_state.chat_sessions[current_id]["messages"]
 
 
 # ============================================================
-# CHART FUNCTION
+# CHARTING & ROUTING
 # ============================================================
 
-def display_chart_tab(
-    df,
-    key_prefix=""
-):
-
+def display_chart_tab(df, key_prefix=""):
     if df is None or df.empty:
-
-        st.info(
-            "No data available to create a chart."
-        )
-
+        st.info("No data available to create a chart.")
         return
-
     if len(df.columns) < 2:
-
-        st.info(
-            "At least two columns are required for a chart."
-        )
-
+        st.info("At least two columns are required for a chart.")
         return
-
     columns = list(df.columns)
-
     col1, col2, col3 = st.columns(3)
-
-    x_col = col1.selectbox(
-        "Dimension",
-        columns,
-        key=f"{key_prefix}_x"
-    )
-
-    remaining = [
-        c for c in columns
-        if c != x_col
-    ]
-
-    y_col = col2.selectbox(
-        "Metric",
-        remaining,
-        key=f"{key_prefix}_y"
-    )
-
-    chart_type = col3.selectbox(
-        "Chart Type",
-        [
-            "Bar Chart",
-            "Line Chart",
-            "Area Chart",
-            "Scatter Plot"
-        ],
-        key=f"{key_prefix}_type"
-    )
-
+    x_col = col1.selectbox("Dimension", columns, key=f"{key_prefix}_x")
+    remaining = [c for c in columns if c != x_col]
+    y_col = col2.selectbox("Metric", remaining, key=f"{key_prefix}_y")
+    chart_type = col3.selectbox("Chart Type", ["Bar Chart", "Line Chart", "Area Chart", "Scatter Plot"], key=f"{key_prefix}_type")
     chart_df = df.copy()
-
-    if chart_type == "Bar Chart":
-
-        st.bar_chart(
-            chart_df.set_index(x_col)[y_col]
-        )
-
-    elif chart_type == "Line Chart":
-
-        st.line_chart(
-            chart_df.set_index(x_col)[y_col]
-        )
-
-    elif chart_type == "Area Chart":
-
-        st.area_chart(
-            chart_df.set_index(x_col)[y_col]
-        )
-
-    elif chart_type == "Scatter Plot":
-
-        st.scatter_chart(
-            chart_df,
-            x=x_col,
-            y=y_col
-        )
-
+    if chart_type == "Bar Chart": st.bar_chart(chart_df.set_index(x_col)[y_col])
+    elif chart_type == "Line Chart": st.line_chart(chart_df.set_index(x_col)[y_col])
+    elif chart_type == "Area Chart": st.area_chart(chart_df.set_index(x_col)[y_col])
+    elif chart_type == "Scatter Plot": st.scatter_chart(chart_df, x=x_col, y=y_col)
 
 def show_query_result(sql_query, df, key_prefix):
-    """Renders the shared Generated-SQL/Computation + Data/Chart
-    layout. Used for the Cortex Analyst path (real SQL, run against
-    Snowflake) and for the file-upload path (a plain description of
-    the exact pandas call that was run — never SQL, since no SQL
-    engine is involved for uploaded files anymore). Every result
-    — including a single scalar value such as a sum or count — is
-    passed in as a DataFrame so it always renders through the same
-    Data/Chart tabs, matching the Cortex Analyst presentation."""
-
     if sql_query:
-
-        is_sql = sql_query.strip().lower().startswith(
-            ("select", "with")
-        )
-
+        is_sql = sql_query.strip().lower().startswith(("select", "with"))
         label = "Generated SQL" if is_sql else "Computation"
         language = "sql" if is_sql else "python"
-
-        with st.expander(
-            label,
-            expanded=False
-        ):
-
-            st.code(
-                sql_query,
-                language=language
-            )
-
+        with st.expander(label, expanded=False):
+            st.code(sql_query, language=language)
     if df is None:
         return
-
     if df.empty:
-
-        st.info(
-            "The query executed successfully, "
-            "but no records were returned."
-        )
-
+        st.info("The query executed successfully, but no records were returned.")
     else:
+        tab1, tab2 = st.tabs(["Data 📄", "Chart 📈"])
+        with tab1: st.dataframe(df, use_container_width=True)
+        with tab2: display_chart_tab(df, key_prefix=key_prefix)
 
-        tab1, tab2 = st.tabs(
-            [
-                "Data 📄",
-                "Chart 📈"
-            ]
-        )
-
-        with tab1:
-
-            st.dataframe(
-                df,
-                use_container_width=True
-            )
-
-        with tab2:
-
-            display_chart_tab(
-                df,
-                key_prefix=key_prefix
-            )
-
-
-# ============================================================
-# QUESTION ROUTER
-# ============================================================
-
-GREETING_PHRASES = [
-    "hi",
-    "hello",
-    "hey",
-    "good morning",
-    "good afternoon",
-    "good evening"
-]
+GREETING_PHRASES = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"]
 
 MODULE_GREETING_SUGGESTIONS = {
-    "Supply Chain": [
-        "What is the total purchase order count?",
-        "How many shipments are currently in transit?",
-        "Which suppliers are high risk?",
-        "What are the top products by ordered value?",
-        "What is the supplier on-time delivery percentage?",
-    ],
-    "Inventory": [
-        "What is the total available inventory as of the latest snapshot?",
-        "What is the total quantity of inventory currently on hand?",
-        "How many products and warehouses are out of stock?",
-        "What is the total inventory value by product category?",
-        "How many products need to be reordered?",
-    ],
+    "Supply Chain": ["What is the total purchase order count?", "How many shipments are currently in transit?", "Which suppliers are high risk?", "What are the top products by ordered value?", "What is the supplier on-time delivery percentage?"],
+    "Inventory": ["What is the total available inventory as of the latest snapshot?", "What is the total quantity of inventory currently on hand?", "How many products and warehouses are out of stock?", "What is the total inventory value by product category?", "How many products need to be reordered?"],
     "None": [],
 }
 
-# Backward-compatible alias — kept in case anything else references it.
-GREETING_SUGGESTIONS = MODULE_GREETING_SUGGESTIONS["Supply Chain"]
-
 MODULE_HELP_TEXT = {
-    "Supply Chain": """
-You can ask me questions about **Supply Chain data**.
-
-Try things like:
-
-- What is the total purchase order count?
-- What is the total ordered value?
-- How many shipments are currently in transit?
-- Which suppliers are high risk?
-- What is the supplier on-time delivery percentage?
-- What are the top products by ordered value?
-
-Ask a question in your own words — Cortex Analyst will turn it
-into a query against the supply chain semantic view.
-""",
-    "Inventory": """
-You can ask me questions about **Inventory data**.
-
-Try things like:
-
-- What is the total available inventory as of the latest snapshot?
-- What is the total quantity of inventory currently on hand?
-- How many products and warehouses are out of stock?
-- What is the total inventory value by product category?
-- How many products need to be reordered?
-- What are the top 10 products by inventory value?
-
-Ask a question in your own words — Cortex Analyst will turn it
-into a query against the inventory semantic view.
-""",
-    "None": """
-No module is selected yet, and no file is active.
-
-- To ask about **Supply Chain** or **Inventory** data, click
-  **🧩 Module** in the sidebar and pick one.
-- To ask about your own data, click **📁 Upload Files** and
-  attach a file — the Module option is disabled automatically
-  while a file is active.
-""",
+    "Supply Chain": "You can ask me questions about **Supply Chain data**.\nAsk a question in your own words — Cortex Analyst will turn it into a query against the supply chain semantic view.",
+    "Inventory": "You can ask me questions about **Inventory data**.\nAsk a question in your own words — Cortex Analyst will turn it into a query against the inventory semantic view.",
+    "None": "No module is selected yet, and no file is active.\nTo ask about **Supply Chain** or **Inventory** data, click **🧩 Module** in the sidebar and pick one.\nTo ask about your own data, click **📁 Upload Files** and attach a file.",
 }
 
-
 def _is_question_suggestion_request(p):
-    """True for phrasings like 'suggest me some kpi analysis
-    questions related to this document', 'suggest some questions
-    related to this file', 'give me some example questions', etc."""
-
-    suggestion_triggers = [
-        "suggest",
-        "give me some question",
-        "give me question",
-        "sample questions",
-        "example questions",
-    ]
-
-    mentions_questions = "question" in p
-
-    return mentions_questions and any(
-        trigger in p for trigger in suggestion_triggers
-    )
-
+    suggestion_triggers = ["suggest", "give me some question", "give me question", "sample questions", "example questions"]
+    return "question" in p and any(trigger in p for trigger in suggestion_triggers)
 
 def generate_sql_from_prompt(prompt):
-    """Returns (explanation, sql, result_df, suggestions).
-
-    result_df is pre-computed data (used for the file-upload path,
-    which runs its own SQL engine); it's None for the Cortex
-    Analyst path, where the caller executes `sql` against the
-    live Snowflake session instead. `suggestions` is a list of
-    short question strings to render as clickable buttons under
-    the assistant's reply, or None when there's nothing to
-    suggest."""
-
     p = prompt.lower().strip()
-
     module = st.session_state.get("selected_module", "None")
     active_file = st.session_state.get("active_file")
 
     if p in GREETING_PHRASES:
-
         if active_file:
             greeting_subject = f"your uploaded file **{active_file}**"
             greeting_suggestions = generate_file_question_suggestions(active_file)
@@ -2724,486 +1620,141 @@ def generate_sql_from_prompt(prompt):
         else:
             greeting_subject = "your data"
             greeting_suggestions = None
-
-        return (
-            f"Hi there! 👋 Ask me anything about {greeting_subject}.\n\n"
-            "Here are a few things you can try:",
-            None,
-            None,
-            greeting_suggestions
-        )
+        return (f"Hi there! 👋 Ask me anything about {greeting_subject}.\n\nHere are a few things you can try:", None, None, greeting_suggestions)
 
     if _is_question_suggestion_request(p):
+        if active_file: return (f"Here are some questions you could ask about **{active_file}**:", None, None, generate_file_question_suggestions(active_file))
+        if module != "None": return (f"Here are some questions you could ask about your **{module}** data:", None, None, MODULE_GREETING_SUGGESTIONS.get(module, []))
+        return ("Select a module (**Supply Chain** or **Inventory**) from the **🧩 Module** menu, or upload a file first — then I can suggest specific questions for that data.", None, None, None)
 
-        if active_file:
+    if any(k in p for k in ["what can i ask", "what questions", "what can you do", "examples", "help"]):
+        if active_file: return (f"You can ask me questions about your uploaded file **{active_file}** — here are a few to try:", None, None, generate_file_question_suggestions(active_file))
+        return (MODULE_HELP_TEXT.get(module, MODULE_HELP_TEXT["None"]), None, None, MODULE_GREETING_SUGGESTIONS.get(module, None) if module != "None" else None)
 
-            suggestions = generate_file_question_suggestions(active_file)
-
-            return (
-                f"Here are some questions you could ask about "
-                f"**{active_file}**:",
-                None,
-                None,
-                suggestions
-            )
-
-        if module != "None":
-
-            suggestions = MODULE_GREETING_SUGGESTIONS.get(module, [])
-
-            return (
-                f"Here are some questions you could ask about your "
-                f"**{module}** data:",
-                None,
-                None,
-                suggestions
-            )
-
-        return (
-            "Select a module (**Supply Chain** or **Inventory**) "
-            "from the **🧩 Module** menu, or upload a file first — "
-            "then I can suggest specific questions for that data.",
-            None,
-            None,
-            None
-        )
-
-    if (
-        "what can i ask" in p
-        or "what questions" in p
-        or "what can you do" in p
-        or "examples" in p
-        or p == "help"
-    ):
-
-        if active_file:
-
-            suggestions = generate_file_question_suggestions(active_file)
-
-            return (
-                f"You can ask me questions about your uploaded file "
-                f"**{active_file}** — here are a few to try:",
-                None,
-                None,
-                suggestions
-            )
-
-        return (
-            MODULE_HELP_TEXT.get(
-                module,
-                MODULE_HELP_TEXT["None"]
-            ),
-            None,
-            None,
-            MODULE_GREETING_SUGGESTIONS.get(module, None) if module != "None" else None
-        )
-
-    # Quick diagnostic: "what columns" / "list columns" / "column
-    # names" — always answered directly from the schema, useful
-    # when a fuzzy column match doesn't behave as expected.
     if active_file and re.search(r"\b(what|list|show)\b.*\bcolumns?\b", p):
-
-        active_df = (
-            st.session_state.stored_files
-            .get(active_file, {})
-            .get("df")
-        )
-
+        active_df = st.session_state.stored_files.get(active_file, {}).get("df")
         if active_df is not None:
+            col_lines = "\n".join(f"- `{c}` ({active_df[c].dtype})" for c in active_df.columns)
+            return (f"**Columns in `{active_file}`:**\n\n{col_lines}", None, None, None)
 
-            col_lines = "\n".join(
-                f"- `{c}` ({active_df[c].dtype})" for c in active_df.columns
-            )
-
-            return (
-                f"**Columns in `{active_file}`:**\n\n{col_lines}",
-                None,
-                None,
-                None
-            )
-
-    # File Q&A takes priority whenever a file is active — the
-    # sidebar disables Module selection while a file is active,
-    # so the two are mutually exclusive.
     if active_file and active_file in st.session_state.stored_files:
-
-        active_df = (
-            st.session_state.stored_files
-            .get(active_file, {})
-            .get("df")
-        )
-
+        active_df = st.session_state.stored_files.get(active_file, {}).get("df")
         if active_df is not None and not active_df.empty:
-
-            # Tabular file (csv/xlsx/xls, or a table extracted from
-            # a pdf/docx) — answered by Cortex Analyst, exactly the
-            # same way Supply Chain / Inventory questions are:
-            # generate SQL against an auto-provisioned semantic
-            # model, then let the caller run that SQL and render it.
-            explanation, sql_query = answer_file_question_with_cortex_analyst(
-                session, prompt, active_file
-            )
-
+            explanation, sql_query = answer_file_question_with_cortex_analyst(session, prompt, active_file)
             return explanation, sql_query, None, None
 
-        # Non-tabular file (plain text, image, or a pdf/docx with no
-        # extractable table) — answered by local TF-IDF Smart Sentence Extractor.
-        explanation, sql_query, result_df = answer_from_file(
-            prompt, active_file
-        )
-
+        # Non-tabular file path: completely local, no Snowflake AI.
+        explanation, sql_query, result_df = answer_from_file(prompt, active_file)
         return explanation, sql_query, result_df, None
 
     if module == "None":
-
-        return (
-            "Please select a module (**Supply Chain** or "
-            "**Inventory**) from the **🧩 Module** menu in the "
-            "sidebar, or upload a file, before asking a data "
-            "question.",
-            None,
-            None,
-            None
-        )
+        return ("Please select a module (**Supply Chain** or **Inventory**) from the **🧩 Module** menu in the sidebar, or upload a file, before asking a data question.", None, None, None)
 
     explanation, sql_query = call_cortex_analyst(prompt, module)
-
     return explanation, sql_query, None, None
 
 
 # ============================================================
-# TOP NAVBAR + FLOATING SIDEBAR TOGGLE
+# TOP NAVBAR & UI RENDERING
 # ============================================================
 
-st.markdown(
-    """
-    <div class="dily-navbar"></div>
-    """,
-    unsafe_allow_html=True
-)
+st.markdown('<div class="dily-navbar"></div>', unsafe_allow_html=True)
 
 with st.container(key="floating_toggle"):
-
     _toggle_label = "«" if st.session_state.sidebar_open else "»"
-
     if st.button(_toggle_label, key="floating_toggle_btn"):
-
         st.session_state.sidebar_open = not st.session_state.sidebar_open
         st.rerun()
-
-
-# ============================================================
-# SIDEBAR
-# ============================================================
-# Order: New Chat, Module, Upload, Suggested Questions, History,
-# Clear Session. Every button below is styled the same way
-# (outlined, no fill — see CSS block above).
-# ============================================================
 
 pending_prompt_from_click = None
 
 if st.session_state.sidebar_open:
-
     with st.sidebar:
-
-        # ---------------- New Chat ----------------
-        if st.button(
-            "➕ New Chat",
-            use_container_width=True,
-            type="primary",
-            key="btn_new_chat"
-        ):
-
-            new_id = datetime.now().strftime(
-                "%Y%m%d_%H%M%S"
-            )
-
+        if st.button("➕ New Chat", use_container_width=True, type="primary", key="btn_new_chat"):
+            new_id = datetime.now().strftime("%Y%m%d_%H%M%S")
             st.session_state.current_session_id = new_id
-
-            st.session_state.chat_sessions[new_id] = {
-                "title": "New Conversation",
-                "messages": []
-            }
-
+            st.session_state.chat_sessions[new_id] = {"title": "New Conversation", "messages": []}
             st.rerun()
-
         st.write("")
 
-        # ---------------- Module ----------------
-        module_is_current_mode = (
-            not st.session_state.active_file
-            and st.session_state.selected_module != "None"
-        )
-
-        with st.container(
-            key=(
-                "module_btn_active"
-                if module_is_current_mode
-                else "module_btn_inactive"
-            )
-        ):
-
-            module_button_label = (
-                "🧩 Module ✅"
-                if module_is_current_mode
-                else "🧩 Module"
-            )
-
-            if st.button(
-                module_button_label,
-                use_container_width=True,
-                type="primary",
-                key="btn_module"
-            ):
-
-                st.session_state.show_module_selector = (
-                    not st.session_state.show_module_selector
-                )
-
+        module_is_current_mode = (not st.session_state.active_file and st.session_state.selected_module != "None")
+        with st.container(key=("module_btn_active" if module_is_current_mode else "module_btn_inactive")):
+            if st.button("🧩 Module ✅" if module_is_current_mode else "🧩 Module", use_container_width=True, type="primary", key="btn_module"):
+                st.session_state.show_module_selector = not st.session_state.show_module_selector
+        
         if st.session_state.show_module_selector:
-
-            module_options = [
-                "None",
-                "Supply Chain",
-                "Inventory"
-            ]
-
-            current_index = (
-                module_options.index(st.session_state.selected_module)
-                if st.session_state.selected_module in module_options
-                else 0
-            )
-
-            new_module = st.selectbox(
-                "Select module",
-                module_options,
-                index=current_index,
-                key="module_selectbox",
-                label_visibility="collapsed"
-            )
-
+            module_options = ["None", "Supply Chain", "Inventory"]
+            current_index = module_options.index(st.session_state.selected_module) if st.session_state.selected_module in module_options else 0
+            new_module = st.selectbox("Select module", module_options, index=current_index, key="module_selectbox", label_visibility="collapsed")
             if new_module != st.session_state.selected_module:
-
                 st.session_state.selected_module = new_module
-
                 if new_module != "None" and st.session_state.active_file:
-
                     st.session_state.active_file = None
                     st.rerun()
-
         st.write("")
 
-        # ---------------- Upload Files ----------------
         file_is_current_mode = bool(st.session_state.active_file)
-
-        with st.container(
-            key=(
-                "upload_btn_active"
-                if file_is_current_mode
-                else "upload_btn_inactive"
-            )
-        ):
-
-            upload_button_label = (
-                "📁 Upload Files ✅"
-                if file_is_current_mode
-                else "📁 Upload Files"
-            )
-
-            if st.button(
-                upload_button_label,
-                use_container_width=True,
-                type="primary",
-                key="btn_upload"
-            ):
-
-                st.session_state.show_files_panel = (
-                    not st.session_state.show_files_panel
-                )
-
+        with st.container(key=("upload_btn_active" if file_is_current_mode else "upload_btn_inactive")):
+            if st.button("📁 Upload Files ✅" if file_is_current_mode else "📁 Upload Files", use_container_width=True, type="primary", key="btn_upload"):
+                st.session_state.show_files_panel = not st.session_state.show_files_panel
+        
         if st.session_state.show_files_panel:
-
             if not st.session_state.stored_files:
-
-                st.caption(
-                    "No files uploaded yet. Use the attach icon "
-                    "inside the chat box below to add one."
-                )
-
+                st.caption("No files uploaded yet. Use the attach icon inside the chat box below to add one.")
             else:
-
                 for fname in list(st.session_state.stored_files.keys()):
-
                     is_active = (fname == st.session_state.active_file)
-                    row_label = f"{'✅ ' if is_active else '📄 '}{fname}"
-
-                    if st.button(
-                        row_label,
-                        key=f"file_row_{fname}",
-                        use_container_width=True
-                    ):
-
-                        st.session_state.selected_file = (
-                            None
-                            if st.session_state.selected_file == fname
-                            else fname
-                        )
-
+                    if st.button(f"{'✅ ' if is_active else '📄 '}{fname}", key=f"file_row_{fname}", use_container_width=True):
+                        st.session_state.selected_file = None if st.session_state.selected_file == fname else fname
                     if st.session_state.selected_file == fname:
-
                         fcol1, fcol2 = st.columns(2)
-
                         with fcol1:
-
-                            if st.button(
-                                "Use",
-                                key=f"use_{fname}",
-                                use_container_width=True
-                            ):
-
+                            if st.button("Use", key=f"use_{fname}", use_container_width=True):
                                 st.session_state.active_file = fname
                                 st.session_state.selected_file = None
-
                                 st.session_state.selected_module = "None"
-
                                 st.rerun()
-
                         with fcol2:
-
-                            if st.button(
-                                "Remove",
-                                key=f"remove_{fname}",
-                                use_container_width=True
-                            ):
-
+                            if st.button("Remove", key=f"remove_{fname}", use_container_width=True):
                                 cleanup_cortex_source_for_file(session, fname)
-
                                 del st.session_state.stored_files[fname]
-
-                                if st.session_state.active_file == fname:
-                                    st.session_state.active_file = None
-
+                                if st.session_state.active_file == fname: st.session_state.active_file = None
                                 st.session_state.selected_file = None
                                 st.rerun()
-
         st.write("")
 
-        # ---------------- Suggested Questions ----------------
-        if st.button(
-            "💡 Suggested Questions",
-            use_container_width=True,
-            type="primary",
-            key="btn_suggestions"
-        ):
-
-            st.session_state.show_suggestions_panel = (
-                not st.session_state.show_suggestions_panel
-            )
-
+        if st.button("💡 Suggested Questions", use_container_width=True, type="primary", key="btn_suggestions"):
+            st.session_state.show_suggestions_panel = not st.session_state.show_suggestions_panel
         if st.session_state.show_suggestions_panel:
-
             if st.session_state.active_file:
-
-                sidebar_suggestions = generate_file_question_suggestions(
-                    st.session_state.active_file
-                )
-
-                st.caption(
-                    f"Questions about **{st.session_state.active_file}**:"
-                )
-
+                sidebar_suggestions = generate_file_question_suggestions(st.session_state.active_file)
+                st.caption(f"Questions about **{st.session_state.active_file}**:")
             elif st.session_state.selected_module != "None":
-
-                sidebar_suggestions = MODULE_GREETING_SUGGESTIONS.get(
-                    st.session_state.selected_module,
-                    []
-                )
-
-                st.caption(
-                    f"Questions about **{st.session_state.selected_module}**:"
-                )
-
+                sidebar_suggestions = MODULE_GREETING_SUGGESTIONS.get(st.session_state.selected_module, [])
+                st.caption(f"Questions about **{st.session_state.selected_module}**:")
             else:
-
                 sidebar_suggestions = []
-
-                st.caption(
-                    "Select a module or upload a file first to see "
-                    "suggested questions here."
-                )
-
+                st.caption("Select a module or upload a file first to see suggested questions here.")
             for sq_i, sq in enumerate(sidebar_suggestions):
-
-                if st.button(
-                    sq,
-                    key=f"sidebar_sugg_{sq_i}",
-                    use_container_width=True
-                ):
-
+                if st.button(sq, key=f"sidebar_sugg_{sq_i}", use_container_width=True):
                     pending_prompt_from_click = sq
-
         st.write("")
 
-        # ---------------- History ----------------
-        if st.button(
-            "🕒 History",
-            use_container_width=True,
-            type="primary",
-            key="btn_history"
-        ):
-
-            st.session_state.show_history_panel = (
-                not st.session_state.show_history_panel
-            )
-
+        if st.button("🕒 History", use_container_width=True, type="primary", key="btn_history"):
+            st.session_state.show_history_panel = not st.session_state.show_history_panel
         if st.session_state.show_history_panel:
-
-            all_sessions = list(
-                reversed(list(st.session_state.chat_sessions.items()))
-            )
-
-            visible_sessions = [
-                (s_id, s_data)
-                for s_id, s_data in all_sessions
-                if s_data["messages"] or s_id == st.session_state.current_session_id
-            ]
-
-            if not visible_sessions:
-
-                st.caption("No conversations yet.")
-
+            all_sessions = list(reversed(list(st.session_state.chat_sessions.items())))
+            visible_sessions = [(s_id, s_data) for s_id, s_data in all_sessions if s_data["messages"] or s_id == st.session_state.current_session_id]
+            if not visible_sessions: st.caption("No conversations yet.")
             for s_id, s_data in visible_sessions:
-
-                label = s_data["title"]
-
-                if len(label) > 20:
-                    label = label[:18] + "..."
-
-                is_current = (s_id == st.session_state.current_session_id)
-                icon = "✅" if is_current else "🗨️"
-
-                if st.button(
-                    f"{icon} {label}",
-                    key=f"sess_{s_id}",
-                    use_container_width=True
-                ):
-
+                label = s_data["title"][:18] + "..." if len(s_data["title"]) > 20 else s_data["title"]
+                if st.button(f"{'✅' if s_id == st.session_state.current_session_id else '🗨️'} {label}", key=f"sess_{s_id}", use_container_width=True):
                     st.session_state.current_session_id = s_id
                     st.rerun()
-
         st.write("")
 
-        # ---------------- Clear All Sessions ----------------
-        if st.button(
-            "🗑️ Clear All Sessions",
-            use_container_width=True,
-            type="primary",
-            key="btn_clear_sessions"
-        ):
-
-            for _fname in list(st.session_state.stored_files.keys()):
-                cleanup_cortex_source_for_file(session, _fname)
-
+        if st.button("🗑️ Clear All Sessions", use_container_width=True, type="primary", key="btn_clear_sessions"):
+            for _fname in list(st.session_state.stored_files.keys()): cleanup_cortex_source_for_file(session, _fname)
             st.session_state.chat_sessions = {}
             st.session_state.stored_files = {}
             st.session_state.active_file = None
@@ -3212,237 +1763,86 @@ if st.session_state.sidebar_open:
             st.session_state.show_module_selector = False
             st.session_state.show_files_panel = False
             st.session_state.show_history_panel = False
-
-            new_id = datetime.now().strftime(
-                "%Y%m%d_%H%M%S"
-            )
-
+            new_id = datetime.now().strftime("%Y%m%d_%H%M%S")
             st.session_state.current_session_id = new_id
-
-            st.session_state.chat_sessions[new_id] = {
-                "title": "New Conversation",
-                "messages": []
-            }
-
+            st.session_state.chat_sessions[new_id] = {"title": "New Conversation", "messages": []}
             st.rerun()
 
 else:
-
-    st.markdown(
-        """
-        <style>
-        section[data-testid="stSidebar"] {
-            width: 64px !important;
-            min-width: 64px !important;
-        }
-        section[data-testid="stSidebar"] > div:first-child {
-            padding-top: 70px;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
+    st.markdown("""<style>section[data-testid="stSidebar"] {width: 64px !important; min-width: 64px !important;} section[data-testid="stSidebar"] > div:first-child {padding-top: 70px;}</style>""", unsafe_allow_html=True)
     with st.sidebar:
-
         st.markdown('<div class="dily-icon-rail">', unsafe_allow_html=True)
-
-        rail_icons = [
-            ("➕", "rail_new_chat"),
-            ("🧩", "rail_module"),
-            ("📁", "rail_upload"),
-            ("🕒", "rail_history"),
-            ("🗑️", "rail_clear_sessions"),
-        ]
-
-        for icon, rail_key in rail_icons:
-
+        for icon, rail_key in [("➕", "rail_new_chat"), ("🧩", "rail_module"), ("📁", "rail_upload"), ("🕒", "rail_history"), ("🗑️", "rail_clear_sessions")]:
             if st.button(icon, key=rail_key):
-
                 st.session_state.sidebar_open = True
                 st.rerun()
-
         st.markdown('</div>', unsafe_allow_html=True)
 
-
-# ============================================================
-# HERO SECTION  (only shown when the current chat is empty)
-# ============================================================
-
 if len(messages) == 0:
-
     _selected_module = st.session_state.get("selected_module", "None")
     _active_file = st.session_state.get("active_file")
-
-    if _active_file:
-        _hero_module = _active_file
-    elif _selected_module != "None":
-        _hero_module = _selected_module
-    else:
-        _hero_module = "Data"
-
-    st.markdown(
-        f"""
+    _hero_module = _active_file if _active_file else (_selected_module if _selected_module != "None" else "Data")
+    st.markdown(f"""
         <div class="dily-hero">
             <div class="dily-hero-copy">
                 <span class="dily-hero-badge">DILYTICS</span>
                 <h1>Chat with your {_hero_module}<br>data using <span>Cortex AI</span></h1>
-                <p class="sub">
-                    Ask questions and get instant
-                    insights across your {_hero_module.lower()} data.
-                </p>
+                <p class="sub">Ask questions and get instant insights across your {_hero_module.lower()} data.</p>
             </div>
-            <div class="dily-hero-graphic">
-                <div class="bubble">💬</div>
-                <div class="dot dot1">🔍</div>
-                <div class="dot dot2">📁</div>
-                <div class="dot dot3">📊</div>
-            </div>
+            <div class="dily-hero-graphic"><div class="bubble">💬</div><div class="dot dot1">🔍</div><div class="dot dot2">📁</div><div class="dot dot3">📊</div></div>
         </div>
-        """,
-        unsafe_allow_html=True
-    )
-
+        """, unsafe_allow_html=True)
     st.write("")
-
-
-# ============================================================
-# DISPLAY CHAT HISTORY
-# ============================================================
 
 suggestion_click_prompt = None
 
 for idx, msg in enumerate(messages):
-
     with st.chat_message(msg["role"]):
-
-        st.markdown(
-            msg["content"]
-        )
-
-        show_query_result(
-            msg.get("sql"),
-            msg.get("data"),
-            key_prefix=f"history_{current_id}_{idx}"
-        )
-
+        st.markdown(msg["content"])
+        show_query_result(msg.get("sql"), msg.get("data"), key_prefix=f"history_{current_id}_{idx}")
         if msg.get("suggestions"):
-
             st.write("")
-
-            sugg_cols = st.columns(
-                len(msg["suggestions"])
-            )
-
-            for s_i, (scol, sugg_q) in enumerate(
-                zip(sugg_cols, msg["suggestions"])
-            ):
-
+            sugg_cols = st.columns(len(msg["suggestions"]))
+            for s_i, (scol, sugg_q) in enumerate(zip(sugg_cols, msg["suggestions"])):
                 with scol:
-
-                    if st.button(
-                        sugg_q,
-                        key=f"sugg_{current_id}_{idx}_{s_i}",
-                        use_container_width=True
-                    ):
-
+                    if st.button(sugg_q, key=f"sugg_{current_id}_{idx}_{s_i}", use_container_width=True):
                         suggestion_click_prompt = sugg_q
 
-
-# ============================================================
-# ACTIVE FILE INDICATOR
-# ============================================================
-
 if st.session_state.active_file:
-
-    st.caption(
-        f"📄 Currently answering from file: "
-        f"**{st.session_state.active_file}**"
-    )
-
-    _active_file_data = st.session_state.stored_files.get(
-        st.session_state.active_file, {}
-    )
+    st.caption(f"📄 Currently answering from file: **{st.session_state.active_file}**")
+    _active_file_data = st.session_state.stored_files.get(st.session_state.active_file, {})
     _available_tables = _active_file_data.get("tables", {}) or {}
-
     if len(_available_tables) > 1:
-
         _table_labels = list(_available_tables.keys())
-        _current_label = _active_file_data.get(
-            "active_table", _table_labels[0]
-        )
-        _current_index = (
-            _table_labels.index(_current_label)
-            if _current_label in _table_labels
-            else 0
-        )
-
-        _picked_label = st.selectbox(
-            "Sheet / table to query",
-            _table_labels,
-            index=_current_index,
-            key=f"table_picker_{st.session_state.active_file}"
-        )
-
+        _current_label = _active_file_data.get("active_table", _table_labels[0])
+        _current_index = _table_labels.index(_current_label) if _current_label in _table_labels else 0
+        _picked_label = st.selectbox("Sheet / table to query", _table_labels, index=_current_index, key=f"table_picker_{st.session_state.active_file}")
         if _picked_label != _active_file_data.get("active_table"):
-
             _active_file_data["active_table"] = _picked_label
             _active_file_data["df"] = _available_tables[_picked_label]
-
-            # A sheet/table switch changes the active dataframe, so
-            # cached question suggestions (built from the old
-            # sheet's columns) need to be regenerated.
-            st.session_state.file_question_suggestions.pop(
-                st.session_state.active_file, None
-            )
-
+            st.session_state.file_question_suggestions.pop(st.session_state.active_file, None)
             st.rerun()
 
-
-# ============================================================
-# CHAT INPUT
-# ============================================================
-
 try:
-
-    chat_result = st.chat_input(
-        "Ask me anything about your data...",
-        accept_file="multiple",
-        file_type=["pdf", "docx", "xlsx", "csv", "txt", "png", "jpg", "jpeg"]
-    )
-
+    chat_result = st.chat_input("Ask me anything about your data...", accept_file="multiple", file_type=["pdf", "docx", "xlsx", "csv", "txt", "png", "jpg", "jpeg"])
     if chat_result:
         user_prompt = chat_result.text
         uploaded_chat_files = chat_result.files
     else:
         user_prompt = None
         uploaded_chat_files = []
-
 except TypeError:
-
-    user_prompt = st.chat_input(
-        "Ask me anything about your data..."
-    )
+    user_prompt = st.chat_input("Ask me anything about your data...")
     uploaded_chat_files = []
 
-user_prompt = (
-    user_prompt
-    or suggestion_click_prompt
-    or pending_prompt_from_click
-)
+user_prompt = (user_prompt or suggestion_click_prompt or pending_prompt_from_click)
 
 if uploaded_chat_files:
-
     typed_prompt = (user_prompt or "").strip()
-
     for f in uploaded_chat_files:
-
         if f.name not in st.session_state.stored_files:
-
             text_content, parsed_tables = extract_data_from_upload(f)
-
             first_label = next(iter(parsed_tables), None)
-
             st.session_state.stored_files[f.name] = {
                 "text": text_content,
                 "type": f.type,
@@ -3450,185 +1850,53 @@ if uploaded_chat_files:
                 "active_table": first_label,
                 "df": parsed_tables.get(first_label) if first_label else None
             }
-
         st.session_state.active_file = f.name
-
+    
     file_names = ", ".join(f.name for f in uploaded_chat_files)
     attach_note = f"(Attached: {file_names})"
-
+    
     if typed_prompt:
-
         user_prompt = f"{typed_prompt}\n\n{attach_note}"
-
     else:
-
         if len(messages) == 0:
-
-            st.session_state.chat_sessions[
-                current_id
-            ]["title"] = file_names[:25] + (
-                "..." if len(file_names) > 25 else ""
-            )
-
-        messages.append(
-            {
-                "role": "user",
-                "content": attach_note
-            }
-        )
-
-        with st.chat_message("user"):
-            st.markdown(attach_note)
-
+            st.session_state.chat_sessions[current_id]["title"] = file_names[:25] + ("..." if len(file_names) > 25 else "")
+        messages.append({"role": "user", "content": attach_note})
+        with st.chat_message("user"): st.markdown(attach_note)
+        
         last_uploaded = uploaded_chat_files[-1].name
-
         with st.chat_message("assistant"):
-
-            explanation, sql_query, preview_df = generate_file_overview(
-                last_uploaded
-            )
-
+            explanation, sql_query, preview_df = generate_file_overview(last_uploaded)
             st.markdown(explanation)
-
-            show_query_result(
-                sql_query,
-                preview_df,
-                key_prefix=f"overview_{current_id}"
-            )
-
-        messages.append(
-            {
-                "role": "assistant",
-                "content": explanation,
-                "sql": sql_query,
-                "data": preview_df,
-                "suggestions": None
-            }
-        )
-
+            show_query_result(sql_query, preview_df, key_prefix=f"overview_{current_id}")
+        messages.append({"role": "assistant", "content": explanation, "sql": sql_query, "data": preview_df, "suggestions": None})
         user_prompt = None
 
-
-# ============================================================
-# PROCESS QUESTION
-# ============================================================
-
 if user_prompt:
-
     if len(messages) == 0:
-
-        st.session_state.chat_sessions[
-            current_id
-        ]["title"] = (
-            user_prompt[:25]
-            + (
-                "..."
-                if len(user_prompt) > 25
-                else ""
-            )
-        )
-
-    messages.append(
-        {
-            "role": "user",
-            "content": user_prompt
-        }
-    )
-
-    with st.chat_message("user"):
-
-        st.markdown(
-            user_prompt
-        )
-
+        st.session_state.chat_sessions[current_id]["title"] = (user_prompt[:25] + ("..." if len(user_prompt) > 25 else ""))
+    messages.append({"role": "user", "content": user_prompt})
+    
+    with st.chat_message("user"): st.markdown(user_prompt)
+    
     with st.chat_message("assistant"):
-
-        explanation, sql_query, file_df, suggestions = (
-            generate_sql_from_prompt(
-                user_prompt
-            )
-        )
-
-        st.markdown(
-            explanation
-        )
-
+        explanation, sql_query, file_df, suggestions = generate_sql_from_prompt(user_prompt)
+        st.markdown(explanation)
         df = None
-
         if file_df is not None:
-
             df = file_df
-
-            show_query_result(
-                sql_query,
-                df,
-                key_prefix=f"live_{current_id}"
-            )
-
+            show_query_result(sql_query, df, key_prefix=f"live_{current_id}")
         elif sql_query:
-
-            with st.expander(
-                "Generated SQL",
-                expanded=False
-            ):
-
-                st.code(
-                    sql_query,
-                    language="sql"
-                )
-
+            with st.expander("Generated SQL", expanded=False): st.code(sql_query, language="sql")
             try:
-
-                df = (
-                    session
-                    .sql(sql_query)
-                    .to_pandas()
-                )
-
+                df = session.sql(sql_query).to_pandas()
                 if df.empty:
-
-                    st.info(
-                        "The query executed successfully, "
-                        "but no records were returned."
-                    )
-
+                    st.info("The query executed successfully, but no records were returned.")
                 else:
-
-                    tab1, tab2 = st.tabs(
-                        [
-                            "Data 📄",
-                            "Chart 📈"
-                        ]
-                    )
-
-                    with tab1:
-
-                        st.dataframe(
-                            df,
-                            use_container_width=True
-                        )
-
-                    with tab2:
-
-                        display_chart_tab(
-                            df,
-                            key_prefix=f"live_{current_id}"
-                        )
-
+                    tab1, tab2 = st.tabs(["Data 📄", "Chart 📈"])
+                    with tab1: st.dataframe(df, use_container_width=True)
+                    with tab2: display_chart_tab(df, key_prefix=f"live_{current_id}")
             except Exception as e:
-
-                st.error(
-                    f"SQL Execution Error: {str(e)}"
-                )
-
-    messages.append(
-        {
-            "role": "assistant",
-            "content": explanation,
-            "sql": sql_query,
-            "data": df,
-            "suggestions": suggestions
-        }
-    )
-
+                st.error(f"SQL Execution Error: {str(e)}")
+                
+    messages.append({"role": "assistant", "content": explanation, "sql": sql_query, "data": df, "suggestions": suggestions})
     st.rerun()
