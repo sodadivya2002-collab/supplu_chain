@@ -1883,8 +1883,7 @@ except ImportError:
 def _keyword_search_text(prompt, text, top_n=3):
     """Extractive, deterministic search over plain text: splits the
     document into paragraphs and ranks them by relevance to the
-    question, then returns the best-matching passages verbatim — no
-    rewriting, no LLM, so nothing can be fabricated."""
+    question, then returns the best-matching passages verbatim."""
 
     paragraphs = [
         para.strip() for para in re.split(r"\n\s*\n|\n", text)
@@ -1943,12 +1942,11 @@ def _keyword_search_text(prompt, text, top_n=3):
     return [para for _, para in scored[:top_n]]
 
 
-def answer_from_file(prompt, fname):
-    """Local, deterministic fallback answer path for uploaded files
-    — used for tabular files via the pandas engine, and as the
-    non-tabular fallback via TF-IDF/keyword search over the
-    extracted text (including OCR'd image text) to return the
-    best-matching passages verbatim."""
+def answer_from_file(session, prompt, fname):
+    """Hybrid approach: Local TF-IDF search combined with Cortex Complete (LLM).
+    This bypasses the Cortex Search limitation on trial accounts
+    by using local Python to find the relevant paragraphs, and then
+    asks the Snowflake LLM to summarize those paragraphs beautifully."""
 
     file_data = st.session_state.stored_files.get(fname, {})
     df = file_data.get("df")
@@ -1957,21 +1955,54 @@ def answer_from_file(prompt, fname):
         return answer_question_from_dataframe(prompt, df)
 
     file_text = file_data.get("text", "")
-    matches = _keyword_search_text(prompt, file_text)
+    
+    # 1. Local Python Keyword Search (Finds the raw text)
+    matches = _keyword_search_text(prompt, file_text, top_n=4)
 
     if not matches:
         return (
-            "I couldn't find any passages in this document matching "
-            "your question's key words. Try rephrasing with more of "
-            "the specific terms you're looking for.",
+            "I couldn't find any information in this document relevant to "
+            "that question. Try rephrasing with more specific terms.",
             None,
             None
         )
 
+    context = "\n\n---\n\n".join(matches)
+
+    # 2. Feed the raw text to Cortex Complete to summarize it
+    try:
+        # We use llama3.1-8b because smaller models are typically allowed on trial accounts
+        model = st.secrets["snowflake"].get("cortex_complete_model", "llama3.1-8b")
+        
+        llm_prompt = (
+            "You are a helpful data assistant. Answer the user's question using ONLY "
+            "the provided context from a document. Summarize the answer beautifully "
+            "and accurately. If the answer isn't in the context, say so.\n\n"
+            f"Context:\n{context}\n\nQuestion: {prompt}\n\nAnswer:"
+        )
+        
+        result = session.sql(
+            "SELECT SNOWFLAKE.CORTEX.COMPLETE(?, ?) AS ANSWER",
+            params=[model, llm_prompt]
+        ).collect()
+        
+        answer = result[0]["ANSWER"] if result else None
+        
+        if answer:
+            explanation = (
+                "This is our interpretation of your question:\n\n"
+                "**Summarized Answer:**\n\n" + answer.strip()
+            )
+            return explanation, None, None
+            
+    except Exception:
+        # If Cortex Complete is ALSO completely blocked on the trial, fall back cleanly
+        pass
+
+    # 3. Absolute Fallback if the LLM fails
     explanation = _with_interpretation(
-        "Passages from the document that best match your question, "
-        "shown exactly as written (nothing here is paraphrased, "
-        "summarized, or inferred):"
+        "*(Note: AI Summarization is currently restricted on this account. Showing exact extracted text below)*\n\n"
+        "Passages from the document that best match your question:"
     ) + "\n\n" + "\n\n---\n\n".join(f"> {m}" for m in matches)
 
     return explanation, None, None
@@ -2840,9 +2871,9 @@ def generate_sql_from_prompt(prompt):
             return explanation, sql_query, None, None
 
         # Non-tabular file (plain text, image, or a pdf/docx with no
-        # extractable table) — answered by local TF-IDF/keyword extractive search.
+        # extractable table) — answered by local TF-IDF search + LLM summarization.
         explanation, sql_query, result_df = answer_from_file(
-            prompt, active_file
+            session, prompt, active_file
         )
 
         return explanation, sql_query, result_df, None
