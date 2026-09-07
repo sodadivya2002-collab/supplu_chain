@@ -929,7 +929,6 @@ def extract_data_from_upload(uploaded_file):
                         table_parts.append(" | ".join(cells))
 
             full_text = "\n".join(paragraphs + table_parts).strip()
-            # For pure document text handling without tables fallback
             return full_text, {}
 
         elif ext in ("png", "jpg", "jpeg"):
@@ -1281,7 +1280,6 @@ def answer_document_locally(question: str, document_text: str):
     query_lower = question.lower()
     phrase_terms = []
     
-    # Common mappings
     if "purpose" in query_lower:
         phrase_terms.extend(["purpose", "objective", "goal", "intended"])
     if "pii" in query_lower:
@@ -1431,7 +1429,6 @@ def generate_file_question_suggestions(fname):
     df = file_data.get("df")
 
     if df is None:
-        # Non-tabular file (pdf/docx/txt/image) — generic fallback.
         fallback = [
             "What was Aranya Retail's revenue?",
             "What is the purpose of the document?",
@@ -1659,72 +1656,6 @@ def show_query_result(sql_query, df, key_prefix):
         with tab1: st.dataframe(df, use_container_width=True)
         with tab2: display_chart_tab(df, key_prefix=key_prefix)
 
-GREETING_PHRASES = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"]
-
-MODULE_GREETING_SUGGESTIONS = {
-    "Supply Chain": ["What is the total purchase order count?", "How many shipments are currently in transit?", "Which suppliers are high risk?", "What are the top products by ordered value?", "What is the supplier on-time delivery percentage?"],
-    "Inventory": ["What is the total available inventory as of the latest snapshot?", "What is the total quantity of inventory currently on hand?", "How many products and warehouses are out of stock?", "What is the total inventory value by product category?", "How many products need to be reordered?"],
-    "None": [],
-}
-
-MODULE_HELP_TEXT = {
-    "Supply Chain": "You can ask me questions about **Supply Chain data**.\nAsk a question in your own words — Cortex Analyst will turn it into a query against the supply chain semantic view.",
-    "Inventory": "You can ask me questions about **Inventory data**.\nAsk a question in your own words — Cortex Analyst will turn it into a query against the inventory semantic view.",
-    "None": "No module is selected yet, and no file is active.\nTo ask about **Supply Chain** or **Inventory** data, click **🧩 Module** in the sidebar and pick one.\nTo ask about your own data, click **📁 Upload Files** and attach a file.",
-}
-
-def _is_question_suggestion_request(p):
-    suggestion_triggers = ["suggest", "give me some question", "give me question", "sample questions", "example questions"]
-    return "question" in p and any(trigger in p for trigger in suggestion_triggers)
-
-def generate_sql_from_prompt(prompt):
-    p = prompt.lower().strip()
-    module = st.session_state.get("selected_module", "None")
-    active_file = st.session_state.get("active_file")
-
-    if p in GREETING_PHRASES:
-        if active_file:
-            greeting_subject = f"your uploaded file **{active_file}**"
-            greeting_suggestions = generate_file_question_suggestions(active_file)
-        elif module != "None":
-            greeting_subject = f"your **{module}** data"
-            greeting_suggestions = MODULE_GREETING_SUGGESTIONS.get(module, [])
-        else:
-            greeting_subject = "your data"
-            greeting_suggestions = None
-        return (f"Hi there! 👋 Ask me anything about {greeting_subject}.\n\nHere are a few things you can try:", None, None, greeting_suggestions)
-
-    if _is_question_suggestion_request(p):
-        if active_file: return (f"Here are some questions you could ask about **{active_file}**:", None, None, generate_file_question_suggestions(active_file))
-        if module != "None": return (f"Here are some questions you could ask about your **{module}** data:", None, None, MODULE_GREETING_SUGGESTIONS.get(module, []))
-        return ("Select a module (**Supply Chain** or **Inventory**) from the **🧩 Module** menu, or upload a file first — then I can suggest specific questions for that data.", None, None, None)
-
-    if any(k in p for k in ["what can i ask", "what questions", "what can you do", "examples", "help"]):
-        if active_file: return (f"You can ask me questions about your uploaded file **{active_file}** — here are a few to try:", None, None, generate_file_question_suggestions(active_file))
-        return (MODULE_HELP_TEXT.get(module, MODULE_HELP_TEXT["None"]), None, None, MODULE_GREETING_SUGGESTIONS.get(module, None) if module != "None" else None)
-
-    if active_file and re.search(r"\b(what|list|show)\b.*\bcolumns?\b", p):
-        active_df = st.session_state.stored_files.get(active_file, {}).get("df")
-        if active_df is not None:
-            col_lines = "\n".join(f"- `{c}` ({active_df[c].dtype})" for c in active_df.columns)
-            return (f"**Columns in `{active_file}`:**\n\n{col_lines}", None, None, None)
-
-    if active_file and active_file in st.session_state.stored_files:
-        active_df = st.session_state.stored_files.get(active_file, {}).get("df")
-        if active_df is not None and not active_df.empty:
-            explanation, sql_query = answer_file_question_with_cortex_analyst(session, prompt, active_file)
-            return explanation, sql_query, None, None
-
-        # Non-tabular file path: completely local, no Snowflake AI.
-        explanation, sql_query, result_df = answer_from_file(prompt, active_file)
-        return explanation, sql_query, result_df, None
-
-    if module == "None":
-        return ("Please select a module (**Supply Chain** or **Inventory**) from the **🧩 Module** menu in the sidebar, or upload a file, before asking a data question.", None, None, None)
-
-    explanation, sql_query = call_cortex_analyst(prompt, module)
-    return explanation, sql_query, None, None
-
 
 # ============================================================
 # TOP NAVBAR & UI RENDERING
@@ -1747,7 +1678,6 @@ if st.session_state.sidebar_open:
             st.session_state.current_session_id = new_id
             st.session_state.chat_sessions[new_id] = {"title": "New Conversation", "messages": []}
             
-            # KEEP ONLY THE 10 MOST RECENT SESSIONS IN MEMORY
             while len(st.session_state.chat_sessions) > 10:
                 oldest_key = list(st.session_state.chat_sessions.keys())[0]
                 del st.session_state.chat_sessions[oldest_key]
@@ -1821,19 +1751,21 @@ if st.session_state.sidebar_open:
         if st.button("🕒 History", use_container_width=True, type="primary", key="btn_history"):
             st.session_state.show_history_panel = not st.session_state.show_history_panel
         if st.session_state.show_history_panel:
-            all_sessions = list(reversed(list(st.session_state.chat_sessions.items())))
-            visible_sessions = [(s_id, s_data) for s_id, s_data in all_sessions if s_data["messages"] or s_id == st.session_state.current_session_id]
-            
-            # LIMIT THE DISPLAY TO THE 10 MOST RECENT
-            visible_sessions = visible_sessions[:10]
+            # Extract recent user prompts from all active chat sessions, keeping up to 10
+            all_recent_questions = []
+            for s_id, s_data in st.session_state.chat_sessions.items():
+                for msg in s_data.get("messages", []):
+                    if msg.get("role") == "user":
+                        all_recent_questions.append(msg["content"])
 
-            if not visible_sessions:
-                st.caption("No conversations yet.")
-            for s_id, s_data in visible_sessions:
-                label = s_data["title"][:18] + "..." if len(s_data["title"]) > 20 else s_data["title"]
-                if st.button(f"{'✅' if s_id == st.session_state.current_session_id else '🗨️'} {label}", key=f"sess_{s_id}", use_container_width=True):
-                    st.session_state.current_session_id = s_id
-                    st.rerun()
+            visible_questions = list(reversed(all_recent_questions))[:10]
+
+            if not visible_questions:
+                st.caption("No questions asked yet.")
+            for q_idx, q_text in enumerate(visible_questions):
+                label = q_text[:18] + "..." if len(q_text) > 20 else q_text
+                if st.button(f"💬 {label}", key=f"recent_q_{q_idx}", use_container_width=True):
+                    pass
         st.write("")
 
         if st.button("🗑️ Clear All Sessions", use_container_width=True, type="primary", key="btn_clear_sessions"):
