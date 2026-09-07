@@ -1001,8 +1001,9 @@ def ensure_cortex_source_for_file(session, fname):
     once, no matter how many questions get asked about it.
 
     Returns the semantic model YAML string, or None if the file
-    has no tabular data to push (non-tabular files fall back to
-    the local text search in `answer_from_file`)."""
+    has no tabular data to push (non-tabular files are answered via
+    Cortex Search + Cortex Complete instead — see
+    `answer_document_question_with_rag` below)."""
 
     file_data = st.session_state.stored_files.get(fname, {})
     df = file_data.get("df")
@@ -1107,6 +1108,267 @@ def answer_file_question_with_cortex_analyst(session, prompt, fname):
 
 
 # ============================================================
+# CORTEX SEARCH FOR DOCUMENT Q&A (RAG)
+# ============================================================
+# Non-tabular uploaded files (plain text, OCR'd images, or a
+# pdf/docx with no extractable table) are answered with a proper
+# retrieval-augmented-generation pipeline instead of local TF-IDF
+# passage matching:
+#
+#   1. The extracted text is split into overlapping chunks and
+#      loaded into ONE shared Snowflake table (DOC_CHUNKS), tagged
+#      with FILE_NAME so each file's chunks can be filtered for.
+#   2. A single shared Cortex Search Service indexes that table.
+#   3. A question is answered by querying the search service
+#      (filtered to the active file) for the most relevant chunks,
+#      then asking SNOWFLAKE.CORTEX.COMPLETE to answer the
+#      question using ONLY those chunks as context.
+#
+# Everything here runs against Snowflake — Streamlit only chunks
+# the text locally before upload and renders the final answer.
+# Requires the logged-in role to have CREATE CORTEX SEARCH SERVICE
+# on the configured schema and the SNOWFLAKE.CORTEX_USER database
+# role (for the REST call + SNOWFLAKE.CORTEX.COMPLETE). If either
+# privilege is missing (common on some trial accounts), callers
+# fall back to the local keyword search in `answer_from_file`.
+# ============================================================
+
+DOC_SEARCH_SERVICE_NAME = "DOC_SEARCH_SVC"
+DOC_CHUNKS_TABLE_NAME = "DOC_CHUNKS"
+
+
+def _chunk_text(text, chunk_size=1200, overlap=150):
+    """Splits `text` into overlapping character-window chunks so
+    each chunk is small enough for the search service to embed and
+    specific enough to ground a single answer, while the overlap
+    keeps a sentence spanning a chunk boundary from being lost."""
+
+    chunks = []
+    start = 0
+    text = text or ""
+
+    while start < len(text):
+        end = start + chunk_size
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+        start += max(chunk_size - overlap, 1)
+
+    return chunks
+
+
+def ensure_cortex_search_service(session):
+    """Idempotently creates the shared DOC_CHUNKS table and the
+    Cortex Search Service over it. Cached in session_state so this
+    only runs once per browser session, not on every question."""
+
+    if st.session_state.get("cortex_search_service_ready"):
+        return True
+
+    config = get_snowflake_config()
+    db = config["database"]
+    schema = config["schema"]
+    warehouse = config["warehouse"]
+
+    session.sql(f"""
+        CREATE TABLE IF NOT EXISTS {db}.{schema}.{DOC_CHUNKS_TABLE_NAME} (
+            FILE_NAME VARCHAR,
+            CHUNK_ID NUMBER,
+            CHUNK_TEXT VARCHAR
+        )
+    """).collect()
+
+    session.sql(f"""
+        CREATE CORTEX SEARCH SERVICE IF NOT EXISTS
+            {db}.{schema}.{DOC_SEARCH_SERVICE_NAME}
+        ON CHUNK_TEXT
+        ATTRIBUTES FILE_NAME
+        WAREHOUSE = {warehouse}
+        TARGET_LAG = '1 minute'
+        AS SELECT FILE_NAME, CHUNK_ID, CHUNK_TEXT
+           FROM {db}.{schema}.{DOC_CHUNKS_TABLE_NAME}
+    """).collect()
+
+    st.session_state.cortex_search_service_ready = True
+
+    return True
+
+
+def index_document_for_search(session, fname, text):
+    """Chunks `text` and (re)loads it into DOC_CHUNKS for `fname`,
+    replacing any chunks already indexed for that file, then forces
+    an immediate refresh of the search index so a question asked
+    right after upload can already retrieve from it (rather than
+    waiting for TARGET_LAG). Called once, right after a non-tabular
+    file is uploaded."""
+
+    config = get_snowflake_config()
+    db = config["database"]
+    schema = config["schema"]
+
+    ensure_cortex_search_service(session)
+
+    session.sql(
+        f"DELETE FROM {db}.{schema}.{DOC_CHUNKS_TABLE_NAME} "
+        f"WHERE FILE_NAME = ?",
+        params=[fname]
+    ).collect()
+
+    chunks = _chunk_text(text)
+
+    if not chunks:
+        return
+
+    chunk_df = pd.DataFrame({
+        "FILE_NAME": [fname] * len(chunks),
+        "CHUNK_ID": list(range(len(chunks))),
+        "CHUNK_TEXT": chunks,
+    })
+
+    session.create_dataframe(chunk_df).write.mode("append").save_as_table(
+        f"{db}.{schema}.{DOC_CHUNKS_TABLE_NAME}"
+    )
+
+    try:
+        session.sql(
+            f"ALTER CORTEX SEARCH SERVICE {db}.{schema}."
+            f"{DOC_SEARCH_SERVICE_NAME} REFRESH"
+        ).collect()
+    except Exception:
+        # Not fatal — the service will still pick the new chunks up
+        # on its own within TARGET_LAG.
+        pass
+
+
+def cleanup_document_search_index(session, fname):
+    """Removes `fname`'s chunks from DOC_CHUNKS. Called when the
+    file is removed from the sidebar or sessions are cleared, so
+    stale document chunks don't linger in Snowflake or get matched
+    against a different, newer file that happens to share a name."""
+
+    config = get_snowflake_config()
+    db = config["database"]
+    schema = config["schema"]
+
+    try:
+        session.sql(
+            f"DELETE FROM {db}.{schema}.{DOC_CHUNKS_TABLE_NAME} "
+            f"WHERE FILE_NAME = ?",
+            params=[fname]
+        ).collect()
+    except Exception:
+        pass
+
+
+def search_document_chunks(fname, question, top_n=5):
+    """Queries the Cortex Search Service REST endpoint, filtered to
+    `fname`, and returns the top matching chunk texts. Raises on
+    any HTTP/auth failure so the caller can fall back cleanly."""
+
+    config = get_snowflake_config()
+    account = str(config["account"]).strip()
+
+    if account.startswith("https://"):
+        host = account.rstrip("/")
+    elif account.startswith("http://"):
+        host = "https://" + account[7:].rstrip("/")
+    elif account.endswith(".snowflakecomputing.com"):
+        host = "https://" + account
+    else:
+        host = "https://" + account + ".snowflakecomputing.com"
+
+    url = (
+        f"{host}/api/v2/databases/{config['database']}/schemas/"
+        f"{config['schema']}/cortex-search-services/"
+        f"{DOC_SEARCH_SERVICE_NAME}:query"
+    )
+
+    token = st.secrets["snowflake"].get("cortex_analyst_token", "")
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-Snowflake-Authorization-Token-Type": "PROGRAMMATIC_ACCESS_TOKEN",
+    }
+
+    body = {
+        "query": question,
+        "columns": ["CHUNK_TEXT"],
+        "filter": {"@eq": {"FILE_NAME": fname}},
+        "limit": top_n,
+    }
+
+    response = requests.post(url, headers=headers, json=body, timeout=60)
+    response.raise_for_status()
+
+    results = response.json().get("results", []) or []
+
+    return [r["CHUNK_TEXT"] for r in results if r.get("CHUNK_TEXT")]
+
+
+def answer_document_question_with_rag(session, fname, question):
+    """Answers a question about non-tabular file `fname` using
+    Cortex Search for retrieval and Cortex Complete for generation.
+    Returns (explanation, sql_query, result_df) matching the shape
+    every other answer path returns, so the caller doesn't need to
+    special-case it (sql_query/result_df are always None here — the
+    answer is prose, not a table).
+
+    Raises on any failure (missing privilege, network error, etc.)
+    so the caller can fall back to the local keyword search in
+    `answer_from_file` instead of silently returning a bad answer."""
+
+    ensure_cortex_search_service(session)
+
+    chunks = search_document_chunks(fname, question)
+
+    if not chunks:
+        return (
+            "I couldn't find anything in this document relevant to "
+            "that question. Try rephrasing with more specific terms.",
+            None,
+            None
+        )
+
+    context = "\n\n---\n\n".join(chunks)
+
+    model = st.secrets["snowflake"].get(
+        "cortex_complete_model", "llama3.1-70b"
+    )
+
+    prompt = (
+        "Answer the question using ONLY the context below, taken "
+        "from the uploaded document. If the answer isn't contained "
+        "in the context, say so plainly rather than guessing.\n\n"
+        f"Context:\n{context}\n\nQuestion: {question}\n\nAnswer:"
+    )
+
+    result = session.sql(
+        "SELECT SNOWFLAKE.CORTEX.COMPLETE(?, ?) AS ANSWER",
+        params=[model, prompt]
+    ).collect()
+
+    answer = result[0]["ANSWER"] if result else None
+
+    if not answer:
+        return (
+            "Cortex Complete did not return an answer for that "
+            "question. Please try rephrasing.",
+            None,
+            None
+        )
+
+    explanation = (
+        "This is our interpretation of your question:\n\n"
+        "Answer generated from the relevant passages of this "
+        "document via Cortex Search + Cortex Complete:"
+    ) + "\n\n" + answer.strip()
+
+    return explanation, None, None
+
+
+# ============================================================
 # FILE UPLOAD HELPERS
 # ============================================================
 # Extracts data from an uploaded file. Tabular files (csv/xlsx/xls)
@@ -1118,20 +1380,18 @@ def answer_file_question_with_cortex_analyst(session, prompt, fname):
 # pdfplumber / python-docx) whenever the document contains one, so
 # numeric questions ("what's the total amount?", "average unit
 # price?") work on those file types too — not just CSV/XLSX. Plain
-# extracted text is always kept alongside as a fallback / for
-# non-tabular passages.
+# extracted text is always kept alongside — used to feed Cortex
+# Search indexing for non-tabular files, and as the extractive
+# fallback if that isn't available.
 #
 # Images are OCR'd with pytesseract (fully local, free) so a
 # photographed invoice or scanned page becomes searchable text.
 #
-# Everything below uses only local, free, open-source Python
-# libraries — no paid API and no LLM call, so results stay
-# 100% deterministic and reproducible from what's actually in the
-# file. Required packages: pandas, pypdf (or PyPDF2), pdfplumber,
-# python-docx, pytesseract, Pillow, and (optional, improves text
-# search quality) scikit-learn. On Streamlit Community Cloud, also
-# add a `packages.txt` file containing the line `tesseract-ocr` so
-# OCR has the system binary it needs.
+# Required packages: pandas, pypdf (or PyPDF2), pdfplumber,
+# python-docx, pytesseract, Pillow, and (optional, improves the
+# local fallback search quality) scikit-learn. On Streamlit
+# Community Cloud, also add a `packages.txt` file containing the
+# line `tesseract-ocr` so OCR has the system binary it needs.
 # ============================================================
 
 def _coerce_numeric_columns(df):
@@ -1373,9 +1633,8 @@ def extract_data_from_upload(uploaded_file):
 #      typing a question.
 #   2. As the answer path in `answer_from_file` for NON-tabular
 #      files (plain text, images, or a pdf/docx with no
-#      extractable table) — Cortex Analyst needs a real table to
-#      query, so those fall back to the extractive text search
-#      further below instead of this aggregation parser.
+#      extractable table) whenever Cortex Search/Complete (RAG) is
+#      unavailable — see `generate_sql_from_prompt`.
 # ------------------------------------------------------------
 
 _AGG_KEYWORDS = [
@@ -1893,7 +2152,9 @@ def _keyword_search_text(prompt, text, top_n=3):
     """Extractive, deterministic search over plain text: splits the
     document into paragraphs and ranks them by relevance to the
     question, then returns the best-matching passages verbatim — no
-    rewriting, no LLM, so nothing can be fabricated.
+    rewriting, no LLM, so nothing can be fabricated. Used only as a
+    fallback when Cortex Search + Cortex Complete (RAG) is not
+    available (e.g. missing privilege on a trial account).
 
     Ranking uses TF-IDF + cosine similarity (via scikit-learn, a
     free local statistics library — not an LLM) when available,
@@ -1960,19 +2221,17 @@ def _keyword_search_text(prompt, text, top_n=3):
 
 
 def answer_from_file(prompt, fname):
-    """Fallback answer path for uploaded files that Cortex Analyst
-    can't be used for — i.e. files with no tabular data (plain
-    text, images, or a pdf/docx with no extractable table). Uses
-    TF-IDF/keyword search over the extracted text (including OCR'd
-    image text) to return the best-matching passages verbatim.
+    """Local, deterministic fallback answer path for uploaded files
+    — used for tabular files via the pandas engine, and as the
+    non-tabular fallback whenever Cortex Search + Cortex Complete
+    (RAG) is unavailable. Uses TF-IDF/keyword search over the
+    extracted text (including OCR'd image text) to return the
+    best-matching passages verbatim.
 
-    Tabular files (csv/xlsx/xls, or a pdf/docx table) are instead
-    routed to `answer_file_question_with_cortex_analyst` before
-    this function is ever called — see `generate_sql_from_prompt`.
-    This function still supports a tabular `df` via the local
-    pandas engine as a defensive fallback (e.g. if a caller invokes
-    it directly, such as `generate_file_overview`'s non-tabular
-    branch never reaching here with a df)."""
+    Non-tabular files are normally answered by
+    `answer_document_question_with_rag` instead — see
+    `generate_sql_from_prompt`, which only calls this function if
+    that raises an exception."""
 
     file_data = st.session_state.stored_files.get(fname, {})
     df = file_data.get("df")
@@ -2433,6 +2692,13 @@ if "cortex_file_tables" not in st.session_state:
     # drop the underlying Snowflake table when a file is removed.
     st.session_state.cortex_file_tables = {}
 
+if "cortex_search_service_ready" not in st.session_state:
+    # Set True once the shared DOC_CHUNKS table + Cortex Search
+    # Service have been created for this browser session, so
+    # `ensure_cortex_search_service` doesn't re-run the CREATE
+    # statements on every question.
+    st.session_state.cortex_search_service_ready = False
+
 
 # ============================================================
 # CHAT SESSIONS
@@ -2861,11 +3127,35 @@ def generate_sql_from_prompt(prompt):
             return explanation, sql_query, None, None
 
         # Non-tabular file (plain text, image, or a pdf/docx with no
-        # extractable table) — Cortex Analyst needs a table to query,
-        # so this falls back to local extractive text search.
-        explanation, sql_query, result_df = answer_from_file(prompt, active_file)
+        # extractable table) — answered by Cortex Search + Cortex
+        # Complete (RAG). If that fails for any reason (missing
+        # privilege on a trial account, network error, the search
+        # service not finished indexing yet, etc.), fall back to the
+        # local TF-IDF/keyword extractive search instead of showing
+        # an error.
+        try:
 
-        return explanation, sql_query, result_df, None
+            explanation, sql_query, result_df = (
+                answer_document_question_with_rag(
+                    session, active_file, prompt
+                )
+            )
+
+            return explanation, sql_query, result_df, None
+
+        except Exception as e:
+
+            explanation, sql_query, result_df = answer_from_file(
+                prompt, active_file
+            )
+
+            explanation = (
+                f"_(Cortex Search is unavailable right now — showing "
+                f"matching passages instead. Error: {str(e)})_\n\n"
+                + explanation
+            )
+
+            return explanation, sql_query, result_df, None
 
     if module == "None":
 
@@ -3090,6 +3380,7 @@ if st.session_state.sidebar_open:
                             ):
 
                                 cleanup_cortex_source_for_file(session, fname)
+                                cleanup_document_search_index(session, fname)
 
                                 del st.session_state.stored_files[fname]
 
@@ -3216,6 +3507,7 @@ if st.session_state.sidebar_open:
 
             for _fname in list(st.session_state.stored_files.keys()):
                 cleanup_cortex_source_for_file(session, _fname)
+                cleanup_document_search_index(session, _fname)
 
             st.session_state.chat_sessions = {}
             st.session_state.stored_files = {}
@@ -3463,6 +3755,21 @@ if uploaded_chat_files:
                 "active_table": first_label,
                 "df": parsed_tables.get(first_label) if first_label else None
             }
+
+            # Non-tabular file (no sheet/table was extracted) —
+            # index its text into Cortex Search right away so it's
+            # ready to answer questions from as soon as the person
+            # asks one. Failures here (e.g. missing CREATE CORTEX
+            # SEARCH SERVICE privilege) are swallowed silently —
+            # the question router falls back to local keyword
+            # search automatically if this wasn't indexed.
+            if not parsed_tables:
+                try:
+                    index_document_for_search(
+                        session, f.name, text_content
+                    )
+                except Exception:
+                    pass
 
         st.session_state.active_file = f.name
 
