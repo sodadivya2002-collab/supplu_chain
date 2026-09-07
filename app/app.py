@@ -1206,13 +1206,77 @@ def _is_list_intent(p):
     return any(kw in p for kw in _LIST_KEYWORDS)
 
 
+# ------------------------------------------------------------
+# RESULT PRESENTATION HELPERS
+# ------------------------------------------------------------
+# These two helpers give every pandas-computed answer the same
+# look-and-feel as a Cortex Analyst (SQL) answer:
+#   - the reply opens with "This is our interpretation of your
+#     question:" followed by a plain-English description
+#   - a single scalar result (a sum, a count, an average, ...) is
+#     rendered as a proper one-row table (Data/Chart tabs) instead
+#     of just a bold line of text, matching how a SQL result like
+#     TOTAL_PO / 450384 is displayed.
+# ------------------------------------------------------------
+
+_AGG_ALIAS_PREFIX = {
+    "sum": "TOTAL",
+    "mean": "AVERAGE",
+    "count": "COUNT",
+    "min": "MIN",
+    "max": "MAX",
+    "median": "MEDIAN",
+    "nunique": "DISTINCT_COUNT",
+}
+
+
+def _scalar_result_column_name(aggregation, metric_col=None):
+    """Builds a business-friendly column name for a single-value
+    result, e.g. sum of ORDER_VALUE -> TOTAL_ORDER_VALUE, plain
+    count -> COUNT. Used so a scalar answer renders as a labeled
+    one-row table rather than a bare number."""
+
+    prefix = _AGG_ALIAS_PREFIX.get(aggregation, aggregation.upper())
+
+    if not metric_col:
+        return prefix
+
+    clean_metric = re.sub(r"[^a-zA-Z0-9]+", "_", metric_col).strip("_").upper()
+
+    return f"{prefix}_{clean_metric}" if clean_metric else prefix
+
+
+def _scalar_result_df(aggregation, result_value, metric_col=None):
+    """Wraps a single computed value into a one-row DataFrame so it
+    can go through the same Data/Chart display as every other
+    result table."""
+
+    col_name = _scalar_result_column_name(aggregation, metric_col)
+
+    return pd.DataFrame({col_name: [result_value]})
+
+
+def _with_interpretation(description):
+    """Prefixes any plain-English description of what was computed
+    with the same "This is our interpretation of your question:"
+    framing used for Cortex Analyst (SQL) answers, so file-based
+    (pandas) answers look and read the same way."""
+
+    return "This is our interpretation of your question:\n\n" + description
+
+
 def answer_question_from_dataframe(prompt, df):
     """Deterministically answers a question about `df` using only
     pandas. Returns (explanation, computation_description,
     result_df). `computation_description` is the exact pandas
     call that was executed, shown to the user for full
     transparency — there is no SQL involved and nothing is
-    inferred beyond simple keyword matching to real column names."""
+    inferred beyond simple keyword matching to real column names.
+
+    `result_df` is always a DataFrame when a numeric answer was
+    computed (even a single scalar gets wrapped into a one-row
+    table) so every answer renders through the same Data/Chart
+    tabs as a Cortex Analyst (SQL) result."""
 
     p = f" {prompt.lower().strip()} "
 
@@ -1221,9 +1285,9 @@ def answer_question_from_dataframe(prompt, df):
 
     if re.search(r"how many (rows|records|entries)|total (rows|records)|row count", p):
         return (
-            f"There are **{len(df):,} rows** in this file.",
+            _with_interpretation("Total number of rows in this file."),
             "len(df)",
-            None
+            _scalar_result_df("count", len(df), "ROWS")
         )
 
     working_df = df
@@ -1285,9 +1349,9 @@ def answer_question_from_dataframe(prompt, df):
             result_rows = result_rows.head(500)
             truncated_note = " (showing first 500 matching rows)"
 
-        explanation = (
-            f"**{len(working_df):,} matching row(s)**{filter_note}"
-            f"{truncated_note}:"
+        explanation = _with_interpretation(
+            f"Matching rows{filter_note} — "
+            f"**{len(working_df):,} row(s) found**{truncated_note}."
         )
 
         computation = "df" + (
@@ -1316,8 +1380,10 @@ def answer_question_from_dataframe(prompt, df):
                 truncated_note = " (showing first 500 matching rows)"
 
             return (
-                f"**{len(working_df):,} matching row(s)**{filter_note}"
-                f"{truncated_note}:",
+                _with_interpretation(
+                    f"Matching rows{filter_note} — "
+                    f"**{len(working_df):,} row(s) found**{truncated_note}."
+                ),
                 "df[conditions]",
                 result_rows
             )
@@ -1337,9 +1403,9 @@ def answer_question_from_dataframe(prompt, df):
 
     if aggregation == "count" and metric_col is None:
         return (
-            f"**Count{filter_note}: {len(working_df):,}**",
+            _with_interpretation(f"Count of matching rows{filter_note}."),
             "len(df)" + (" [after filter]" if filter_note else ""),
-            None
+            _scalar_result_df("count", len(working_df))
         )
 
     if metric_col is None:
@@ -1368,9 +1434,9 @@ def answer_question_from_dataframe(prompt, df):
                 None
             )
 
-        explanation = (
-            f"**{aggregation.capitalize()} of `{metric_col}` by "
-            f"`{group_col}`**{filter_note}:"
+        explanation = _with_interpretation(
+            f"{aggregation.capitalize()} of `{metric_col}` by "
+            f"`{group_col}`{filter_note}."
         )
 
         computation = (
@@ -1389,19 +1455,15 @@ def answer_question_from_dataframe(prompt, df):
             None
         )
 
-    result_display = (
-        f"{result_value:,.2f}" if isinstance(result_value, float)
-        else f"{result_value:,}"
-    )
-
-    explanation = (
-        f"**{aggregation.capitalize()} of `{metric_col}`{filter_note}: "
-        f"{result_display}**"
+    explanation = _with_interpretation(
+        f"{aggregation.capitalize()} of `{metric_col}`{filter_note}."
     )
 
     computation = f"df['{metric_col}'].{aggregation}()"
 
-    return explanation, computation, None
+    return explanation, computation, _scalar_result_df(
+        aggregation, result_value, metric_col
+    )
 
 
 try:
@@ -1510,12 +1572,11 @@ def answer_from_file(prompt, fname):
             None
         )
 
-    explanation = (
-        "Here are the passages from the document that best match "
-        "your question, shown exactly as written (nothing here is "
-        "paraphrased, summarized, or inferred):\n\n"
-        + "\n\n---\n\n".join(f"> {m}" for m in matches)
-    )
+    explanation = _with_interpretation(
+        "Passages from the document that best match your question, "
+        "shown exactly as written (nothing here is paraphrased, "
+        "summarized, or inferred):"
+    ) + "\n\n" + "\n\n---\n\n".join(f"> {m}" for m in matches)
 
     return explanation, None, None
 
@@ -1608,9 +1669,9 @@ def render_guided_query_builder(df):
                         .sort_values(by=metric_col, ascending=False)
                     )
 
-                    explanation = (
-                        f"**{agg_choice} of `{metric_col}` by "
-                        f"`{group_col_choice}`**{filter_note}:"
+                    explanation = _with_interpretation(
+                        f"{agg_choice} of `{metric_col}` by "
+                        f"`{group_col_choice}`{filter_note}."
                     )
 
                     computation = (
@@ -1622,19 +1683,15 @@ def render_guided_query_builder(df):
 
                 result_value = getattr(working_df[metric_col], aggregation)()
 
-                result_display = (
-                    f"{result_value:,.2f}" if isinstance(result_value, float)
-                    else f"{result_value:,}"
-                )
-
-                explanation = (
-                    f"**{agg_choice} of `{metric_col}`{filter_note}: "
-                    f"{result_display}**"
+                explanation = _with_interpretation(
+                    f"{agg_choice} of `{metric_col}`{filter_note}."
                 )
 
                 computation = f"df['{metric_col}'].{aggregation}()"
 
-                return explanation, computation, None
+                return explanation, computation, _scalar_result_df(
+                    aggregation, result_value, metric_col
+                )
 
             except Exception as e:
 
@@ -2063,7 +2120,10 @@ def show_query_result(sql_query, df, key_prefix):
     layout. Used for the Cortex Analyst path (real SQL, run against
     Snowflake) and for the file-upload path (a plain description of
     the exact pandas call that was run — never SQL, since no SQL
-    engine is involved for uploaded files anymore)."""
+    engine is involved for uploaded files anymore). Every result
+    — including a single scalar value such as a sum or count — is
+    passed in as a DataFrame so it always renders through the same
+    Data/Chart tabs, matching the Cortex Analyst presentation."""
 
     if sql_query:
 
