@@ -1141,14 +1141,34 @@ def _detect_numeric_filter(p, columns):
     return None
 
 
+_ID_COLUMN_PATTERN = re.compile(r"(^|_)(id|code|key|no|num|number)$")
+
+
+def _looks_like_identifier_column(col):
+    """True for columns that are identifiers (EVENT_ID, ORDER_CODE,
+    CUSTOMER_KEY, ...) rather than measurable metrics. These should
+    only ever be matched when the person names them explicitly and
+    in full — never via the looser 'significant word overlap'
+    match used for ordinary metric columns, since that lets an
+    unrelated word elsewhere in the question (e.g. 'events' in
+    'how many people attended the events') falsely pull in an ID
+    column and produce a meaningless count/sum/average of it."""
+
+    normalized = re.sub(r"[^a-z0-9]+", "_", col.strip().lower()).strip("_")
+    return bool(_ID_COLUMN_PATTERN.search(normalized))
+
+
 def _detect_metric_column(p, columns, numeric_columns):
     """Finds the single column the question is most plausibly
     referring to. A column only counts as matched if either (a)
-    every word in its name appears in the question, or (b) every
-    one of its non-generic words (i.e. excluding filler like
-    'name'/'value'/'id') appears in the question. If more than one
-    column ties for the best match, this returns None rather than
-    guessing which one the user meant."""
+    every word in its name appears in the question, or (b) — for
+    non-identifier columns only — every one of its non-generic
+    words (i.e. excluding filler like 'name'/'value'/'id') appears
+    in the question. Identifier columns (EVENT_ID, ORDER_CODE, ...)
+    require the stricter full match (a), so they're never picked up
+    just because a related-sounding word is mentioned elsewhere. If
+    more than one column ties for the best match, this returns None
+    rather than guessing which one the user meant."""
 
     q_words = set(_words(p))
 
@@ -1158,6 +1178,8 @@ def _detect_metric_column(p, columns, numeric_columns):
             return 0
         if all(w in q_words for w in col_words):
             return 100 + len(col_words)
+        if _looks_like_identifier_column(col):
+            return 0
         significant = [w for w in col_words if w not in _GENERIC_COLUMN_WORDS]
         if significant and all(w in q_words for w in significant):
             return 50 + len(significant)
@@ -2293,6 +2315,30 @@ def generate_sql_from_prompt(prompt):
             None,
             MODULE_GREETING_SUGGESTIONS.get(module, None) if module != "None" else None
         )
+
+    # Quick diagnostic: "what columns" / "list columns" / "column
+    # names" — always answered directly from the schema, useful
+    # when a fuzzy column match doesn't behave as expected.
+    if active_file and re.search(r"\b(what|list|show)\b.*\bcolumns?\b", p):
+
+        active_df = (
+            st.session_state.stored_files
+            .get(active_file, {})
+            .get("df")
+        )
+
+        if active_df is not None:
+
+            col_lines = "\n".join(
+                f"- `{c}` ({active_df[c].dtype})" for c in active_df.columns
+            )
+
+            return (
+                f"**Columns in `{active_file}`:**\n\n{col_lines}",
+                None,
+                None,
+                None
+            )
 
     # File Q&A takes priority whenever a file is active — the
     # sidebar disables Module selection while a file is active,
