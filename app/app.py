@@ -1834,7 +1834,7 @@ def _looks_like_identifier_column(col):
 
 def _detect_metric_column(p, columns, numeric_columns):
     """Finds the single column the question is most plausibly
-    referring to. A column only counts as matched if either (a)
+    refering to. A column only counts as matched if either (a)
     every word in its name appears in the question, or (b) — for
     non-identifier columns only — every one of its non-generic
     words (i.e. excluding filler like 'name'/'value'/'id') appears
@@ -2189,7 +2189,7 @@ def _keyword_search_text(prompt, text, top_n=3):
             if results:
                 return results
 
-        except Exception:
+            except Exception:
             pass  # fall through to the keyword-overlap method below
 
     stopwords = {
@@ -2457,13 +2457,17 @@ def generate_file_overview(fname):
     df = file_data.get("df")
 
     if df is None:
-        # Non-tabular file — show the first few extractive matches
-        # against a generic "overview" query instead of an LLM
-        # summary, so nothing here is paraphrased or invented.
-        return answer_from_file(
-            "summary overview key points",
-            fname
+        # Non-tabular file — provide a clean structural overview of the document
+        # instead of attempting a strict keyword match that might fail.
+        text_content = file_data.get("text", "")
+        word_count = len(text_content.split())
+        
+        explanation = (
+            f"**{fname}** uploaded successfully!\n\n"
+            f"This document contains **{word_count:,} words**. "
+            "I've indexed the contents using Cortex Search, and I am ready to answer your questions about it."
         )
+        return explanation, None, None
 
     total_rows = len(df)
     total_cols = len(df.columns)
