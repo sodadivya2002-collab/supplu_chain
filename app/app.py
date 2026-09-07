@@ -10,7 +10,6 @@ import io
 import zipfile
 import xml.etree.ElementTree as ET
 
-
 # ============================================================
 # PAGE CONFIG
 # ============================================================
@@ -29,6 +28,7 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+
     /* ---------- Global cleanup ---------- */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -805,7 +805,7 @@ def answer_file_question_with_cortex_analyst(session, prompt, fname):
 
 
 # ============================================================
-# FILE UPLOAD HELPERS (No python-docx needed, native Zip parsing)
+# FILE UPLOAD HELPERS (Native Zip parsing for DOCX)
 # ============================================================
 
 def _coerce_numeric_columns(df):
@@ -1329,7 +1329,7 @@ def answer_document_locally(question: str, document_text: str):
         if len(selected) >= 7:
             break
 
-    explanation = (
+    explanation = _with_interpretation(
         "Based on a semantic scan of the document, here is the most relevant extracted information:\n\n> "
         + "\n>\n> ".join(selected[:7])
     )
@@ -1350,6 +1350,78 @@ def answer_from_file(prompt, fname):
     return answer_document_locally(prompt, file_text)
 
 
+def render_guided_query_builder(df):
+    numeric_cols = df.select_dtypes(include="number").columns.tolist()
+    all_cols = list(df.columns)
+
+    if not numeric_cols:
+        return None
+
+    with st.expander("🎛️ Guided Query (menu-driven, always exact)", expanded=False):
+
+        gcol1, gcol2, gcol3 = st.columns(3)
+        metric_col = gcol1.selectbox("Metric column", numeric_cols, key="gq_metric")
+        agg_choice = gcol2.selectbox(
+            "Aggregation",
+            ["Sum", "Average", "Count", "Min", "Max", "Median", "Distinct count"],
+            key="gq_agg"
+        )
+        group_col_choice = gcol3.selectbox(
+            "Group by (optional)",
+            ["(none)"] + all_cols,
+            key="gq_group"
+        )
+
+        fcol1, fcol2 = st.columns(2)
+        filter_col_choice = fcol1.selectbox(
+            "Filter column (optional)",
+            ["(none)"] + all_cols,
+            key="gq_filter_col"
+        )
+
+        filter_val = None
+        if filter_col_choice != "(none)":
+            distinct_values = df[filter_col_choice].dropna().unique().tolist()
+            if 0 < len(distinct_values) <= 200:
+                filter_val = fcol2.selectbox("Equals", distinct_values, key="gq_filter_val")
+            else:
+                filter_val = fcol2.text_input("Equals", key="gq_filter_val_text") or None
+
+        if st.button("Run Query", key="gq_run", type="primary"):
+            agg_map = {
+                "Sum": "sum", "Average": "mean", "Count": "count",
+                "Min": "min", "Max": "max", "Median": "median",
+                "Distinct count": "nunique"
+            }
+            aggregation = agg_map[agg_choice]
+            working_df = df
+            filter_note = ""
+
+            if filter_col_choice != "(none)" and filter_val is not None:
+                working_df = working_df[working_df[filter_col_choice] == filter_val]
+                filter_note = f" where `{filter_col_choice}` = \"{filter_val}\""
+
+            try:
+                if group_col_choice != "(none)" and group_col_choice != metric_col:
+                    result_df = (
+                        working_df.groupby(group_col_choice)[metric_col]
+                        .agg(aggregation)
+                        .reset_index()
+                        .sort_values(by=metric_col, ascending=False)
+                    )
+                    explanation = _with_interpretation(f"{agg_choice} of `{metric_col}` by `{group_col_choice}`{filter_note}.")
+                    computation = f"df.groupby('{group_col_choice}')['{metric_col}'].{aggregation}()"
+                    return explanation, computation, result_df
+
+                result_value = getattr(working_df[metric_col], aggregation)()
+                explanation = _with_interpretation(f"{agg_choice} of `{metric_col}`{filter_note}.")
+                computation = f"df['{metric_col}'].{aggregation}()"
+                return explanation, computation, _scalar_result_df(aggregation, result_value, metric_col)
+            except Exception as e:
+                return (f"Could not run that query.\n\n**Error:** {str(e)}", None, None)
+
+    return None
+
 def generate_file_question_suggestions(fname):
     cached = st.session_state.file_question_suggestions.get(fname)
     if cached:
@@ -1359,6 +1431,7 @@ def generate_file_question_suggestions(fname):
     df = file_data.get("df")
 
     if df is None:
+        # Non-tabular file (pdf/docx/txt/image) — generic fallback.
         fallback = [
             "What was Aranya Retail's revenue?",
             "What is the purpose of the document?",
@@ -1382,7 +1455,6 @@ def generate_file_question_suggestions(fname):
     questions = questions[:5]
     st.session_state.file_question_suggestions[fname] = questions
     return questions
-
 
 def generate_file_overview(fname):
     file_data = st.session_state.stored_files.get(fname, {})
@@ -1674,6 +1746,12 @@ if st.session_state.sidebar_open:
             new_id = datetime.now().strftime("%Y%m%d_%H%M%S")
             st.session_state.current_session_id = new_id
             st.session_state.chat_sessions[new_id] = {"title": "New Conversation", "messages": []}
+            
+            # KEEP ONLY THE 10 MOST RECENT SESSIONS IN MEMORY
+            while len(st.session_state.chat_sessions) > 10:
+                oldest_key = list(st.session_state.chat_sessions.keys())[0]
+                del st.session_state.chat_sessions[oldest_key]
+                
             st.rerun()
         st.write("")
 
@@ -1745,7 +1823,12 @@ if st.session_state.sidebar_open:
         if st.session_state.show_history_panel:
             all_sessions = list(reversed(list(st.session_state.chat_sessions.items())))
             visible_sessions = [(s_id, s_data) for s_id, s_data in all_sessions if s_data["messages"] or s_id == st.session_state.current_session_id]
-            if not visible_sessions: st.caption("No conversations yet.")
+            
+            # LIMIT THE DISPLAY TO THE 10 MOST RECENT
+            visible_sessions = visible_sessions[:10]
+
+            if not visible_sessions:
+                st.caption("No conversations yet.")
             for s_id, s_data in visible_sessions:
                 label = s_data["title"][:18] + "..." if len(s_data["title"]) > 20 else s_data["title"]
                 if st.button(f"{'✅' if s_id == st.session_state.current_session_id else '🗨️'} {label}", key=f"sess_{s_id}", use_container_width=True):
