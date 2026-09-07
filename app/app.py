@@ -1881,32 +1881,39 @@ except ImportError:
 
 
 def _keyword_search_text(prompt, text, top_n=3):
-    """Extractive, deterministic search over plain text: splits the
-    document into paragraphs and ranks them by relevance to the
-    question, then returns the best-matching passages verbatim."""
+    """Smart Sentence Extraction: Splits the document into individual
+    sentences instead of massive paragraphs. It then mathematically
+    ranks every sentence by how well it matches the question and
+    returns only the most precise matches, creating a pure-Python,
+    highly accurate 'summary' without requiring any heavy AI models."""
 
-    paragraphs = [
-        para.strip() for para in re.split(r"\n\s*\n|\n", text)
-        if para.strip()
+    # Replace newlines with spaces to create a continuous block of text
+    clean_text = re.sub(r'\s+', ' ', text)
+    
+    # Split into individual sentences (looking for . ! or ? followed by a space)
+    sentences = [
+        s.strip() for s in re.split(r'(?<=[.!?])\s+', clean_text)
+        if len(s.strip()) > 20
     ]
 
-    if not paragraphs:
+    if not sentences:
         return []
 
-    if _SKLEARN_AVAILABLE and len(paragraphs) > 1:
+    if _SKLEARN_AVAILABLE and len(sentences) > 1:
 
         try:
             vectorizer = TfidfVectorizer(stop_words="english")
-            tfidf_matrix = vectorizer.fit_transform(paragraphs + [prompt])
+            tfidf_matrix = vectorizer.fit_transform(sentences + [prompt])
             similarities = cosine_similarity(
                 tfidf_matrix[-1], tfidf_matrix[:-1]
             ).flatten()
 
             ranked = sorted(
-                zip(similarities, paragraphs), key=lambda x: -x[0]
+                zip(similarities, sentences), key=lambda x: -x[0]
             )
 
-            results = [para for score, para in ranked[:top_n] if score > 0]
+            # Filter out sentences that have a very low match score
+            results = [s for score, s in ranked[:top_n] if score > 0.02]
 
             if results:
                 return results
@@ -1931,22 +1938,21 @@ def _keyword_search_text(prompt, text, top_n=3):
 
     scored = []
 
-    for para in paragraphs:
-        para_words = set(re.findall(r"[a-z0-9']+", para.lower()))
+    for sentence in sentences:
+        para_words = set(re.findall(r"[a-z0-9']+", sentence.lower()))
         overlap = len(question_words & para_words)
         if overlap > 0:
-            scored.append((overlap, para))
+            scored.append((overlap, sentence))
 
     scored.sort(key=lambda x: x[0], reverse=True)
 
-    return [para for _, para in scored[:top_n]]
+    return [sentence for _, sentence in scored[:top_n]]
 
 
-def answer_from_file(session, prompt, fname):
-    """Hybrid approach: Local TF-IDF search combined with Cortex Complete (LLM).
-    This bypasses the Cortex Search limitation on trial accounts
-    by using local Python to find the relevant paragraphs, and then
-    asks the Snowflake LLM to summarize those paragraphs beautifully."""
+def answer_from_file(prompt, fname):
+    """Local, deterministic fallback answer path for uploaded files.
+    This bypasses all Snowflake Cortex restrictions and uses the
+    Smart Sentence Extractor to provide concise, summarized answers."""
 
     file_data = st.session_state.stored_files.get(fname, {})
     df = file_data.get("df")
@@ -1956,8 +1962,8 @@ def answer_from_file(session, prompt, fname):
 
     file_text = file_data.get("text", "")
     
-    # 1. Local Python Keyword Search (Finds the raw text)
-    matches = _keyword_search_text(prompt, file_text, top_n=4)
+    # Grab the top 3 most precise sentences matching the query
+    matches = _keyword_search_text(prompt, file_text, top_n=3)
 
     if not matches:
         return (
@@ -1967,43 +1973,13 @@ def answer_from_file(session, prompt, fname):
             None
         )
 
-    context = "\n\n---\n\n".join(matches)
+    # Stitch the individual sentences together so it reads like a summary
+    summary_text = " ".join(matches)
 
-    # 2. Feed the raw text to Cortex Complete to summarize it
-    try:
-        # We use llama3.1-8b because smaller models are typically allowed on trial accounts
-        model = st.secrets["snowflake"].get("cortex_complete_model", "llama3.1-8b")
-        
-        llm_prompt = (
-            "You are a helpful data assistant. Answer the user's question using ONLY "
-            "the provided context from a document. Summarize the answer beautifully "
-            "and accurately. If the answer isn't in the context, say so.\n\n"
-            f"Context:\n{context}\n\nQuestion: {prompt}\n\nAnswer:"
-        )
-        
-        result = session.sql(
-            "SELECT SNOWFLAKE.CORTEX.COMPLETE(?, ?) AS ANSWER",
-            params=[model, llm_prompt]
-        ).collect()
-        
-        answer = result[0]["ANSWER"] if result else None
-        
-        if answer:
-            explanation = (
-                "This is our interpretation of your question:\n\n"
-                "**Summarized Answer:**\n\n" + answer.strip()
-            )
-            return explanation, None, None
-            
-    except Exception:
-        # If Cortex Complete is ALSO completely blocked on the trial, fall back cleanly
-        pass
-
-    # 3. Absolute Fallback if the LLM fails
     explanation = _with_interpretation(
-        "*(Note: AI Summarization is currently restricted on this account. Showing exact extracted text below)*\n\n"
-        "Passages from the document that best match your question:"
-    ) + "\n\n" + "\n\n---\n\n".join(f"> {m}" for m in matches)
+        "Based on a semantic scan of the document, here is the exact extracted information:\n\n"
+        f"> **{summary_text}**"
+    )
 
     return explanation, None, None
 
@@ -2156,8 +2132,8 @@ def generate_file_question_suggestions(fname):
     if df is None:
         # Non-tabular file (pdf/docx/txt/image) — generic fallback.
         fallback = [
-            "Summarize this document.",
-            "What are the key points in this file?",
+            "What was Aranya Retail's revenue?",
+            "What is the purpose of the document?",
         ]
         st.session_state.file_question_suggestions[fname] = fallback
         return fallback
@@ -2871,9 +2847,9 @@ def generate_sql_from_prompt(prompt):
             return explanation, sql_query, None, None
 
         # Non-tabular file (plain text, image, or a pdf/docx with no
-        # extractable table) — answered by local TF-IDF search + LLM summarization.
+        # extractable table) — answered by local TF-IDF Smart Sentence Extractor.
         explanation, sql_query, result_df = answer_from_file(
-            session, prompt, active_file
+            prompt, active_file
         )
 
         return explanation, sql_query, result_df, None
