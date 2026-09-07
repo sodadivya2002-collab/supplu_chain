@@ -854,28 +854,78 @@ def push_dataframe_to_snowflake(session, df, table_fqn):
     return clean_df
 
 
-def build_semantic_model_yaml(clean_df, table_fqn, model_name):
-    """Auto-generates a minimal Cortex Analyst semantic model (as a
-    YAML string) describing `table_fqn`, using only the column
-    names and pandas dtypes already sitting in `clean_df` — no LLM
-    involved in building the model itself. Numeric columns become
-    measures (summable metrics); everything else, plus numeric
-    columns whose name looks like an identifier, become
-    dimensions."""
+_DATE_NAME_HINT = re.compile(r"(date|_dt$|^dt_|time)", re.IGNORECASE)
+
+
+def _looks_like_date_column(col, series):
+    """True if the column name hints at a date/time AND at least
+    70% of its non-null values actually parse as dates. Guards
+    against false positives like 'update_by' or 'date_id'."""
+
+    if not _DATE_NAME_HINT.search(str(col)):
+        return False
+
+    if _looks_like_id_column_name(col):
+        return False
+
+    sample = series.dropna().astype(str).head(200)
+    if sample.empty:
+        return False
+
+    parsed = pd.to_datetime(sample, errors="coerce")
+    return parsed.notna().mean() >= 0.7
+
+
+def build_semantic_model_yaml(clean_df, table_fqn, model_name,
+                               max_sample_values=40,
+                               max_distinct_for_samples=300):
+    """Auto-generates a Cortex Analyst semantic model (as a YAML
+    string) describing `table_fqn`, using only the column names,
+    pandas dtypes, and actual data already sitting in `clean_df` —
+    no LLM involved in building the model itself.
+
+    Numeric columns become measures (summable metrics); numeric
+    columns whose name looks like an identifier become dimensions
+    instead. Columns that look like dates (by name AND by actually
+    parsing as dates) become time_dimensions so Cortex Analyst can
+    reason about date filters/aggregations correctly.
+
+    Crucially, every remaining categorical (VARCHAR) dimension gets
+    its real distinct values embedded as `sample_values` (capped at
+    `max_sample_values`, and skipped entirely for high-cardinality
+    free-text columns above `max_distinct_for_samples` distinct
+    values). Without this, Cortex Analyst has nothing to ground a
+    generated SQL filter in and will guess plausible-sounding
+    values from the column name alone — e.g. filtering
+    STATUS = 'Delayed' when the real values are 'Late', 'On Time',
+    'Early'. Embedding the real values fixes that."""
 
     database, schema, table = table_fqn.split(".")
 
     dimension_lines = []
+    time_dimension_lines = []
     measure_lines = []
 
     for col in clean_df.columns:
 
-        is_numeric = pd.api.types.is_numeric_dtype(clean_df[col])
+        series = clean_df[col]
+        is_numeric = pd.api.types.is_numeric_dtype(series)
         is_id_like = _looks_like_id_column_name(col)
+        is_date_like = (not is_numeric) and _looks_like_date_column(col, series)
 
         description = col.replace("_", " ").title()
 
-        if is_numeric and not is_id_like:
+        if is_date_like:
+
+            time_dimension_lines.append(
+                f"      - name: {col}\n"
+                f"        expr: {col}\n"
+                f"        data_type: DATE\n"
+                f"        description: \"{description}\"\n"
+            )
+
+        elif is_numeric and not is_id_like:
+
             measure_lines.append(
                 f"      - name: {col}\n"
                 f"        expr: {col}\n"
@@ -883,13 +933,38 @@ def build_semantic_model_yaml(clean_df, table_fqn, model_name):
                 f"        default_aggregation: sum\n"
                 f"        description: \"{description}\"\n"
             )
+
         else:
+
             data_type = "NUMBER" if is_numeric else "VARCHAR"
+
+            sample_block = ""
+
+            if not is_numeric and not is_id_like:
+
+                distinct_vals = series.dropna().unique().tolist()
+
+                if 0 < len(distinct_vals) <= max_distinct_for_samples:
+
+                    sample_vals = [
+                        str(v).replace('"', '\\"')
+                        for v in distinct_vals[:max_sample_values]
+                    ]
+
+                    sample_lines = "\n".join(
+                        f'          - "{v}"' for v in sample_vals
+                    )
+
+                    sample_block = (
+                        f"        sample_values:\n{sample_lines}\n"
+                    )
+
             dimension_lines.append(
                 f"      - name: {col}\n"
                 f"        expr: {col}\n"
                 f"        data_type: {data_type}\n"
                 f"        description: \"{description}\"\n"
+                f"{sample_block}"
             )
 
     yaml_text = (
@@ -907,6 +982,9 @@ def build_semantic_model_yaml(clean_df, table_fqn, model_name):
 
     if dimension_lines:
         yaml_text += "    dimensions:\n" + "".join(dimension_lines)
+
+    if time_dimension_lines:
+        yaml_text += "    time_dimensions:\n" + "".join(time_dimension_lines)
 
     if measure_lines:
         yaml_text += "    measures:\n" + "".join(measure_lines)
@@ -1931,7 +2009,12 @@ def render_guided_query_builder(df):
     accurate fallback whenever a typed question isn't confidently
     understood by the keyword parser above. Returns
     (explanation, computation_description, result_df) only on the
-    turn the user clicks "Run Query"; otherwise returns None."""
+    turn the user clicks "Run Query"; otherwise returns None.
+
+    NOTE: this function is currently unused — the sidebar/chat UI
+    no longer calls it (see the ACTIVE FILE INDICATOR section) —
+    but is kept here in case a menu-driven fallback is wanted
+    again in the future."""
 
     numeric_cols = df.select_dtypes(include="number").columns.tolist()
     all_cols = list(df.columns)
@@ -3324,35 +3407,6 @@ if st.session_state.active_file:
             # sheet's columns) need to be regenerated.
             st.session_state.file_question_suggestions.pop(
                 st.session_state.active_file, None
-            )
-
-            st.rerun()
-
-    _active_df = _active_file_data.get("df")
-
-    if _active_df is not None:
-
-        _guided_result = render_guided_query_builder(_active_df)
-
-        if _guided_result:
-
-            _g_explanation, _g_computation, _g_df = _guided_result
-
-            messages.append(
-                {
-                    "role": "user",
-                    "content": "Guided query"
-                }
-            )
-
-            messages.append(
-                {
-                    "role": "assistant",
-                    "content": _g_explanation,
-                    "sql": _g_computation,
-                    "data": _g_df,
-                    "suggestions": None
-                }
             )
 
             st.rerun()
