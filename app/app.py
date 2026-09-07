@@ -521,36 +521,63 @@ MODULE_SEMANTIC_VIEW_KEYS = {
 }
 
 
-def call_cortex_analyst(prompt, module="Supply Chain"):
+def call_cortex_analyst(prompt, module="Supply Chain", semantic_model_yaml=None):
+    """Sends `prompt` to the Cortex Analyst REST API and returns
+    (explanation, sql_query).
+
+    Cortex Analyst needs to be told what data to reason over. There
+    are two ways to tell it, and this function supports both:
+
+      1. `semantic_model_yaml` — a full semantic model, as a YAML
+         string, sent inline in the request body under the
+         "semantic_model" field. This is how uploaded-file
+         questions are answered: the file's data lives in a
+         Snowflake table (see `ensure_cortex_source_for_file`
+         below) and a semantic model describing that table's
+         columns is generated on the fly and passed straight in
+         here — no `module` argument is used in that case.
+
+      2. `module` — looks up a pre-configured semantic *view* name
+         from Streamlit secrets (the original Supply Chain /
+         Inventory behavior). Used only when `semantic_model_yaml`
+         is not supplied.
+
+    Either way, the call, the SQL-generation, and the response
+    parsing are identical — uploaded-file questions are answered by
+    Cortex Analyst exactly the same way module questions are."""
 
     try:
 
-        secret_key = MODULE_SEMANTIC_VIEW_KEYS.get(
-            module,
-            "semantic_view"
-        )
+        semantic_view = None
 
-        semantic_view = st.secrets["snowflake"].get(
-            secret_key,
-            ""
-        )
+        if not semantic_model_yaml:
 
-        # Backward compatibility: older deployments only ever set
-        # `semantic_view` (no module suffix) for Supply Chain.
-        if not semantic_view and module == "Supply Chain":
+            secret_key = MODULE_SEMANTIC_VIEW_KEYS.get(
+                module,
+                "semantic_view"
+            )
 
             semantic_view = st.secrets["snowflake"].get(
-                "semantic_view",
+                secret_key,
                 ""
             )
 
-        if not semantic_view:
-            return (
-                f"Cortex Analyst is not configured yet for the "
-                f"**{module}** module. Please add `{secret_key}` "
-                f"under `[snowflake]` in your Streamlit secrets.",
-                None
-            )
+            # Backward compatibility: older deployments only ever set
+            # `semantic_view` (no module suffix) for Supply Chain.
+            if not semantic_view and module == "Supply Chain":
+
+                semantic_view = st.secrets["snowflake"].get(
+                    "semantic_view",
+                    ""
+                )
+
+            if not semantic_view:
+                return (
+                    f"Cortex Analyst is not configured yet for the "
+                    f"**{module}** module. Please add `{secret_key}` "
+                    f"under `[snowflake]` in your Streamlit secrets.",
+                    None
+                )
 
         analyst_token = st.secrets["snowflake"].get(
             "cortex_analyst_token",
@@ -598,9 +625,13 @@ def call_cortex_analyst(prompt, module="Supply Chain"):
                     ]
                 }
             ],
-            "semantic_view": semantic_view,
             "stream": False
         }
+
+        if semantic_model_yaml:
+            request_body["semantic_model"] = semantic_model_yaml
+        else:
+            request_body["semantic_view"] = semantic_view
 
         response = requests.post(
             url,
@@ -688,6 +719,245 @@ def call_cortex_analyst(prompt, module="Supply Chain"):
             f"Cortex Analyst error.\n\n**Error:** {str(e)}",
             None
         )
+
+
+# ============================================================
+# CORTEX ANALYST FOR UPLOADED FILES
+# ============================================================
+# Uploaded tabular files (csv/xlsx/xls, and PDFs/DOCX that contain
+# a table) are answered by Cortex Analyst exactly the same way
+# Supply Chain / Inventory module questions are: the data is
+# pushed into a real Snowflake table, a semantic model describing
+# that table is generated automatically from its column names and
+# dtypes, and every typed question is sent to Cortex Analyst along
+# with that semantic model. Cortex Analyst returns SQL, which is
+# then run against Snowflake and rendered through the same
+# Generated SQL / Data / Chart layout used for module answers.
+#
+# This requires the logged-in Snowflake role to have privileges to
+# create a table in the configured database/schema.
+# ============================================================
+
+_ID_LIKE_COLUMN_PATTERN = re.compile(r"(^|_)(id|code|key|no|num|number)$")
+
+
+def _looks_like_id_column_name(col):
+    """Heuristic used only when deciding measure vs. dimension for
+    the auto-generated semantic model: a numeric column whose name
+    looks like an identifier (ORDER_ID, CUSTOMER_CODE, ...) is
+    modeled as a dimension, not a summable measure, so Cortex
+    Analyst doesn't default to summing/averaging an ID column."""
+
+    normalized = re.sub(r"[^a-z0-9]+", "_", str(col).strip().lower()).strip("_")
+    return bool(_ID_LIKE_COLUMN_PATTERN.search(normalized))
+
+
+def _sanitize_sql_identifier(name, fallback="COL"):
+    """Turns an arbitrary column/file name into a safe, unquoted
+    Snowflake identifier: letters, digits, underscores only, never
+    starting with a digit."""
+
+    ident = re.sub(r"[^A-Za-z0-9_]", "_", str(name).strip())
+    ident = re.sub(r"_+", "_", ident).strip("_")
+
+    if not ident:
+        ident = fallback
+
+    if ident[0].isdigit():
+        ident = f"{fallback}_{ident}"
+
+    return ident.upper()[:64]
+
+
+def push_dataframe_to_snowflake(session, df, table_fqn):
+    """Writes `df` to Snowflake as table `table_fqn` (overwriting
+    it if it already exists) via Snowpark, after normalizing every
+    column name into a safe SQL identifier. Returns the DataFrame
+    with the same normalized column names, which the caller then
+    uses to build the matching semantic model so the model's column
+    references line up exactly with what's actually in the table."""
+
+    clean_df = df.copy()
+
+    seen = {}
+    new_columns = []
+
+    for col in clean_df.columns:
+        ident = _sanitize_sql_identifier(col)
+        if ident in seen:
+            seen[ident] += 1
+            ident = f"{ident}_{seen[ident]}"
+        else:
+            seen[ident] = 0
+        new_columns.append(ident)
+
+    clean_df.columns = new_columns
+
+    snowpark_df = session.create_dataframe(clean_df)
+    snowpark_df.write.mode("overwrite").save_as_table(table_fqn)
+
+    return clean_df
+
+
+def build_semantic_model_yaml(clean_df, table_fqn, model_name):
+    """Auto-generates a minimal Cortex Analyst semantic model (as a
+    YAML string) describing `table_fqn`, using only the column
+    names and pandas dtypes already sitting in `clean_df` — no LLM
+    involved in building the model itself. Numeric columns become
+    measures (summable metrics); everything else, plus numeric
+    columns whose name looks like an identifier, become
+    dimensions."""
+
+    database, schema, table = table_fqn.split(".")
+
+    dimension_lines = []
+    measure_lines = []
+
+    for col in clean_df.columns:
+
+        is_numeric = pd.api.types.is_numeric_dtype(clean_df[col])
+        is_id_like = _looks_like_id_column_name(col)
+
+        description = col.replace("_", " ").title()
+
+        if is_numeric and not is_id_like:
+            measure_lines.append(
+                f"      - name: {col}\n"
+                f"        expr: {col}\n"
+                f"        data_type: NUMBER\n"
+                f"        default_aggregation: sum\n"
+                f"        description: \"{description}\"\n"
+            )
+        else:
+            data_type = "NUMBER" if is_numeric else "VARCHAR"
+            dimension_lines.append(
+                f"      - name: {col}\n"
+                f"        expr: {col}\n"
+                f"        data_type: {data_type}\n"
+                f"        description: \"{description}\"\n"
+            )
+
+    yaml_text = (
+        f"name: {model_name}\n"
+        f"description: \"Auto-generated semantic model for the "
+        f"uploaded file table {table}.\"\n"
+        f"tables:\n"
+        f"  - name: {table}\n"
+        f"    description: \"Data from a file uploaded by the user.\"\n"
+        f"    base_table:\n"
+        f"      database: {database}\n"
+        f"      schema: {schema}\n"
+        f"      table: {table}\n"
+    )
+
+    if dimension_lines:
+        yaml_text += "    dimensions:\n" + "".join(dimension_lines)
+
+    if measure_lines:
+        yaml_text += "    measures:\n" + "".join(measure_lines)
+
+    return yaml_text
+
+
+def ensure_cortex_source_for_file(session, fname):
+    """Idempotently provisions everything Cortex Analyst needs to
+    answer questions about the active sheet/table of uploaded file
+    `fname`: a physical Snowflake table holding its data, plus an
+    auto-generated semantic model YAML for that table. Cached per
+    (file, sheet/table) so a file's table and model are only built
+    once, no matter how many questions get asked about it.
+
+    Returns the semantic model YAML string, or None if the file
+    has no tabular data to push (non-tabular files fall back to
+    the local text search in `answer_from_file`)."""
+
+    file_data = st.session_state.stored_files.get(fname, {})
+    df = file_data.get("df")
+
+    if df is None or df.empty:
+        return None
+
+    active_table_label = file_data.get("active_table") or "Data"
+    cache_key = (fname, active_table_label)
+
+    cached = st.session_state.cortex_file_models.get(cache_key)
+
+    if cached:
+        return cached
+
+    config = get_snowflake_config()
+    database = config["database"]
+    schema = config["schema"]
+
+    safe_label = _sanitize_sql_identifier(
+        f"{fname}_{active_table_label}", fallback="FILE"
+    )
+
+    table_fqn = f"{database}.{schema}.UPLOAD_{safe_label}"
+    model_name = f"MODEL_{safe_label}"
+
+    clean_df = push_dataframe_to_snowflake(session, df, table_fqn)
+
+    yaml_text = build_semantic_model_yaml(clean_df, table_fqn, model_name)
+
+    st.session_state.cortex_file_models[cache_key] = yaml_text
+    st.session_state.cortex_file_tables[cache_key] = table_fqn
+
+    return yaml_text
+
+
+def cleanup_cortex_source_for_file(session, fname):
+    """Drops every Snowflake table this app created for `fname`
+    (across all of its sheets/tables) and clears the cached
+    semantic models for it. Called when the user removes a file
+    from the sidebar, so uploaded data doesn't linger in Snowflake
+    after it's no longer needed."""
+
+    keys_to_drop = [
+        key for key in st.session_state.cortex_file_models
+        if key[0] == fname
+    ]
+
+    for key in keys_to_drop:
+
+        table_fqn = st.session_state.cortex_file_tables.get(key)
+
+        if table_fqn:
+            try:
+                session.sql(f"DROP TABLE IF EXISTS {table_fqn}").collect()
+            except Exception:
+                pass
+
+        st.session_state.cortex_file_models.pop(key, None)
+        st.session_state.cortex_file_tables.pop(key, None)
+
+
+def answer_file_question_with_cortex_analyst(session, prompt, fname):
+    """Answers a question about the active table of uploaded file
+    `fname` by routing it through Cortex Analyst — the exact same
+    call used for Supply Chain / Inventory module questions — using
+    an auto-generated semantic model for that file's Snowflake
+    table instead of a pre-configured semantic view. Returns
+    (explanation, sql_query), matching `call_cortex_analyst`'s
+    return shape so the caller can execute `sql_query` against
+    Snowflake and render it the same way a module answer is
+    rendered."""
+
+    try:
+        semantic_model_yaml = ensure_cortex_source_for_file(session, fname)
+    except Exception as e:
+        return (
+            f"Could not prepare **{fname}** for Cortex Analyst — this "
+            f"usually means the logged-in Snowflake role can't create "
+            f"a table in the configured database/schema.\n\n"
+            f"**Error:** {str(e)}",
+            None
+        )
+
+    if not semantic_model_yaml:
+        return None, None
+
+    return call_cortex_analyst(prompt, semantic_model_yaml=semantic_model_yaml)
 
 
 # ============================================================
@@ -943,24 +1213,23 @@ def extract_data_from_upload(uploaded_file):
 # ------------------------------------------------------------
 # DETERMINISTIC QUERY ENGINE (pandas only — no LLM anywhere)
 # ------------------------------------------------------------
-# Every number this
-# engine returns comes straight out of a pandas call that this
-# code builds and runs itself — nothing is guessed, invented, or
-# hallucinated by a model. There are two levels of it:
+# Typed questions about a TABULAR uploaded file (csv/xlsx/xls, or a
+# table extracted from a pdf/docx) are now answered by Cortex
+# Analyst (see "CORTEX ANALYST FOR UPLOADED FILES" above), the same
+# way Supply Chain / Inventory module questions are.
 #
-#   1. A lightweight keyword/pattern parser (below) that maps a
-#      typed question to an aggregation + column(s), for the
-#      "ask anything" chat feel. If it can't confidently match a
-#      real column and operation, it says so instead of guessing.
-#   2. A menu-driven "Guided Query" builder (further down) that
-#      lets the user pick column/operation/group-by/filter from
-#      dropdowns — this is always exact, since nothing is parsed.
+# This local pandas engine remains in use for two things:
 #
-# It now also understands numeric comparisons ("orders over 500",
-# "amount greater than 1000"), "list/show me" style questions
-# (returns the matching rows instead of a single number), and
-# "top N" questions — on top of the original equality-filter and
-# aggregation support.
+#   1. The "🎛️ Guided Query" menu-driven builder further down,
+#      which stays 100% local/deterministic on purpose — it's the
+#      guaranteed-exact option when someone wants to pick
+#      column/operation/group-by/filter from dropdowns instead of
+#      typing a question.
+#   2. As the answer path in `answer_from_file` for NON-tabular
+#      files (plain text, images, or a pdf/docx with no
+#      extractable table) — Cortex Analyst needs a real table to
+#      query, so those fall back to the extractive text search
+#      further below instead of this aggregation parser.
 # ------------------------------------------------------------
 
 _AGG_KEYWORDS = [
@@ -1545,14 +1814,19 @@ def _keyword_search_text(prompt, text, top_n=3):
 
 
 def answer_from_file(prompt, fname):
-    """Answers a question about the active uploaded file using only
-    deterministic Python: pandas for tabular files (csv/xlsx/xls,
-    and now PDFs/DOCX that contain a table), TF-IDF/keyword search
-    over the extracted text for everything else (including OCR'd
-    image text). No LLM is involved anywhere in this function, so
-    a result can never drift from what's actually in the file —
-    every number or passage returned is either computed directly
-    by pandas or quoted verbatim from the document."""
+    """Fallback answer path for uploaded files that Cortex Analyst
+    can't be used for — i.e. files with no tabular data (plain
+    text, images, or a pdf/docx with no extractable table). Uses
+    TF-IDF/keyword search over the extracted text (including OCR'd
+    image text) to return the best-matching passages verbatim.
+
+    Tabular files (csv/xlsx/xls, or a pdf/docx table) are instead
+    routed to `answer_file_question_with_cortex_analyst` before
+    this function is ever called — see `generate_sql_from_prompt`.
+    This function still supports a tabular `df` via the local
+    pandas engine as a defensive fallback (e.g. if a caller invokes
+    it directly, such as `generate_file_overview`'s non-tabular
+    branch never reaching here with a df)."""
 
     file_data = st.session_state.stored_files.get(fname, {})
     df = file_data.get("df")
@@ -1997,6 +2271,17 @@ if "file_question_suggestions" not in st.session_state:
     # filename, so this only runs once per upload.
     st.session_state.file_question_suggestions = {}
 
+if "cortex_file_models" not in st.session_state:
+    # Cache of {(filename, sheet/table label): semantic_model_yaml}
+    # so a file's Snowflake table + semantic model are built once,
+    # not on every question asked about it.
+    st.session_state.cortex_file_models = {}
+
+if "cortex_file_tables" not in st.session_state:
+    # Cache of {(filename, sheet/table label): table_fqn}, used to
+    # drop the underlying Snowflake table when a file is removed.
+    st.session_state.cortex_file_tables = {}
+
 
 # ============================================================
 # CHAT SESSIONS
@@ -2405,6 +2690,28 @@ def generate_sql_from_prompt(prompt):
     # so the two are mutually exclusive.
     if active_file and active_file in st.session_state.stored_files:
 
+        active_df = (
+            st.session_state.stored_files
+            .get(active_file, {})
+            .get("df")
+        )
+
+        if active_df is not None and not active_df.empty:
+
+            # Tabular file (csv/xlsx/xls, or a table extracted from
+            # a pdf/docx) — answered by Cortex Analyst, exactly the
+            # same way Supply Chain / Inventory questions are:
+            # generate SQL against an auto-provisioned semantic
+            # model, then let the caller run that SQL and render it.
+            explanation, sql_query = answer_file_question_with_cortex_analyst(
+                session, prompt, active_file
+            )
+
+            return explanation, sql_query, None, None
+
+        # Non-tabular file (plain text, image, or a pdf/docx with no
+        # extractable table) — Cortex Analyst needs a table to query,
+        # so this falls back to local extractive text search.
         explanation, sql_query, result_df = answer_from_file(prompt, active_file)
 
         return explanation, sql_query, result_df, None
@@ -2631,6 +2938,8 @@ if st.session_state.sidebar_open:
                                 use_container_width=True
                             ):
 
+                                cleanup_cortex_source_for_file(session, fname)
+
                                 del st.session_state.stored_files[fname]
 
                                 if st.session_state.active_file == fname:
@@ -2753,6 +3062,9 @@ if st.session_state.sidebar_open:
             type="primary",
             key="btn_clear_sessions"
         ):
+
+            for _fname in list(st.session_state.stored_files.keys()):
+                cleanup_cortex_source_for_file(session, _fname)
 
             st.session_state.chat_sessions = {}
             st.session_state.stored_files = {}
