@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import re
+import difflib
 from datetime import datetime
 import requests
 import snowflake.connector
@@ -752,257 +754,521 @@ def extract_data_from_upload(uploaded_file):
         return f"[Could not read '{name}': {e}]", None
 
 
-def _call_groq_json(system_prompt, user_message):
-    """Calls the Groq chat completions API and returns the raw
-    response text (expected to be a JSON object). Raises on
-    network/HTTP errors so callers can report them."""
+# ------------------------------------------------------------
+# DETERMINISTIC QUERY ENGINE (pandas only — no LLM anywhere)
+# ------------------------------------------------------------
+# Every number this
+# engine returns comes straight out of a pandas call that this
+# code builds and runs itself — nothing is guessed, invented, or
+# hallucinated by a model. There are two levels of it:
+#
+#   1. A lightweight keyword/pattern parser (below) that maps a
+#      typed question to an aggregation + column(s), for the
+#      "ask anything" chat feel. If it can't confidently match a
+#      real column and operation, it says so instead of guessing.
+#   2. A menu-driven "Guided Query" builder (further down) that
+#      lets the user pick column/operation/group-by/filter from
+#      dropdowns — this is always exact, since nothing is parsed.
+# ------------------------------------------------------------
 
-    groq_api_key = st.secrets.get("groq", {}).get("api_key", "")
+_AGG_KEYWORDS = [
+    # Checked in order — "distinct"/"unique" must be checked before
+    # the generic "how many"/"count" keywords, since phrasings like
+    # "how many distinct suppliers" contain both and should resolve
+    # to nunique, not a plain row count.
+    (["distinct", "unique"], "nunique"),
+    (["how many", "count", "number of", "no. of", "no of"], "count"),
+    (["total", "sum", "overall"], "sum"),
+    (["average", "avg", "mean"], "mean"),
+    (["median"], "median"),
+    (["maximum", "max ", "highest", "largest", "biggest", "top"], "max"),
+    (["minimum", "min ", "lowest", "smallest"], "min"),
+]
 
-    if not groq_api_key:
-        raise RuntimeError(
-            "File Q&A is not configured yet. Please add `api_key` "
-            "under a `[groq]` section in your Streamlit secrets "
-            "(get a free key at console.groq.com)."
-        )
+_GROUPBY_PATTERNS = [
+    r"(?:grouped by|group by|breakdown by|broken down by)\s+([a-z0-9_ ]+?)(?:\?|$|,|\.)",
+    r"\bby\s+([a-z0-9_ ]+?)(?:\?|$|,|\.)",
+    r"\bper\s+([a-z0-9_ ]+?)(?:\?|$|,|\.)",
+    r"for each\s+([a-z0-9_ ]+?)(?:\?|$|,|\.)",
+]
 
-    url = "https://api.groq.com/openai/v1/chat/completions"
-
-    headers = {
-        "Authorization": f"Bearer {groq_api_key}",
-        "Content-Type": "application/json"
-    }
-
-    request_body = {
-        "model": "openai/gpt-oss-20b",
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message}
-        ],
-        "temperature": 0.1
-    }
-
-    response = requests.post(
-        url,
-        headers=headers,
-        json=request_body,
-        timeout=60
-    )
-
-    if response.status_code != 200:
-        try:
-            error_json = response.json()
-            error_message = (
-                error_json.get("error", {}).get("message")
-                or response.text
-            )
-        except Exception:
-            error_message = response.text
-
-        raise RuntimeError(error_message)
-
-    result = response.json()
-
-    return (
-        result.get("choices", [{}])[0]
-        .get("message", {})
-        .get("content", "")
-        .strip()
-    )
+_FILTER_PATTERNS = [
+    r"where\s+([a-z0-9_ ]+?)\s+(?:is|=|==|equals?)\s+([a-z0-9_ .\-]+?)(?:\?|$|,|\.)",
+    r"for\s+([a-z0-9_ ]+?)\s*=\s*([a-z0-9_ .\-]+?)(?:\?|$|,|\.)",
+]
 
 
-def _parse_json_response(raw_text):
-    """Best-effort parse of a JSON object out of an LLM response,
-    stripping markdown code fences if present."""
-
-    import json
-
-    cleaned = raw_text.strip()
-
-    if cleaned.startswith("```"):
-        cleaned = cleaned.strip("`")
-        if cleaned.lower().startswith("json"):
-            cleaned = cleaned[4:]
-        cleaned = cleaned.strip()
-
-    return json.loads(cleaned)
+_GENERIC_COLUMN_WORDS = {"name", "id", "value", "amount", "code", "type", "date"}
 
 
-def _generate_narrative_overview(df, fname):
-    """Asks the LLM to describe, in plain business language, what
-    this dataset represents and what it's typically used for —
-    based on the column names and a few sample rows. This is
-    separate from the numeric/categorical stats block: those are
-    computed directly with pandas (real numbers), while this is
-    purely an interpretive, human-readable summary. Returns None
-    on any failure (missing config, network error, etc.) so the
-    caller can just fall back to the stats-only view."""
+def _singularize(word):
+    """Crude but safe English singularizer — good enough to match
+    'suppliers' to a column word 'supplier' without over-matching
+    unrelated short words."""
 
-    try:
+    if len(word) > 4 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 4 and word.endswith("es") and word[-3] not in "aeiou":
+        return word[:-2]
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
 
-        columns = list(df.columns)
-        sample_csv = df.head(5).to_csv(index=False)
 
-        system_prompt = (
-            "You are a data analyst describing a dataset to a "
-            "non-technical business user. Given the file name, "
-            "column names, and a few sample rows, write a short "
-            "plain-English description (2-4 sentences, flowing "
-            "prose, no bullet points, no markdown headers) of what "
-            "this dataset represents and what it is typically used "
-            "for. Infer the business context from the column names "
-            "(e.g. event/attendance tracking, sales orders, "
-            "inventory levels). Do NOT mention data types, row or "
-            "column counts, or statistics — only the business "
-            "meaning of the data."
-        )
+def _words(text):
+    return [_singularize(w) for w in re.findall(r"[a-z0-9]+", text.lower())]
 
-        user_message = (
-            f"File name: {fname}\n"
-            f"Columns: {', '.join(columns)}\n\n"
-            f"Sample rows:\n{sample_csv}"
-        )
 
-        narrative = _call_groq_json(system_prompt, user_message)
+def _match_column(token, columns):
+    """Fuzzy-matches a user-typed word/phrase to one of the file's
+    actual column names, singular/plural-insensitive. Tries an
+    exact match first, then a word-subset match (only if exactly
+    one column qualifies), then a close-spelling match — and
+    returns None (never a guess) if the match is ambiguous or
+    nothing lines up confidently."""
 
-        return narrative.strip() if narrative else None
+    token_words = set(_words(token))
 
-    except Exception:
-
-        # Narrative summary is a nice-to-have on top of the real
-        # stats below — never let it block or error out the
-        # overview if Groq isn't configured or is unreachable.
+    if not token_words:
         return None
 
+    lower_map = {c.lower().replace("_", " "): c for c in columns}
+    token_clean = " ".join(sorted(token_words))
 
-def answer_from_file(prompt, fname):
-    """Answer a question about the active uploaded file, via the
-    Groq API. Tabular files (csv/xlsx/xls) are queried with real
-    SQL over the FULL dataset (loaded into an in-memory SQLite
-    table) so KPI-style questions return the same shape as the
-    Cortex Analyst path: (explanation, sql, result_dataframe).
-    Non-tabular files fall back to a plain text-context answer."""
+    for lower_name, real_name in lower_map.items():
+        if set(_words(lower_name)) == token_words:
+            return real_name
 
-    file_data = st.session_state.stored_files.get(fname, {})
-    df = file_data.get("df")
+    # Word-subset match in either direction (handles "suppliers" ->
+    # "Supplier Name", and "order value" -> exact column of the
+    # same words). Only accepted if exactly one column qualifies —
+    # ties mean the question is ambiguous, so refuse rather than
+    # guess.
+    subset_hits = [
+        real_name
+        for lower_name, real_name in lower_map.items()
+        if (token_words <= set(_words(lower_name)))
+        or (set(_words(lower_name)) <= token_words)
+    ]
 
-    # ---------------- Tabular file: text-to-SQL over SQLite ----------------
-    if df is not None:
+    if len(subset_hits) == 1:
+        return subset_hits[0]
+
+    if len(subset_hits) > 1:
+        return None
+
+    close = difflib.get_close_matches(
+        token_clean, list(lower_map.keys()), n=2, cutoff=0.75
+    )
+
+    if len(close) == 1:
+        return lower_map[close[0]]
+
+    return None
+
+
+def _detect_aggregation(p):
+    for keywords, agg in _AGG_KEYWORDS:
+        for kw in keywords:
+            if kw in p:
+                return agg
+    return None
+
+
+def _detect_groupby(p, columns):
+    for pattern in _GROUPBY_PATTERNS:
+        match = re.search(pattern, p)
+        if match:
+            matched_col = _match_column(match.group(1), columns)
+            if matched_col:
+                return matched_col
+    return None
+
+
+def _detect_filter(p, columns):
+    for pattern in _FILTER_PATTERNS:
+        match = re.search(pattern, p)
+        if match:
+            matched_col = _match_column(match.group(1), columns)
+            if matched_col:
+                return matched_col, match.group(2).strip()
+    return None
+
+
+def _detect_metric_column(p, columns, numeric_columns):
+    """Finds the single column the question is most plausibly
+    referring to. A column only counts as matched if either (a)
+    every word in its name appears in the question, or (b) every
+    one of its non-generic words (i.e. excluding filler like
+    'name'/'value'/'id') appears in the question. If more than one
+    column ties for the best match, this returns None rather than
+    guessing which one the user meant."""
+
+    q_words = set(_words(p))
+
+    def score(col):
+        col_words = _words(col)
+        if not col_words:
+            return 0
+        if all(w in q_words for w in col_words):
+            return 100 + len(col_words)
+        significant = [w for w in col_words if w not in _GENERIC_COLUMN_WORDS]
+        if significant and all(w in q_words for w in significant):
+            return 50 + len(significant)
+        return 0
+
+    def best(cols):
+        scored = sorted(
+            ((score(c), c) for c in cols if score(c) > 0),
+            key=lambda x: -x[0]
+        )
+        if not scored:
+            return None
+        if len(scored) > 1 and scored[0][0] == scored[1][0]:
+            return None
+        return scored[0][1]
+
+    # Prefer a numeric column match (most questions ask about a
+    # metric); fall back to any column (covers count/nunique on a
+    # categorical column, e.g. "how many distinct suppliers").
+    return best(numeric_columns) or best(columns)
+
+
+def answer_question_from_dataframe(prompt, df):
+    """Deterministically answers a question about `df` using only
+    pandas. Returns (explanation, computation_description,
+    result_df). `computation_description` is the exact pandas
+    call that was executed, shown to the user for full
+    transparency — there is no SQL involved and nothing is
+    inferred beyond simple keyword matching to real column names."""
+
+    p = f" {prompt.lower().strip()} "
+
+    columns = list(df.columns)
+    numeric_columns = df.select_dtypes(include="number").columns.tolist()
+
+    if re.search(r"how many (rows|records|entries)|total (rows|records)|row count", p):
+        return (
+            f"There are **{len(df):,} rows** in this file.",
+            "len(df)",
+            None
+        )
+
+    filter_result = _detect_filter(p, columns)
+    working_df = df
+    filter_note = ""
+
+    if filter_result:
+        filter_col, filter_val = filter_result
+        mask = (
+            working_df[filter_col]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            == filter_val.strip().lower()
+        )
+        working_df = working_df[mask]
+        filter_note = f" where `{filter_col}` = \"{filter_val}\""
+
+    aggregation = _detect_aggregation(p)
+    group_col = _detect_groupby(p, columns)
+    metric_col = _detect_metric_column(p, columns, numeric_columns)
+
+    if aggregation is None:
+        return (
+            "I couldn't confidently match that question to a specific "
+            "calculation, so rather than guess I've left it unanswered. "
+            "Try rephrasing with a clear operation (total / average / "
+            "count / max / min) and a column name — or use the "
+            "**🎛️ Guided Query** panel below the chat for a menu-driven "
+            "question that's always exact.\n\n"
+            f"Available columns: {', '.join(columns)}",
+            None,
+            None
+        )
+
+    if aggregation == "count" and metric_col is None:
+        return (
+            f"**Count{filter_note}: {len(working_df):,}**",
+            "len(df)" + (" [after filter]" if filter_note else ""),
+            None
+        )
+
+    if metric_col is None:
+        return (
+            "I recognized the operation but couldn't confidently match "
+            "it to one of this file's actual columns, so I won't guess "
+            f"at a result. Available columns: {', '.join(columns)}",
+            None,
+            None
+        )
+
+    if group_col and group_col != metric_col:
 
         try:
-
-            import sqlite3
-
-            total_rows = len(df)
-
-            schema_lines = [
-                f"- {col} ({str(dtype)})"
-                for col, dtype in df.dtypes.items()
-            ]
-            schema_text = "\n".join(schema_lines)
-
-            sample_csv = df.head(5).to_csv(index=False)
-
-            system_prompt = (
-                "You are a data analyst. You have access to a SQLite "
-                "table named `uploaded_data` with this schema:\n"
-                f"{schema_text}\n\n"
-                f"The table has exactly {total_rows} rows in total "
-                "(not just the sample below). Here are the first 5 "
-                f"rows as a sample of the data format:\n{sample_csv}\n\n"
-                "Given the user's question, respond with ONLY a JSON "
-                "object (no markdown, no code fences) with exactly "
-                "two fields:\n"
-                '  "explanation": a short natural-language summary of '
-                "what the answer shows.\n"
-                '  "sql": a single valid SQLite SELECT query against '
-                "`uploaded_data` that answers the question using the "
-                "FULL table (never assume only the sample rows exist). "
-                "If the question is a greeting or cannot be answered "
-                "with a query, set \"sql\" to null and just answer in "
-                '"explanation".'
+            grouped = (
+                working_df.groupby(group_col)[metric_col]
+                .agg(aggregation)
+                .reset_index()
+                .sort_values(by=metric_col, ascending=False)
             )
-
-            raw_response = _call_groq_json(system_prompt, prompt)
-
-            try:
-                parsed = _parse_json_response(raw_response)
-            except Exception:
-                # Model didn't return clean JSON — treat the whole
-                # response as the explanation with no query.
-                return raw_response, None, None
-
-            explanation = parsed.get("explanation", "").strip()
-            sql_query = parsed.get("sql")
-
-            if not sql_query:
-                return (
-                    explanation or "I couldn't generate an answer from the file.",
-                    None,
-                    None
-                )
-
-            conn = sqlite3.connect(":memory:")
-
-            try:
-                df.to_sql("uploaded_data", conn, index=False, if_exists="replace")
-                result_df = pd.read_sql_query(sql_query, conn)
-            finally:
-                conn.close()
-
-            return explanation or "Here is the result from your file.", sql_query, result_df
-
-        except RuntimeError as e:
-            return f"Error answering from the uploaded file.\n\n**Error:** {str(e)}", None, None
-
         except Exception as e:
             return (
-                "The generated query could not be run against the "
-                f"file.\n\n**Error:** {str(e)}",
+                f"Could not compute `{aggregation}` of `{metric_col}` "
+                f"grouped by `{group_col}`.\n\n**Error:** {str(e)}",
                 None,
                 None
             )
 
-    # ---------------- Non-tabular file: plain text context ----------------
+        explanation = (
+            f"**{aggregation.capitalize()} of `{metric_col}` by "
+            f"`{group_col}`**{filter_note}:"
+        )
+
+        computation = (
+            f"df.groupby('{group_col}')['{metric_col}'].{aggregation}()"
+        )
+
+        return explanation, computation, grouped
+
     try:
-
-        file_text = file_data.get("text", "")
-        context = file_text[:60000]
-
-        system_prompt = (
-            "You are a helpful assistant. Use the document content "
-            "provided by the user to answer their question. If the "
-            "answer is not in the document, say so clearly."
-        )
-
-        user_message = (
-            f"DOCUMENT:\n{context}\n\n"
-            f"QUESTION: {prompt}"
-        )
-
-        answer = _call_groq_json(system_prompt, user_message)
-
-        if answer:
-            return answer, None, None
-
-        return "I couldn't generate an answer from the file.", None, None
-
-    except RuntimeError as e:
-        return f"Error answering from the uploaded file.\n\n**Error:** {str(e)}", None, None
-
+        result_value = getattr(working_df[metric_col], aggregation)()
     except Exception as e:
-        return f"Error answering from the uploaded file.\n\n**Error:** {str(e)}", None, None
+        return (
+            f"Could not compute `{aggregation}` of `{metric_col}`.\n\n"
+            f"**Error:** {str(e)}",
+            None,
+            None
+        )
+
+    result_display = (
+        f"{result_value:,.2f}" if isinstance(result_value, float)
+        else f"{result_value:,}"
+    )
+
+    explanation = (
+        f"**{aggregation.capitalize()} of `{metric_col}`{filter_note}: "
+        f"{result_display}**"
+    )
+
+    computation = f"df['{metric_col}'].{aggregation}()"
+
+    return explanation, computation, None
+
+
+def _keyword_search_text(prompt, text, top_n=3):
+    """Extractive, deterministic search over plain text: splits the
+    document into paragraphs, scores each by how many of the
+    question's significant words it contains, and returns the
+    best-matching passages verbatim — no rewriting, no LLM, so
+    nothing can be fabricated. This is what PDF/Word/txt Q&A uses
+    now instead of an LLM summarizing/answering."""
+
+    stopwords = {
+        "the", "a", "an", "is", "are", "was", "were", "of", "in",
+        "on", "for", "to", "and", "or", "what", "which", "how",
+        "does", "do", "this", "that", "with", "about", "as", "by",
+        "at", "from", "it", "its", "be", "has", "have", "many"
+    }
+
+    question_words = {
+        w for w in re.findall(r"[a-z0-9']+", prompt.lower())
+        if w not in stopwords and len(w) > 2
+    }
+
+    if not question_words:
+        return []
+
+    paragraphs = [
+        para.strip() for para in re.split(r"\n\s*\n|\n", text)
+        if para.strip()
+    ]
+
+    scored = []
+
+    for para in paragraphs:
+        para_words = set(re.findall(r"[a-z0-9']+", para.lower()))
+        overlap = len(question_words & para_words)
+        if overlap > 0:
+            scored.append((overlap, para))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    return [para for _, para in scored[:top_n]]
+
+
+def answer_from_file(prompt, fname):
+    """Answers a question about the active uploaded file using only
+    deterministic Python: pandas for tabular files (csv/xlsx/xls),
+    keyword search over the extracted text for everything else. No
+    LLM is involved anywhere in this function, so a result can
+    never drift from what's actually in the file — every number or
+    passage returned is either computed directly by pandas or
+    quoted verbatim from the document."""
+
+    file_data = st.session_state.stored_files.get(fname, {})
+    df = file_data.get("df")
+
+    if df is not None:
+        return answer_question_from_dataframe(prompt, df)
+
+    file_text = file_data.get("text", "")
+    matches = _keyword_search_text(prompt, file_text)
+
+    if not matches:
+        return (
+            "I couldn't find any passages in this document matching "
+            "your question's key words. Try rephrasing with more of "
+            "the specific terms you're looking for.",
+            None,
+            None
+        )
+
+    explanation = (
+        "Here are the passages from the document that best match "
+        "your question, shown exactly as written (nothing here is "
+        "paraphrased, summarized, or inferred):\n\n"
+        + "\n\n---\n\n".join(f"> {m}" for m in matches)
+    )
+
+    return explanation, None, None
+
+
+def render_guided_query_builder(df):
+    """Menu-driven query builder: metric column + aggregation +
+    optional group-by + optional equality filter, all picked from
+    dropdowns. Nothing here is parsed from free text, so the result
+    is always exactly what the dropdowns say — the guaranteed-
+    accurate fallback whenever a typed question isn't confidently
+    understood by the keyword parser above. Returns
+    (explanation, computation_description, result_df) only on the
+    turn the user clicks "Run Query"; otherwise returns None."""
+
+    numeric_cols = df.select_dtypes(include="number").columns.tolist()
+    all_cols = list(df.columns)
+
+    if not numeric_cols:
+        return None
+
+    with st.expander("🎛️ Guided Query (menu-driven, always exact)", expanded=False):
+
+        gcol1, gcol2, gcol3 = st.columns(3)
+
+        metric_col = gcol1.selectbox("Metric column", numeric_cols, key="gq_metric")
+
+        agg_choice = gcol2.selectbox(
+            "Aggregation",
+            ["Sum", "Average", "Count", "Min", "Max", "Median", "Distinct count"],
+            key="gq_agg"
+        )
+
+        group_col_choice = gcol3.selectbox(
+            "Group by (optional)",
+            ["(none)"] + all_cols,
+            key="gq_group"
+        )
+
+        fcol1, fcol2 = st.columns(2)
+
+        filter_col_choice = fcol1.selectbox(
+            "Filter column (optional)",
+            ["(none)"] + all_cols,
+            key="gq_filter_col"
+        )
+
+        filter_val = None
+
+        if filter_col_choice != "(none)":
+
+            distinct_values = df[filter_col_choice].dropna().unique().tolist()
+
+            if 0 < len(distinct_values) <= 200:
+                filter_val = fcol2.selectbox(
+                    "Equals",
+                    distinct_values,
+                    key="gq_filter_val"
+                )
+            else:
+                filter_val = fcol2.text_input(
+                    "Equals",
+                    key="gq_filter_val_text"
+                ) or None
+
+        if st.button("Run Query", key="gq_run", type="primary"):
+
+            agg_map = {
+                "Sum": "sum", "Average": "mean", "Count": "count",
+                "Min": "min", "Max": "max", "Median": "median",
+                "Distinct count": "nunique"
+            }
+
+            aggregation = agg_map[agg_choice]
+
+            working_df = df
+            filter_note = ""
+
+            if filter_col_choice != "(none)" and filter_val is not None:
+                working_df = working_df[working_df[filter_col_choice] == filter_val]
+                filter_note = f" where `{filter_col_choice}` = \"{filter_val}\""
+
+            try:
+
+                if group_col_choice != "(none)" and group_col_choice != metric_col:
+
+                    result_df = (
+                        working_df.groupby(group_col_choice)[metric_col]
+                        .agg(aggregation)
+                        .reset_index()
+                        .sort_values(by=metric_col, ascending=False)
+                    )
+
+                    explanation = (
+                        f"**{agg_choice} of `{metric_col}` by "
+                        f"`{group_col_choice}`**{filter_note}:"
+                    )
+
+                    computation = (
+                        f"df.groupby('{group_col_choice}')"
+                        f"['{metric_col}'].{aggregation}()"
+                    )
+
+                    return explanation, computation, result_df
+
+                result_value = getattr(working_df[metric_col], aggregation)()
+
+                result_display = (
+                    f"{result_value:,.2f}" if isinstance(result_value, float)
+                    else f"{result_value:,}"
+                )
+
+                explanation = (
+                    f"**{agg_choice} of `{metric_col}`{filter_note}: "
+                    f"{result_display}**"
+                )
+
+                computation = f"df['{metric_col}'].{aggregation}()"
+
+                return explanation, computation, None
+
+            except Exception as e:
+
+                return (
+                    f"Could not run that query.\n\n**Error:** {str(e)}",
+                    None,
+                    None
+                )
+
+    return None
 
 
 def generate_file_question_suggestions(fname):
     """Returns a list of ~5 short, clickable KPI/analysis
-    questions grounded in the actual columns of the uploaded
-    file `fname`. Results are cached per filename in
-    session_state so the LLM is only called once per upload,
-    not on every rerun or button click. Falls back to a
-    deterministic, schema-based list (no LLM needed) if Groq
-    isn't configured or the call fails, so something useful is
-    always shown."""
+    questions grounded in the actual columns of the uploaded file
+    `fname`. Built purely from the schema (column names + dtypes)
+    with plain Python — no LLM involved — so every suggested
+    question is guaranteed answerable and grounded in real
+    columns. Cached per filename so this only runs once per
+    upload."""
 
     cached = st.session_state.file_question_suggestions.get(fname)
 
@@ -1021,71 +1287,32 @@ def generate_file_question_suggestions(fname):
         st.session_state.file_question_suggestions[fname] = fallback
         return fallback
 
-    columns = list(df.columns)
     numeric_cols = df.select_dtypes(include="number").columns.tolist()
     categorical_cols = df.select_dtypes(include="object").columns.tolist()
 
-    questions = None
+    questions = ["How many total records are there?"]
 
-    try:
-
-        sample_csv = df.head(5).to_csv(index=False)
-
-        system_prompt = (
-            "You are a data analyst. Given a dataset's column names "
-            "and a few sample rows, suggest 5 short, specific KPI or "
-            "business-analysis questions a user could ask about this "
-            "data — questions answerable with a SQL query over this "
-            "table. Ground every question in actual column names "
-            "from the data (don't invent columns). Respond with "
-            "ONLY a JSON array of 5 short question strings, e.g. "
-            '["question 1", "question 2", ...]. No markdown, no '
-            "extra text, no explanation — just the JSON array."
+    if categorical_cols:
+        questions.append(
+            f"What is the breakdown by {categorical_cols[0]}?"
         )
 
-        user_message = (
-            f"Columns: {', '.join(columns)}\n\n"
-            f"Sample rows:\n{sample_csv}"
+    if numeric_cols:
+        questions.append(
+            f"What is the average {numeric_cols[0]}?"
         )
 
-        raw_response = _call_groq_json(system_prompt, user_message)
-        parsed = _parse_json_response(raw_response)
+    if len(categorical_cols) > 1:
+        questions.append(
+            f"How many records fall under each {categorical_cols[1]}?"
+        )
 
-        if isinstance(parsed, list) and parsed:
-            questions = [
-                str(q).strip() for q in parsed if str(q).strip()
-            ][:5]
+    if numeric_cols and categorical_cols:
+        questions.append(
+            f"What is the total {numeric_cols[0]} by {categorical_cols[0]}?"
+        )
 
-    except Exception:
-        questions = None
-
-    if not questions:
-
-        # Deterministic fallback built straight from the schema —
-        # always available even without Groq configured.
-        questions = ["How many total records are there?"]
-
-        if categorical_cols:
-            questions.append(
-                f"What is the breakdown by {categorical_cols[0]}?"
-            )
-
-        if numeric_cols:
-            questions.append(
-                f"What is the average {numeric_cols[0]}?"
-            )
-
-        if len(categorical_cols) > 1:
-            questions.append(
-                f"How many records fall under each {categorical_cols[1]}?"
-            )
-
-        if numeric_cols and categorical_cols:
-            questions.append(
-                f"What is the total {numeric_cols[0]} by {categorical_cols[0]}?"
-            )
-
-        questions = questions[:5]
+    questions = questions[:5]
 
     st.session_state.file_question_suggestions[fname] = questions
 
@@ -1093,40 +1320,28 @@ def generate_file_question_suggestions(fname):
 
 
 def generate_file_overview(fname):
-    """Automatically summarizes a freshly uploaded file.
-
-    The response leads with a plain-English narrative (via
-    `_generate_narrative_overview`) describing what the dataset
-    IS and what it's used for — this is the part the user reads
-    first. Underneath it, the real pandas-computed technical
-    details (row/column counts, missing values, numeric ranges,
-    distinct value counts) are still included as a reference
-    section — nothing is guessed for those, they come straight
-    from the data. Returns (explanation, sql, preview_df)."""
+    """Automatically summarizes a freshly uploaded file using only
+    pandas-computed facts — row/column counts, missing values,
+    numeric ranges, distinct value counts. Nothing here is an LLM
+    guess at what the data "means"; it's exactly what's in the
+    file. Returns (explanation, computation, preview_df)."""
 
     file_data = st.session_state.stored_files.get(fname, {})
     df = file_data.get("df")
 
     if df is None:
-        # Non-tabular file — ask the LLM to summarize the extracted text.
+        # Non-tabular file — show the first few extractive matches
+        # against a generic "overview" query instead of an LLM
+        # summary, so nothing here is paraphrased or invented.
         return answer_from_file(
-            "Give me an overview and the key observations about "
-            "this document.",
+            "summary overview key points",
             fname
         )
 
     total_rows = len(df)
     total_cols = len(df.columns)
 
-    narrative = _generate_narrative_overview(df, fname)
-
-    lines = []
-
-    if narrative:
-        lines.append(narrative)
-        lines.append("")
-
-    lines.append(f"**{fname}** — {total_rows:,} rows, {total_cols} columns.")
+    lines = [f"**{fname}** — {total_rows:,} rows, {total_cols} columns."]
     lines.append("")
     lines.append("**Columns:**")
 
@@ -1445,20 +1660,29 @@ def display_chart_tab(
 
 
 def show_query_result(sql_query, df, key_prefix):
-    """Renders the shared Generated-SQL / Data / Chart layout used
-    for both the Cortex Analyst path and the file-upload SQL path,
-    so both feel identical to the user."""
+    """Renders the shared Generated-SQL/Computation + Data/Chart
+    layout. Used for the Cortex Analyst path (real SQL, run against
+    Snowflake) and for the file-upload path (a plain description of
+    the exact pandas call that was run — never SQL, since no SQL
+    engine is involved for uploaded files anymore)."""
 
     if sql_query:
 
+        is_sql = sql_query.strip().lower().startswith(
+            ("select", "with")
+        )
+
+        label = "Generated SQL" if is_sql else "Computation"
+        language = "sql" if is_sql else "python"
+
         with st.expander(
-            "Generated SQL",
+            label,
             expanded=False
         ):
 
             st.code(
                 sql_query,
-                language="sql"
+                language=language
             )
 
     if df is None:
@@ -2201,47 +2425,11 @@ for idx, msg in enumerate(messages):
             msg["content"]
         )
 
-        if (
-            "sql" in msg
-            and msg["sql"]
-        ):
-
-            with st.expander(
-                "Generated SQL",
-                expanded=False
-            ):
-
-                st.code(
-                    msg["sql"],
-                    language="sql"
-                )
-
-        if (
-            "data" in msg
-            and msg["data"] is not None
-            and not msg["data"].empty
-        ):
-
-            tab1, tab2 = st.tabs(
-                [
-                    "Data 📄",
-                    "Chart 📈"
-                ]
-            )
-
-            with tab1:
-
-                st.dataframe(
-                    msg["data"],
-                    use_container_width=True
-                )
-
-            with tab2:
-
-                display_chart_tab(
-                    msg["data"],
-                    key_prefix=f"history_{current_id}_{idx}"
-                )
+        show_query_result(
+            msg.get("sql"),
+            msg.get("data"),
+            key_prefix=f"history_{current_id}_{idx}"
+        )
 
         if msg.get("suggestions"):
 
@@ -2276,6 +2464,39 @@ if st.session_state.active_file:
         f"📄 Currently answering from file: "
         f"**{st.session_state.active_file}**"
     )
+
+    _active_df = (
+        st.session_state.stored_files
+        .get(st.session_state.active_file, {})
+        .get("df")
+    )
+
+    if _active_df is not None:
+
+        _guided_result = render_guided_query_builder(_active_df)
+
+        if _guided_result:
+
+            _g_explanation, _g_computation, _g_df = _guided_result
+
+            messages.append(
+                {
+                    "role": "user",
+                    "content": "Guided query"
+                }
+            )
+
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": _g_explanation,
+                    "sql": _g_computation,
+                    "data": _g_df,
+                    "suggestions": None
+                }
+            )
+
+            st.rerun()
 
 
 # ============================================================
