@@ -2189,7 +2189,7 @@ def _keyword_search_text(prompt, text, top_n=3):
             if results:
                 return results
 
-            except Exception:
+        except Exception:
             pass  # fall through to the keyword-overlap method below
 
     stopwords = {
