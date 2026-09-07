@@ -769,13 +769,66 @@ def _sanitize_sql_identifier(name, fallback="COL"):
     return ident.upper()[:64]
 
 
+def _normalize_dataframe_for_snowflake(df):
+    """Normalizes dtypes so Snowpark's local type inference (used
+    by `session.create_dataframe`) doesn't choke on a column that
+    mixes types — e.g. an `object` column with some rows holding a
+    Python int and others holding a string or a blank/NaN. Snowpark
+    infers a column's Snowflake type from its values locally before
+    upload, and a mixed column trips it up with errors like
+    "Expected bytes, got a 'int' object".
+
+    Every `object`-dtype column is coerced to ONE consistent type:
+    numeric, if at least 70% of its non-null values genuinely look
+    numeric (after stripping thousands separators); otherwise a
+    clean string column, with real NaN/None left as an actual
+    `None` (not the string "nan")."""
+
+    clean = df.copy()
+
+    for col in clean.columns:
+
+        if clean[col].dtype != object:
+            continue
+
+        numeric_attempt = pd.to_numeric(
+            clean[col]
+            .astype(str)
+            .str.replace(",", "", regex=False)
+            .str.strip(),
+            errors="coerce"
+        )
+
+        non_null_mask = clean[col].notna()
+        looks_numeric = (
+            non_null_mask.any()
+            and (numeric_attempt[non_null_mask].notna().mean() >= 0.7)
+        )
+
+        if looks_numeric:
+            clean[col] = numeric_attempt
+        else:
+            clean[col] = clean[col].apply(
+                lambda v: (
+                    None
+                    if (v is None or (isinstance(v, float) and pd.isna(v)))
+                    else str(v)
+                )
+            )
+
+    return clean
+
+
 def push_dataframe_to_snowflake(session, df, table_fqn):
     """Writes `df` to Snowflake as table `table_fqn` (overwriting
     it if it already exists) via Snowpark, after normalizing every
-    column name into a safe SQL identifier. Returns the DataFrame
-    with the same normalized column names, which the caller then
-    uses to build the matching semantic model so the model's column
-    references line up exactly with what's actually in the table."""
+    column name into a safe SQL identifier and every column's dtype
+    into something Snowpark's local type inference can upload
+    without guessing wrong (see `_normalize_dataframe_for_snowflake`).
+    Returns the cleaned DataFrame, which the caller then uses to
+    build the matching semantic model so the model's column
+    references and data types line up exactly with what's actually
+    in the table."""
 
     clean_df = df.copy()
 
@@ -792,6 +845,8 @@ def push_dataframe_to_snowflake(session, df, table_fqn):
         new_columns.append(ident)
 
     clean_df.columns = new_columns
+
+    clean_df = _normalize_dataframe_for_snowflake(clean_df)
 
     snowpark_df = session.create_dataframe(clean_df)
     snowpark_df.write.mode("overwrite").save_as_table(table_fqn)
@@ -946,11 +1001,24 @@ def answer_file_question_with_cortex_analyst(session, prompt, fname):
     try:
         semantic_model_yaml = ensure_cortex_source_for_file(session, fname)
     except Exception as e:
+
+        error_text = str(e)
+
+        privilege_hint = ""
+        if re.search(
+            r"insufficient privileges|not authorized|access control",
+            error_text,
+            re.IGNORECASE
+        ):
+            privilege_hint = (
+                " This usually means the logged-in Snowflake role "
+                "can't create a table in the configured database/"
+                "schema."
+            )
+
         return (
-            f"Could not prepare **{fname}** for Cortex Analyst — this "
-            f"usually means the logged-in Snowflake role can't create "
-            f"a table in the configured database/schema.\n\n"
-            f"**Error:** {str(e)}",
+            f"Could not prepare **{fname}** for Cortex Analyst.{privilege_hint}"
+            f"\n\n**Error:** {error_text}",
             None
         )
 
