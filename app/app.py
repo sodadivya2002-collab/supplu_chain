@@ -96,8 +96,8 @@ st.markdown(
         transition: all 0.15s ease;
     }
     div[data-testid="stButton"] > button:hover {
-        border-color: #ff3046;
-        color: #ff3046;
+        border-color: #4ca2ff;
+        color: #4ca2ff;
         background: transparent;
     }
 
@@ -117,8 +117,8 @@ st.markdown(
     }
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button:hover {
         background: transparent;
-        border-color: #ff3046;
-        color: #ff3046 !important;
+        border-color: #4ca2ff;
+        color: #4ca2ff !important;
     }
 
     /* ---------- Sidebar: primary action buttons ---------- */
@@ -140,8 +140,8 @@ st.markdown(
     }
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"]:hover {
         background: transparent;
-        color: #ff3046 !important;
-        border-color: #ff3046;
+        color: #4ca2ff !important;
+        border-color: #4ca2ff;
     }
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"]:disabled {
         background: transparent;
@@ -156,9 +156,9 @@ st.markdown(
     div[data-testid="stVerticalBlockBorderWrapper"].st-key-upload_btn_active button[kind="primary"],
     .st-key-module_btn_active button[kind="primary"],
     .st-key-upload_btn_active button[kind="primary"] {
-        border-color: #ff3046 !important;
-        color: #ff3046 !important;
-        box-shadow: 0 0 0 1px rgba(255, 48, 70, 0.25) !important;
+        border-color: #4ca2ff !important;
+        color: #4ca2ff !important;
+        box-shadow: 0 0 0 1px rgba(76, 162, 255, 0.25) !important;
     }
 
     section[data-testid="stSidebar"] div[data-testid="stExpander"] {
@@ -172,7 +172,7 @@ st.markdown(
         padding: 4px 4px;
     }
     section[data-testid="stSidebar"] div[data-testid="stExpander"] summary:hover {
-        color: #ff3046 !important;
+        color: #4ca2ff !important;
     }
     section[data-testid="stSidebar"] div[data-testid="stExpanderDetails"] {
         background: #0b2044;
@@ -222,14 +222,14 @@ st.markdown(
         padding: 0;
         border-radius: 6px;
         background: transparent;
-        color: #ff3046;
+        color: #4ca2ff;
         border: none;
         box-shadow: none;
         font-size: 1.15rem;
         font-weight: 700;
     }
     .st-key-floating_toggle div[data-testid="stButton"] > button:hover {
-        color: #ff5164;
+        color: #7cc0ff;
         background: transparent;
     }
     .st-key-floating_toggle [data-testid="stTooltipHoverTarget"] + div,
@@ -255,8 +255,8 @@ st.markdown(
     }
     .dily-icon-rail div[data-testid="stButton"] > button:hover {
         background: transparent;
-        border-color: #ff3046;
-        color: #ff3046;
+        border-color: #4ca2ff;
+        color: #4ca2ff;
     }
     .dily-icon-rail div[data-testid="column"] {
         display: flex;
@@ -511,7 +511,7 @@ st.markdown(
     .dily-login-hero h1 {
         font-size: 1.8rem;
         font-weight: 700;
-        color: #eef5ff;
+        color: #eef5ff !important;
         margin-bottom: 10px;
     }
     .dily-login-hero p.sub {
@@ -548,13 +548,13 @@ st.markdown(
     .dily-hero-copy h1 {
         font-size: 2.1rem;
         font-weight: 700;
-        color: #eef5ff;
+        color: #eef5ff !important;
         line-height: 1.2;
         margin-bottom: 14px;
         letter-spacing: -0.02em;
     }
     .dily-hero-copy h1 span {
-        color: #ff3046;
+        color: #ff3046 !important;
     }
     .dily-hero-copy p.sub {
         color: #94afd1;
@@ -566,7 +566,8 @@ st.markdown(
         width: 220px;
         height: 220px;
         border-radius: 50%;
-        background: radial-gradient(circle at 35% 30%, #ff3046 0%, #8a0f1a 60%, #2a0508 100%);
+        background: radial-gradient(circle at 35% 30%, #2f6fdb 0%, #123a6b 55%, #04122a 100%);
+        box-shadow: 0 0 46px rgba(47, 111, 219, 0.35);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -589,7 +590,7 @@ st.markdown(
         height: 26px;
         border-radius: 50%;
         background: #0b2044;
-        border: 1px solid rgba(255,48,70,0.4);
+        border: 1px solid rgba(76,162,255,0.4);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -611,13 +612,13 @@ st.markdown(
         border-radius: 26px !important;
         border: 1px solid #1c3a68 !important;
         background: #0d2650 !important;
-        box-shadow: 0 0 0 1px rgba(255,48,70,0.06), 0 8px 24px rgba(0,0,0,0.35);
+        box-shadow: 0 0 0 1px rgba(76,162,255,0.06), 0 8px 24px rgba(0,0,0,0.35);
         max-width: 760px;
         margin: 6px auto 0 auto;
     }
     div[data-testid="stChatInput"]:focus-within {
-        border-color: #ff3046 !important;
-        box-shadow: 0 0 0 3px rgba(255,48,70,0.15);
+        border-color: #4ca2ff !important;
+        box-shadow: 0 0 0 3px rgba(76,162,255,0.15);
     }
     div[data-testid="stChatInput"] textarea,
     div[data-testid="stChatInput"] [contenteditable="true"],
@@ -626,7 +627,7 @@ st.markdown(
         color: #eef5ff !important;
         -webkit-text-fill-color: #eef5ff !important;
         background: transparent !important;
-        caret-color: #ff3046 !important;
+        caret-color: #4ca2ff !important;
     }
     div[data-testid="stChatInput"] textarea::placeholder {
         color: #7d9bc1 !important;
@@ -644,7 +645,7 @@ st.markdown(
     div[data-testid="stChatInputFileUploaderButton"] button,
     div[data-testid="stChatInput"] button[title*="attach" i] {
         background: transparent !important;
-        color: #ff3046 !important;
+        color: #4ca2ff !important;
         border: none !important;
         box-shadow: none !important;
     }
