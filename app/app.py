@@ -15,7 +15,7 @@ import xml.etree.ElementTree as ET
 # ============================================================
 
 st.set_page_config(
-    page_title="Dilytics Chatbot",
+    page_title="Dilytics Supply Chain AI",
     page_icon="📦",
     layout="wide"
 )
@@ -1985,13 +1985,13 @@ def generate_sql_from_prompt(prompt):
         if active_file:
             greeting_subject = f"your uploaded file **{active_file}**"
             greeting_suggestions = generate_file_question_suggestions(active_file)
+            return (f"Hi there! 👋 Ask me anything about {greeting_subject}.\n\nHere are a few things you can try:", None, None, greeting_suggestions)
         elif module != "None":
             greeting_subject = f"your **{module}** data"
             greeting_suggestions = MODULE_GREETING_SUGGESTIONS.get(module, [])
+            return (f"Hi there! 👋 Ask me anything about {greeting_subject}.\n\nHere are a few things you can try:", None, None, greeting_suggestions)
         else:
-            greeting_subject = "your data"
-            greeting_suggestions = None
-        return (f"Hi there! 👋 Ask me anything about {greeting_subject}.\n\nHere are a few things you can try:", None, None, greeting_suggestions)
+            return ("👋 Hi there! Ask me anything about your data.\n\nChoose a **module** or **upload a file** to begin.", None, None, None)
 
     if _is_question_suggestion_request(p):
         if active_file: return (f"Here are some questions you could ask about **{active_file}**:", None, None, generate_file_question_suggestions(active_file))
