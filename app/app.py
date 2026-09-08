@@ -720,6 +720,7 @@ def get_snowflake_config():
 MODULE_SEMANTIC_VIEW_KEYS = {
     "Supply Chain": "semantic_view_supply_chain",
     "Inventory": "semantic_view_inventory",
+    "Sales": "semantic_view_sales"
 }
 
 def call_cortex_analyst(prompt, module="Supply Chain", semantic_model_yaml=None):
