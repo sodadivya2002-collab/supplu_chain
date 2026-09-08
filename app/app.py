@@ -831,9 +831,24 @@ def call_cortex_analyst(prompt, module="Supply Chain", semantic_model_yaml=None)
                 "Here are some questions I can answer:\n\n" + suggestion_text
             )
 
-        explanation = "\n\n".join(explanation_parts).strip()
-        if not explanation:
-            explanation = "Here is the result from Cortex Analyst."
+        raw_explanation = "\n\n".join(explanation_parts).strip()
+
+        if sql_query:
+            # Cortex Analyst's own text is usually just "This is our
+            # interpretation of your question: <question restated>",
+            # which is redundant with the question the user just typed.
+            # Show a clean, friendly line instead.
+            explanation = "Here are the results for your question:"
+        else:
+            # No SQL was generated (e.g. a clarification or suggestion
+            # response) — keep the model's text, just drop the generic label.
+            explanation = re.sub(
+                r"(?i)^\s*this is our interpretation of your question:?\s*",
+                "",
+                raw_explanation
+            ).strip()
+            if not explanation:
+                explanation = "Here is the result from Cortex Analyst."
 
         return explanation, sql_query
 
@@ -2164,12 +2179,14 @@ else:
 if len(messages) == 0:
     _selected_module = st.session_state.get("selected_module", "None")
     _active_file = st.session_state.get("active_file")
-    _hero_module = _active_file if _active_file else (_selected_module if _selected_module != "None" else "Data")
+    _hero_subject = _active_file if _active_file else (_selected_module if _selected_module != "None" else None)
+    _hero_title_middle = f"your {_hero_subject}<br>data" if _hero_subject else "your data"
+    _hero_sub_subject = f"{_hero_subject.lower()} " if _hero_subject else ""
     st.markdown(f"""
         <div class="dily-hero">
             <div class="dily-hero-copy">
-                <h1 style="color:#eef5ff !important;">Chat with your {_hero_module}<br>data using <span style="color:#4ca2ff !important;">Cortex AI</span></h1>
-                <p class="sub">Ask questions and get instant insights across your {_hero_module.lower()} data.</p>
+                <h1 style="color:#eef5ff !important;">Chat with {_hero_title_middle} using <span style="color:#4ca2ff !important;">Cortex AI</span></h1>
+                <p class="sub">Ask questions and get instant insights across your {_hero_sub_subject}data.</p>
             </div>
             <div class="dily-hero-graphic-wrap">
                 <div class="dily-hero-graphic"><div class="bubble">💬</div><div class="dot dot1">🔍</div><div class="dot dot2">📁</div><div class="dot dot3">📊</div></div>
