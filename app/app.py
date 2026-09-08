@@ -200,7 +200,7 @@ st.markdown(
         gap: 16px;
     }
     .dily-logo-box {
-    display: inline-flex;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
         background: #f20d2d;
@@ -211,7 +211,6 @@ st.markdown(
         padding: 14px 22px;
         border-radius: 2px;
         box-shadow: 0 8px 22px rgba(242, 13, 45, 0.20);
-}
     }
 
     /* ---------- Floating toggle ---------- */
