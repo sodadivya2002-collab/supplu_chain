@@ -190,9 +190,9 @@ st.markdown(
         border-bottom: none;
         display: flex;
         align-items: center;
-        justify-content: flex-end;
-        padding: 0 26px 0 76px;
-        z-index: 999999;
+        justify-content: flex-start;
+        padding: 0 26px 0 58px;
+        z-index: 999998;
     }
     .dily-navbar-left {
         display: flex;
@@ -2006,7 +2006,7 @@ def generate_sql_from_prompt(prompt):
 # TOP NAVBAR & UI RENDERING
 # ============================================================
 
-st.markdown('<div class="dily-navbar"></div>', unsafe_allow_html=True)
+st.markdown('<div class="dily-navbar"><div class="dily-navbar-left"><span class="dily-logo-box">DILYTICS</span></div></div>', unsafe_allow_html=True)
 
 with st.container(key="floating_toggle"):
     _toggle_label = "«" if st.session_state.sidebar_open else "»"
@@ -2148,7 +2148,6 @@ if len(messages) == 0:
                 <p class="sub">Ask questions and get instant insights across your {_hero_module.lower()} data.</p>
             </div>
             <div class="dily-hero-graphic-wrap">
-                <span class="dily-hero-badge">DILYTICS</span>
                 <div class="dily-hero-graphic"><div class="bubble">💬</div><div class="dot dot1">🔍</div><div class="dot dot2">📁</div><div class="dot dot3">📊</div></div>
             </div>
         </div>
