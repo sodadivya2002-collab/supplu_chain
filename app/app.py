@@ -278,6 +278,123 @@ st.markdown(
         visibility: hidden !important;
     }
 
+    /* ---------- LOGIN PAGE: generated AI-bot artwork ---------- */
+    .dily-login-bg {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        background: #020817;
+        overflow: hidden;
+    }
+
+    .dily-login-bg img {
+        width: 100vw;
+        height: 100vh;
+        object-fit: cover;
+        object-position: center center;
+        display: block;
+    }
+
+    /* Real Streamlit controls are placed over the matching controls in the artwork. */
+    .st-key-dily_login_widget_user,
+    .st-key-dily_login_widget_password,
+    .st-key-dily_login_widget_button {
+        position: fixed !important;
+        left: calc(50% + 300px) !important;
+        width: 423px !important;
+        max-width: calc(50vw - 335px) !important;
+        z-index: 30 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .st-key-dily_login_widget_user {
+        top: 42.3vh !important;
+    }
+
+    .st-key-dily_login_widget_password {
+        top: 52.7vh !important;
+    }
+
+    .st-key-dily_login_widget_button {
+        top: 61.0vh !important;
+    }
+
+    .st-key-dily_login_widget_user div[data-testid="stTextInput"],
+    .st-key-dily_login_widget_password div[data-testid="stTextInput"] {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .st-key-dily_login_widget_user div[data-testid="stTextInput"] input,
+    .st-key-dily_login_widget_password div[data-testid="stTextInput"] input {
+        width: 100% !important;
+        height: 50px !important;
+        min-height: 50px !important;
+        background: rgba(11, 42, 88, 0.88) !important;
+        color: #eaf4ff !important;
+        border: 1px solid rgba(74, 145, 231, 0.52) !important;
+        border-radius: 8px !important;
+        box-shadow: inset 0 0 18px rgba(31, 117, 220, 0.08) !important;
+        font-size: 0.95rem !important;
+        padding: 0 16px !important;
+        box-sizing: border-box !important;
+    }
+
+    .st-key-dily_login_widget_user div[data-testid="stTextInput"] input::placeholder,
+    .st-key-dily_login_widget_password div[data-testid="stTextInput"] input::placeholder {
+        color: #7e9bc0 !important;
+        opacity: 1 !important;
+    }
+
+    .st-key-dily_login_widget_user label,
+    .st-key-dily_login_widget_password label {
+        display: none !important;
+    }
+
+    .st-key-dily_login_widget_button div[data-testid="stButton"] {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .st-key-dily_login_widget_button div[data-testid="stButton"] > button {
+        width: 100% !important;
+        height: 52px !important;
+        border-radius: 7px !important;
+        background: linear-gradient(90deg, #ff1230, #f20b24) !important;
+        border: 1px solid #ff3048 !important;
+        color: #ffffff !important;
+        font-size: 1rem !important;
+        font-weight: 700 !important;
+        box-shadow: 0 8px 24px rgba(245, 20, 48, 0.25) !important;
+    }
+
+    .st-key-dily_login_widget_button div[data-testid="stButton"] > button:hover {
+        background: linear-gradient(90deg, #ff2440, #ff102c) !important;
+        border-color: #ff4a5d !important;
+        color: #ffffff !important;
+        transform: translateY(-1px);
+    }
+
+    /* Login screen must sit above Streamlit's normal page chrome. */
+    .dily-login-active ~ * {
+        position: relative;
+        z-index: 10;
+    }
+
+    @media (max-width: 1100px) {
+        .st-key-dily_login_widget_user,
+        .st-key-dily_login_widget_password,
+        .st-key-dily_login_widget_button {
+            left: auto !important;
+            right: 4vw !important;
+            width: 39vw !important;
+            max-width: none !important;
+        }
+    }
+
     /* ---------- Login page heading ---------- */
     .dily-login-hero {
         text-align: center;
@@ -1531,47 +1648,81 @@ if "snowpark_session" not in st.session_state:
     st.session_state.snowpark_session = None
 
 if not st.session_state.authenticated:
-    st.write("")
-    st.write("")
+    # Generated login artwork. Keep the existing authentication logic unchanged.
+    import base64
+    from pathlib import Path
+
+    login_image_path = Path(__file__).with_name("dilytics_login_page.png")
+    if not login_image_path.exists():
+        st.error("Login artwork file 'dilytics_login_page.png' is missing. Keep it in the same folder as this Python file.")
+        st.stop()
+
+    login_image_b64 = base64.b64encode(login_image_path.read_bytes()).decode("utf-8")
+
     st.markdown(
-        """
-        <div class="dily-login-hero">
-            <h1>Welcome to Dilytics Chatbot</h1>
-            <p class="sub">Please log in to connect to your Snowflake data warehouse.</p>
+        f"""
+        <div class="dily-login-active">
+            <div class="dily-login-bg">
+                <img src="data:image/png;base64,{login_image_b64}" alt="Dilytics AI login" />
+            </div>
         </div>
         """,
         unsafe_allow_html=True
     )
-    login_col = st.columns([1, 1.2, 1])[1]
-    with login_col:
-        st.session_state.username = st.text_input("Snowflake Username", value=st.session_state.username)
-        st.session_state.password = st.text_input("Password", type="password")
-        if st.button("Login", use_container_width=True, type="primary"):
-            if not st.session_state.username:
-                st.error("Please enter your Snowflake username.")
-                st.stop()
-            if not st.session_state.password:
-                st.error("Please enter your Snowflake password.")
-                st.stop()
-            try:
-                with st.spinner("Connecting to Snowflake..."):
-                    config = get_snowflake_config()
-                    connection_parameters = {
-                        "account": config["account"],
-                        "user": st.session_state.username,
-                        "password": st.session_state.password,
-                        "role": config["role"],
-                        "warehouse": config["warehouse"],
-                        "database": config["database"],
-                        "schema": config["schema"]
-                    }
-                    conn = snowflake.connector.connect(**connection_parameters)
-                    conn.close()
-                    st.session_state.snowpark_session = Session.builder.configs(connection_parameters).create()
-                    st.session_state.authenticated = True
-                    st.rerun()
-            except Exception as e:
-                st.error(f"Authentication failed: {str(e)}")
+
+    user_container = st.container(key="dily_login_widget_user")
+    with user_container:
+        st.session_state.username = st.text_input(
+            "Username",
+            value=st.session_state.username,
+            placeholder="Enter your username",
+            label_visibility="collapsed"
+        )
+
+    password_container = st.container(key="dily_login_widget_password")
+    with password_container:
+        st.session_state.password = st.text_input(
+            "Password",
+            type="password",
+            placeholder="Enter your password",
+            label_visibility="collapsed"
+        )
+
+    button_container = st.container(key="dily_login_widget_button")
+    with button_container:
+        login_clicked = st.button(
+            "Sign in to Dilytics  →",
+            use_container_width=True,
+            type="primary"
+        )
+
+    if login_clicked:
+        if not st.session_state.username:
+            st.error("Please enter your Snowflake username.")
+            st.stop()
+        if not st.session_state.password:
+            st.error("Please enter your Snowflake password.")
+            st.stop()
+        try:
+            with st.spinner("Connecting to Snowflake..."):
+                config = get_snowflake_config()
+                connection_parameters = {
+                    "account": config["account"],
+                    "user": st.session_state.username,
+                    "password": st.session_state.password,
+                    "role": config["role"],
+                    "warehouse": config["warehouse"],
+                    "database": config["database"],
+                    "schema": config["schema"]
+                }
+                conn = snowflake.connector.connect(**connection_parameters)
+                conn.close()
+                st.session_state.snowpark_session = Session.builder.configs(connection_parameters).create()
+                st.session_state.authenticated = True
+                st.rerun()
+        except Exception as e:
+            st.error(f"Authentication failed: {str(e)}")
+
     st.stop()
 
 session = st.session_state.snowpark_session
@@ -1984,4 +2135,3 @@ if user_prompt:
                 
     messages.append({"role": "assistant", "content": explanation, "sql": sql_query, "data": df, "suggestions": suggestions})
     st.rerun()
-    
