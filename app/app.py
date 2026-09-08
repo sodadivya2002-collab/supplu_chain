@@ -208,7 +208,7 @@ st.markdown(
         font-size: 1.7rem;
         font-weight: 800;
         letter-spacing: 0.01em;
-        padding: 14px 22px;
+        padding: 4px 14px;
         border-radius: 2px;
         box-shadow: 0 8px 22px rgba(242, 13, 45, 0.20);
     }
