@@ -1693,16 +1693,19 @@ if not st.session_state.authenticated:
         }
 
         /* Right-side card */
-        .dily-login-card {
+        .st-key-dily_login_card {
             position: relative;
             z-index: 5;
-            width: 390px;
+            width: 390px !important;
+            min-width: 390px !important;
+            max-width: 390px !important;
             min-height: 545px;
-            margin-left: auto;
-            margin-right: 5vw;
+            margin-left: auto !important;
+            margin-right: 20vw !important;
             margin-top: 13vh;
             padding: 33px 36px 28px 36px;
             box-sizing: border-box;
+            overflow: visible;
             border-radius: 14px;
             border: 1px solid rgba(74, 119, 190, 0.40);
             background:
@@ -1754,18 +1757,23 @@ if not st.session_state.authenticated:
         }
 
         /* Inputs */
-        .dily-login-card div[data-testid="stTextInput"] {
+        .st-key-dily_login_card div[data-testid="stTextInput"] {
             margin-bottom: 11px !important;
+            width: 100% !important;
         }
 
-        .dily-login-card div[data-testid="stTextInput"] label {
+        .st-key-dily_login_card div[data-testid="stTextInput"] > div {
+            width: 100% !important;
+        }
+
+        .st-key-dily_login_card div[data-testid="stTextInput"] label {
             color: #dce6f6 !important;
             font-size: 11px !important;
             font-weight: 600 !important;
             margin-bottom: 5px !important;
         }
 
-        .dily-login-card div[data-testid="stTextInput"] input {
+        .st-key-dily_login_card div[data-testid="stTextInput"] input {
             height: 43px !important;
             min-height: 43px !important;
             background: rgba(57, 85, 125, 0.82) !important;
@@ -1777,12 +1785,12 @@ if not st.session_state.authenticated:
             box-shadow: none !important;
         }
 
-        .dily-login-card div[data-testid="stTextInput"] input::placeholder {
+        .st-key-dily_login_card div[data-testid="stTextInput"] input::placeholder {
             color: #a9beda !important;
             -webkit-text-fill-color: #a9beda !important;
         }
 
-        .dily-login-card div[data-testid="stTextInput"] input:focus {
+        .st-key-dily_login_card div[data-testid="stTextInput"] input:focus {
             border-color: #5aa0ff !important;
             box-shadow:
                 0 0 0 1px rgba(90, 160, 255, 0.23),
@@ -1790,16 +1798,16 @@ if not st.session_state.authenticated:
         }
 
         /* Password eye */
-        .dily-login-card div[data-testid="stTextInput"] button {
+        .st-key-dily_login_card div[data-testid="stTextInput"] button {
             color: #53647c !important;
         }
 
         /* Login button */
-        .dily-login-card div[data-testid="stButton"] {
+        .st-key-dily_login_card div[data-testid="stButton"] {
             margin-top: 5px;
         }
 
-        .dily-login-card div[data-testid="stButton"] > button {
+        .st-key-dily_login_card div[data-testid="stButton"] > button {
             width: 100% !important;
             height: 44px !important;
             min-height: 44px !important;
@@ -1818,7 +1826,7 @@ if not st.session_state.authenticated:
             transition: all 0.18s ease !important;
         }
 
-        .dily-login-card div[data-testid="stButton"] > button:hover {
+        .st-key-dily_login_card div[data-testid="stButton"] > button:hover {
             background: linear-gradient(
                 90deg,
                 #ff102d,
@@ -1876,13 +1884,13 @@ if not st.session_state.authenticated:
 
         /* Mobile */
         @media (max-width: 850px) {
-            .dily-login-card {
+            .st-key-dily_login_card {
                 margin: 9vh auto 0 auto;
             }
         }
 
         @media (max-width: 500px) {
-            .dily-login-card {
+            .st-key-dily_login_card {
                 width: calc(100vw - 40px);
                 margin: 5vh 20px 0 20px;
                 padding: 29px 26px 25px 26px;
