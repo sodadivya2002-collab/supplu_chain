@@ -287,51 +287,12 @@ st.markdown(
         overflow: hidden;
     }
 
-    .dily-login-bg {
-        position: fixed;
-        inset: 0;
-        z-index: 0;
-        background: #020817;
-        overflow: hidden;
-    }
-
-    /* Main artwork is scaled down slightly so the left-side copy and bot feel lighter. */
-    .dily-login-bg-main {
-        position: absolute;
-        inset: 0;
+    .dily-login-bg img {
         width: 100vw;
         height: 100vh;
         object-fit: cover;
         object-position: center center;
-        transform: scale(0.94);
-        transform-origin: center center;
         display: block;
-    }
-
-    /* Keep the right login card at the original scale for alignment with the live controls. */
-    .dily-login-bg-right {
-        position: absolute;
-        inset: 0;
-        width: 100vw;
-        height: 100vh;
-        object-fit: cover;
-        object-position: center center;
-        clip-path: inset(0 0 0 64%);
-        display: block;
-        pointer-events: none;
-    }
-
-    /* Hide the small red accent line at the top-right of the source artwork. */
-    .dily-login-bg::after {
-        content: \"\";
-        position: absolute;
-        top: 37px;
-        right: 18.0vw;
-        width: 72px;
-        height: 14px;
-        background: #02102e;
-        z-index: 4;
-        pointer-events: none;
     }
 
     /* Real Streamlit controls are placed over the matching controls in the artwork. */
@@ -348,15 +309,15 @@ st.markdown(
     }
 
     .st-key-dily_login_widget_user {
-        top: 40.4vh !important;
+        top: 42.3vh !important;
     }
 
     .st-key-dily_login_widget_password {
-        top: 50.6vh !important;
+        top: 52.7vh !important;
     }
 
     .st-key-dily_login_widget_button {
-        top: 63.2vh !important;
+        top: 61.0vh !important;
     }
 
     .st-key-dily_login_widget_user div[data-testid="stTextInput"],
@@ -366,40 +327,19 @@ st.markdown(
         padding: 0 !important;
     }
 
-    .st-key-dily_login_widget_user div[data-testid="stTextInput"],
-    .st-key-dily_login_widget_password div[data-testid="stTextInput"],
-    .st-key-dily_login_widget_user div[data-baseweb="input"],
-    .st-key-dily_login_widget_password div[data-baseweb="input"] {
-        width: 100% !important;
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-    }
-
     .st-key-dily_login_widget_user div[data-testid="stTextInput"] input,
     .st-key-dily_login_widget_password div[data-testid="stTextInput"] input {
         width: 100% !important;
-        height: 48px !important;
-        min-height: 48px !important;
-        background: transparent !important;
+        height: 50px !important;
+        min-height: 50px !important;
+        background: rgba(11, 42, 88, 0.88) !important;
         color: #eaf4ff !important;
-        border: none !important;
-        outline: none !important;
+        border: 1px solid rgba(74, 145, 231, 0.52) !important;
         border-radius: 8px !important;
-        box-shadow: none !important;
-        font-size: 0.90rem !important;
-        font-weight: 500 !important;
-        padding: 0 16px 0 42px !important;
+        box-shadow: inset 0 0 18px rgba(31, 117, 220, 0.08) !important;
+        font-size: 0.95rem !important;
+        padding: 0 16px !important;
         box-sizing: border-box !important;
-        -webkit-text-fill-color: #eaf4ff !important;
-        caret-color: #eaf4ff !important;
-    }
-
-    .st-key-dily_login_widget_user div[data-testid="stTextInput"] input:focus,
-    .st-key-dily_login_widget_password div[data-testid="stTextInput"] input:focus {
-        border: none !important;
-        outline: none !important;
-        box-shadow: none !important;
     }
 
     .st-key-dily_login_widget_user div[data-testid="stTextInput"] input::placeholder,
@@ -422,24 +362,20 @@ st.markdown(
     .st-key-dily_login_widget_button div[data-testid="stButton"] > button {
         width: 100% !important;
         height: 52px !important;
-        border-radius: 8px !important;
-        background: transparent !important;
-        border: none !important;
-        color: transparent !important;
-        font-size: 0 !important;
-        box-shadow: none !important;
-        cursor: pointer !important;
+        border-radius: 7px !important;
+        background: linear-gradient(90deg, #ff1230, #f20b24) !important;
+        border: 1px solid #ff3048 !important;
+        color: #ffffff !important;
+        font-size: 1rem !important;
+        font-weight: 700 !important;
+        box-shadow: 0 8px 24px rgba(245, 20, 48, 0.25) !important;
     }
 
-    .st-key-dily_login_widget_button div[data-testid="stButton"] > button:hover,
-    .st-key-dily_login_widget_button div[data-testid="stButton"] > button:focus,
-    .st-key-dily_login_widget_button div[data-testid="stButton"] > button:active {
-        background: transparent !important;
-        border: none !important;
-        color: transparent !important;
-        box-shadow: none !important;
-        outline: none !important;
-        transform: none !important;
+    .st-key-dily_login_widget_button div[data-testid="stButton"] > button:hover {
+        background: linear-gradient(90deg, #ff2440, #ff102c) !important;
+        border-color: #ff4a5d !important;
+        color: #ffffff !important;
+        transform: translateY(-1px);
     }
 
     /* Login screen must sit above Streamlit's normal page chrome. */
@@ -1720,8 +1656,7 @@ if not st.session_state.authenticated:
         f"""
         <div class="dily-login-active">
             <div class="dily-login-bg">
-                <img class="dily-login-bg-main" src="data:image/png;base64,{login_image_b64}" alt="Dilytics AI login" />
-                <img class="dily-login-bg-right" src="data:image/png;base64,{login_image_b64}" alt="" aria-hidden="true" />
+                <img src="data:image/png;base64,{login_image_b64}" alt="Dilytics AI login" />
             </div>
         </div>
         """,
