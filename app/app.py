@@ -15,7 +15,7 @@ import xml.etree.ElementTree as ET
 # ============================================================
 
 st.set_page_config(
-    page_title="Dilytics Supply Chain AI",
+    page_title="Dilytics Chatbot",
     page_icon="📦",
     layout="wide"
 )
