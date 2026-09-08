@@ -53,7 +53,7 @@ st.markdown(
     }
 
     .block-container {
-        padding-top: 98px !important;
+        padding-top: 112px !important;
         max-width: 1100px;
     }
 
@@ -70,7 +70,7 @@ st.markdown(
         box-shadow: none !important;
     }
     section[data-testid="stSidebar"] > div:first-child {
-        padding-top: 90px;
+        padding-top: 104px;
     }
     section[data-testid="stSidebar"] h5,
     section[data-testid="stSidebar"] h4,
@@ -185,7 +185,7 @@ st.markdown(
         top: 0;
         left: 0;
         right: 0;
-        height: 74px;
+        height: 88px;
         background: #05122b;
         border-bottom: none;
         display: flex;
@@ -205,18 +205,18 @@ st.markdown(
         justify-content: center;
         background: #f20d2d;
         color: #ffffff;
-        font-size: 1.35rem;
-        font-weight: 850;
-        letter-spacing: 0.02em;
-        padding: 10px 16px;
-        border-radius: 3px;
+        font-size: 1.7rem;
+        font-weight: 800;
+        letter-spacing: 0.01em;
+        padding: 14px 22px;
+        border-radius: 2px;
         box-shadow: 0 8px 22px rgba(242, 13, 45, 0.20);
     }
 
     /* ---------- Floating toggle ---------- */
     .st-key-floating_toggle {
         position: fixed !important;
-        top: 22px;
+        top: 29px;
         left: 18px;
         z-index: 1000010;
     }
