@@ -1802,16 +1802,14 @@ if not st.session_state.authenticated:
 
     # ---------- Top bar ----------
     st.markdown(
-        """
-        <div class="dily-login-topbar">
-            <div class="dily-login-topbar-left">
-                <span class="dily-logo-box">DILYTICS</span>
-                <span class="dily-login-topbar-divider"></span>
-                <span class="dily-login-topbar-text">Enterprise Intelligence Workspace</span>
-            </div>
-            <div class="dily-login-topbar-right">Better Insights. A Smarter Tomorrow. —</div>
-        </div>
-        """,
+        '<div class="dily-login-topbar">'
+        '<div class="dily-login-topbar-left">'
+        '<span class="dily-logo-box">DILYTICS</span>'
+        '<span class="dily-login-topbar-divider"></span>'
+        '<span class="dily-login-topbar-text">Enterprise Intelligence Workspace</span>'
+        '</div>'
+        '<div class="dily-login-topbar-right">Better Insights. A Smarter Tomorrow. —</div>'
+        '</div>',
         unsafe_allow_html=True
     )
 
@@ -1820,60 +1818,27 @@ if not st.session_state.authenticated:
     # ---------- Left: marketing hero ----------
     with left_col:
         st.markdown(
-            """
-            <div class="dily-hero-left">
-                <div class="dily-hero-kicker">AI POWERED &nbsp;•&nbsp; DATA DRIVEN &nbsp;•&nbsp; SUPPLY CHAIN FOCUSED</div>
-                <h1 class="dily-hero-title">Turn your data into<br><span>smarter decisions.</span></h1>
-                <p class="dily-hero-desc">Dilytics helps you ask questions, get instant insights and make data-driven decisions across Inventory, Supply Chain, Sales and Documents — powered by Snowflake and AI.</p>
-
-                <div class="dily-feature-grid">
-                    <div class="dily-feature-card">
-                        <div class="dily-feature-icon">📦</div>
-                        <div class="dily-feature-title">Inventory</div>
-                        <div class="dily-feature-sub">Track stock &amp; optimize levels</div>
-                    </div>
-                    <div class="dily-feature-card">
-                        <div class="dily-feature-icon">🚚</div>
-                        <div class="dily-feature-title">Supply Chain</div>
-                        <div class="dily-feature-sub">Monitor flow &amp; reduce delays</div>
-                    </div>
-                    <div class="dily-feature-card">
-                        <div class="dily-feature-icon">📊</div>
-                        <div class="dily-feature-title">Sales</div>
-                        <div class="dily-feature-sub">Analyze trends &amp; find opportunities</div>
-                    </div>
-                    <div class="dily-feature-card">
-                        <div class="dily-feature-icon">📄</div>
-                        <div class="dily-feature-title">Documents</div>
-                        <div class="dily-feature-sub">Search &amp; get instant answers</div>
-                    </div>
-                </div>
-
-                <div class="dily-flow-row">
-                    <div class="dily-flow-step">
-                        <div class="dily-flow-icon">🏭</div>
-                        <div class="dily-flow-label">Manufacturing</div>
-                    </div>
-                    <div class="dily-flow-line"></div>
-                    <div class="dily-flow-step">
-                        <div class="dily-flow-icon">🏢</div>
-                        <div class="dily-flow-label">Warehouse</div>
-                    </div>
-                    <div class="dily-flow-line"></div>
-                    <div class="dily-flow-step">
-                        <div class="dily-flow-icon">🚢</div>
-                        <div class="dily-flow-label">Logistics</div>
-                    </div>
-                    <div class="dily-flow-line"></div>
-                    <div class="dily-flow-step">
-                        <div class="dily-flow-icon">📈</div>
-                        <div class="dily-flow-label">Analytics</div>
-                    </div>
-                </div>
-
-                <div class="dily-hero-footer">❄️ Powered by Snowflake &nbsp;|&nbsp; Secure. Scalable. Intelligent.</div>
-            </div>
-            """,
+            '<div class="dily-hero-left">'
+            '<div class="dily-hero-kicker">AI POWERED &nbsp;•&nbsp; DATA DRIVEN &nbsp;•&nbsp; SUPPLY CHAIN FOCUSED</div>'
+            '<h1 class="dily-hero-title"><span>Turn your data into<br>smarter decisions.</span></h1>'
+            '<p class="dily-hero-desc">Dilytics helps you ask questions, get instant insights and make data-driven decisions across Inventory, Supply Chain, Sales and Documents — powered by Snowflake and AI.</p>'
+            '<div class="dily-feature-grid">'
+            '<div class="dily-feature-card"><div class="dily-feature-icon">📦</div><div class="dily-feature-title">Inventory</div><div class="dily-feature-sub">Track stock &amp; optimize levels</div></div>'
+            '<div class="dily-feature-card"><div class="dily-feature-icon">🚚</div><div class="dily-feature-title">Supply Chain</div><div class="dily-feature-sub">Monitor flow &amp; reduce delays</div></div>'
+            '<div class="dily-feature-card"><div class="dily-feature-icon">📊</div><div class="dily-feature-title">Sales</div><div class="dily-feature-sub">Analyze trends &amp; find opportunities</div></div>'
+            '<div class="dily-feature-card"><div class="dily-feature-icon">📄</div><div class="dily-feature-title">Documents</div><div class="dily-feature-sub">Search &amp; get instant answers</div></div>'
+            '</div>'
+            '<div class="dily-flow-row">'
+            '<div class="dily-flow-step"><div class="dily-flow-icon">🏭</div><div class="dily-flow-label">Manufacturing</div></div>'
+            '<div class="dily-flow-line"></div>'
+            '<div class="dily-flow-step"><div class="dily-flow-icon">🏢</div><div class="dily-flow-label">Warehouse</div></div>'
+            '<div class="dily-flow-line"></div>'
+            '<div class="dily-flow-step"><div class="dily-flow-icon">🚢</div><div class="dily-flow-label">Logistics</div></div>'
+            '<div class="dily-flow-line"></div>'
+            '<div class="dily-flow-step"><div class="dily-flow-icon">📈</div><div class="dily-flow-label">Analytics</div></div>'
+            '</div>'
+            '<div class="dily-hero-footer">❄️ Powered by Snowflake &nbsp;|&nbsp; Secure. Scalable. Intelligent.</div>'
+            '</div>',
             unsafe_allow_html=True
         )
 
@@ -1882,13 +1847,11 @@ if not st.session_state.authenticated:
         login_clicked = False
         with st.container(key="login_card"):
             st.markdown(
-                """
-                <div class="dily-login-card-header">
-                    <span class="dily-logo-box">DILYTICS</span>
-                    <h2>Welcome back 👋</h2>
-                    <p>Log in to your Dilytics account to access enterprise data and AI insights.</p>
-                </div>
-                """,
+                '<div class="dily-login-card-header">'
+                '<span class="dily-logo-box">DILYTICS</span>'
+                '<h2>Welcome back 👋</h2>'
+                '<p>Log in to your Dilytics account to access enterprise data and AI insights.</p>'
+                '</div>',
                 unsafe_allow_html=True
             )
 
