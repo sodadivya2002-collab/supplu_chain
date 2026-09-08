@@ -38,8 +38,8 @@ st.markdown(
     }
 
     .stApp {
-        background: radial-gradient(1200px 600px at 50% -10%, #14141c 0%, #0b0b0f 55%, #0b0b0f 100%) !important;
-        color: #f5f5f7;
+        background: radial-gradient(1200px 600px at 50% -10%, #0a1a33 0%, #020817 55%, #020817 100%) !important;
+        color: #eef5ff;
     }
 
     header[data-testid="stHeader"] {
@@ -49,7 +49,7 @@ st.markdown(
     }
     header[data-testid="stHeader"] * {
         visibility: visible !important;
-        fill: #f5f5f7 !important;
+        fill: #eef5ff !important;
     }
 
     .block-container {
@@ -59,7 +59,7 @@ st.markdown(
 
     /* ---------- Sidebar ---------- */
     section[data-testid="stSidebar"] {
-        background: #0e0e13;
+        background: #05122b;
         border-right: none;
         box-shadow: none;
     }
@@ -77,13 +77,13 @@ st.markdown(
     section[data-testid="stSidebar"] p,
     section[data-testid="stSidebar"] span,
     section[data-testid="stSidebar"] label {
-        color: #9a9aa8 !important;
+        color: #94afd1 !important;
         font-size: 0.78rem;
         text-transform: uppercase;
         letter-spacing: 0.04em;
     }
     section[data-testid="stSidebar"] hr {
-        border-color: #22222b;
+        border-color: #17335c;
     }
 
     /* ---------- Buttons (generic, whole app) ---------- */
@@ -91,13 +91,13 @@ st.markdown(
         border-radius: 10px;
         font-weight: 500;
         background: transparent;
-        color: #f5f5f7;
-        border: 1px solid #2a2a34;
+        color: #eef5ff;
+        border: 1px solid #1f3f70;
         transition: all 0.15s ease;
     }
     div[data-testid="stButton"] > button:hover {
-        border-color: #2dd4bf;
-        color: #2dd4bf;
+        border-color: #ff3046;
+        color: #ff3046;
         background: transparent;
     }
 
@@ -107,7 +107,7 @@ st.markdown(
         border: 1px solid transparent;
         text-align: left;
         justify-content: flex-start;
-        color: #cfcfd8 !important;
+        color: #cfe0f5 !important;
         font-weight: 500;
         text-transform: none;
         letter-spacing: normal;
@@ -117,15 +117,15 @@ st.markdown(
     }
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button:hover {
         background: transparent;
-        border-color: #2dd4bf;
-        color: #2dd4bf !important;
+        border-color: #ff3046;
+        color: #ff3046 !important;
     }
 
     /* ---------- Sidebar: primary action buttons ---------- */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"] {
         background: transparent;
-        color: #f5f5f7 !important;
-        border: 1.5px solid #2a2a34;
+        color: #eef5ff !important;
+        border: 1.5px solid #1f3f70;
         border-radius: 10px;
         padding: 9px 10px;
         text-align: center;
@@ -140,13 +140,13 @@ st.markdown(
     }
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"]:hover {
         background: transparent;
-        color: #2dd4bf !important;
-        border-color: #2dd4bf;
+        color: #ff3046 !important;
+        border-color: #ff3046;
     }
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"]:disabled {
         background: transparent;
-        color: #55555f !important;
-        border-color: #22222b;
+        color: #4a6485 !important;
+        border-color: #17335c;
         opacity: 0.55;
         cursor: not-allowed;
     }
@@ -156,9 +156,9 @@ st.markdown(
     div[data-testid="stVerticalBlockBorderWrapper"].st-key-upload_btn_active button[kind="primary"],
     .st-key-module_btn_active button[kind="primary"],
     .st-key-upload_btn_active button[kind="primary"] {
-        border-color: #2dd4bf !important;
-        color: #2dd4bf !important;
-        box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.25) !important;
+        border-color: #ff3046 !important;
+        color: #ff3046 !important;
+        box-shadow: 0 0 0 1px rgba(255, 48, 70, 0.25) !important;
     }
 
     section[data-testid="stSidebar"] div[data-testid="stExpander"] {
@@ -167,15 +167,15 @@ st.markdown(
     }
     section[data-testid="stSidebar"] div[data-testid="stExpander"] summary {
         font-weight: 500;
-        color: #cfcfd8 !important;
+        color: #cfe0f5 !important;
         text-transform: none;
         padding: 4px 4px;
     }
     section[data-testid="stSidebar"] div[data-testid="stExpander"] summary:hover {
-        color: #2dd4bf !important;
+        color: #ff3046 !important;
     }
     section[data-testid="stSidebar"] div[data-testid="stExpanderDetails"] {
-        background: #131318;
+        background: #0b2044;
         border-radius: 8px;
     }
 
@@ -186,7 +186,7 @@ st.markdown(
         left: 0;
         right: 0;
         height: 62px;
-        background: #0e0e13;
+        background: #05122b;
         border-bottom: none;
         display: flex;
         align-items: center;
@@ -200,7 +200,7 @@ st.markdown(
         gap: 16px;
     }
     .dily-logo-box {
-        background: #d6231c;
+        background: #f20d2d;
         color: #ffffff;
         font-weight: 800;
         letter-spacing: 1px;
@@ -222,14 +222,14 @@ st.markdown(
         padding: 0;
         border-radius: 6px;
         background: transparent;
-        color: #2dd4bf;
+        color: #ff3046;
         border: none;
         box-shadow: none;
         font-size: 1.15rem;
         font-weight: 700;
     }
     .st-key-floating_toggle div[data-testid="stButton"] > button:hover {
-        color: #5eead4;
+        color: #ff5164;
         background: transparent;
     }
     .st-key-floating_toggle [data-testid="stTooltipHoverTarget"] + div,
@@ -247,7 +247,7 @@ st.markdown(
         border-radius: 8px;
         background: transparent;
         border: 1px solid transparent;
-        color: #7a7a89;
+        color: #6f8aaa;
         font-size: 1.1rem;
         display: flex;
         align-items: center;
@@ -255,8 +255,8 @@ st.markdown(
     }
     .dily-icon-rail div[data-testid="stButton"] > button:hover {
         background: transparent;
-        border-color: #2dd4bf;
-        color: #2dd4bf;
+        border-color: #ff3046;
+        color: #ff3046;
     }
     .dily-icon-rail div[data-testid="column"] {
         display: flex;
@@ -511,11 +511,11 @@ st.markdown(
     .dily-login-hero h1 {
         font-size: 1.8rem;
         font-weight: 700;
-        color: #f5f5f7;
+        color: #eef5ff;
         margin-bottom: 10px;
     }
     .dily-login-hero p.sub {
-        color: #9a9aa8;
+        color: #94afd1;
         font-size: 0.92rem;
     }
 
@@ -534,7 +534,7 @@ st.markdown(
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: #d6231c;
+        background: #f20d2d;
         color: #ffffff;
         border: none;
         border-radius: 5px;
@@ -548,16 +548,16 @@ st.markdown(
     .dily-hero-copy h1 {
         font-size: 2.1rem;
         font-weight: 700;
-        color: #f5f5f7;
+        color: #eef5ff;
         line-height: 1.2;
         margin-bottom: 14px;
         letter-spacing: -0.02em;
     }
     .dily-hero-copy h1 span {
-        color: #2dd4bf;
+        color: #ff3046;
     }
     .dily-hero-copy p.sub {
-        color: #9a9aa8;
+        color: #94afd1;
         font-size: 0.92rem;
         line-height: 1.55;
         margin-bottom: 20px;
@@ -566,7 +566,7 @@ st.markdown(
         width: 220px;
         height: 220px;
         border-radius: 50%;
-        background: radial-gradient(circle at 35% 30%, #2dd4bf 0%, #0f766e 60%, #0b3a35 100%);
+        background: radial-gradient(circle at 35% 30%, #ff3046 0%, #8a0f1a 60%, #2a0508 100%);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -576,7 +576,7 @@ st.markdown(
     .dily-hero-graphic .bubble {
         width: 90px;
         height: 66px;
-        background: #0b0b0f;
+        background: #020817;
         border-radius: 16px;
         display: flex;
         align-items: center;
@@ -588,8 +588,8 @@ st.markdown(
         width: 26px;
         height: 26px;
         border-radius: 50%;
-        background: #14141a;
-        border: 1px solid rgba(45,212,191,0.4);
+        background: #0b2044;
+        border: 1px solid rgba(255,48,70,0.4);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -605,79 +605,79 @@ st.markdown(
     .stBottomBlockContainer,
     div[data-testid="stChatInput"] > div,
     section[data-testid="stChatInputContainer"] {
-        background: #0b0b0f !important;
+        background: #020817 !important;
     }
     div[data-testid="stChatInput"] {
         border-radius: 26px !important;
-        border: 1px solid #26262f !important;
-        background: #16161c !important;
-        box-shadow: 0 0 0 1px rgba(45,212,191,0.06), 0 8px 24px rgba(0,0,0,0.35);
+        border: 1px solid #1c3a68 !important;
+        background: #0d2650 !important;
+        box-shadow: 0 0 0 1px rgba(255,48,70,0.06), 0 8px 24px rgba(0,0,0,0.35);
         max-width: 760px;
         margin: 6px auto 0 auto;
     }
     div[data-testid="stChatInput"]:focus-within {
-        border-color: #2dd4bf !important;
-        box-shadow: 0 0 0 3px rgba(45,212,191,0.15);
+        border-color: #ff3046 !important;
+        box-shadow: 0 0 0 3px rgba(255,48,70,0.15);
     }
     div[data-testid="stChatInput"] textarea,
     div[data-testid="stChatInput"] [contenteditable="true"],
     div[data-testid="stChatInput"] input {
         font-size: 0.92rem;
-        color: #f5f5f7 !important;
-        -webkit-text-fill-color: #f5f5f7 !important;
+        color: #eef5ff !important;
+        -webkit-text-fill-color: #eef5ff !important;
         background: transparent !important;
-        caret-color: #2dd4bf !important;
+        caret-color: #ff3046 !important;
     }
     div[data-testid="stChatInput"] textarea::placeholder {
-        color: #6b6b78 !important;
-        -webkit-text-fill-color: #6b6b78 !important;
+        color: #7d9bc1 !important;
+        -webkit-text-fill-color: #7d9bc1 !important;
     }
     div[data-testid="stChatInput"] button[kind="icon"],
     div[data-testid="stChatInput"] button {
         background: transparent !important;
-        border: 1.5px solid #2dd4bf !important;
+        border: 1.5px solid #ff3046 !important;
         border-radius: 50% !important;
     }
     div[data-testid="stChatInput"] button svg {
-        fill: #2dd4bf !important;
+        fill: #ff3046 !important;
     }
     div[data-testid="stChatInputFileUploaderButton"] button,
     div[data-testid="stChatInput"] button[title*="attach" i] {
         background: transparent !important;
-        color: #2dd4bf !important;
+        color: #ff3046 !important;
         border: none !important;
         box-shadow: none !important;
     }
 
     /* ---------- Chat messages ---------- */
     div[data-testid="stChatMessage"] {
-        background: #14141a;
-        border: 1px solid #22222b;
+        background: #0b2044;
+        border: 1px solid #17335c;
         border-radius: 14px;
         padding: 4px 6px;
     }
 
     /* ---------- Text inputs (login page) ---------- */
     div[data-testid="stTextInput"] input {
-        background: #16161c !important;
-        color: #f5f5f7 !important;
-        border: 1px solid #2a2a34 !important;
+        background: #0d2650 !important;
+        color: #eef5ff !important;
+        border: 1px solid #1f3f70 !important;
         border-radius: 10px !important;
     }
     div[data-testid="stTextInput"] label {
-        color: #cfcfd8 !important;
+        color: #cfe0f5 !important;
     }
 
     /* ---------- Dataframe / expander ---------- */
     div[data-testid="stExpander"] {
-        background: #14141a;
-        border: 1px solid #22222b;
+        background: #0b2044;
+        border: 1px solid #17335c;
         border-radius: 10px;
     }
 
     /* ---------- Misc text ---------- */
     h1, h2, h3, h4, h5, h6, p, label, .stMarkdown {
-        color: #f5f5f7;
+        color: #eef5ff;
     }
 
     </style>
