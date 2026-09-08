@@ -533,16 +533,24 @@ st.markdown(
     .dily-hero-badge {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 6px;
         background: #f20d2d;
         color: #ffffff;
         border: none;
-        border-radius: 5px;
-        padding: 6px 14px;
-        font-size: 0.8rem;
-        font-weight: 800;
-        letter-spacing: 0.03em;
-        margin-bottom: 16px;
+        border-radius: 3px;
+        padding: 10px 16px;
+        font-size: 1.35rem;
+        font-weight: 850;
+        letter-spacing: 0.02em;
+        box-shadow: 0 8px 22px rgba(242, 13, 45, 0.20);
+    }
+    .dily-hero-graphic-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 22px;
+        flex-shrink: 0;
     }
     .dily-hero-copy { max-width: 480px; }
     .dily-hero-copy h1 {
@@ -554,7 +562,7 @@ st.markdown(
         letter-spacing: -0.02em;
     }
     .dily-hero-copy h1 span {
-        color: #ff3046 !important;
+        color: #4ca2ff !important;
     }
     .dily-hero-copy p.sub {
         color: #94afd1;
@@ -636,11 +644,11 @@ st.markdown(
     div[data-testid="stChatInput"] button[kind="icon"],
     div[data-testid="stChatInput"] button {
         background: transparent !important;
-        border: 1.5px solid #ff3046 !important;
+        border: 1.5px solid #4ca2ff !important;
         border-radius: 50% !important;
     }
     div[data-testid="stChatInput"] button svg {
-        fill: #ff3046 !important;
+        fill: #4ca2ff !important;
     }
     div[data-testid="stChatInputFileUploaderButton"] button,
     div[data-testid="stChatInput"] button[title*="attach" i] {
@@ -2136,11 +2144,13 @@ if len(messages) == 0:
     st.markdown(f"""
         <div class="dily-hero">
             <div class="dily-hero-copy">
-                <span class="dily-hero-badge">DILYTICS</span>
-                <h1>Chat with your {_hero_module}<br>data using <span>Cortex AI</span></h1>
+                <h1 style="color:#eef5ff !important;">Chat with your {_hero_module}<br>data using <span style="color:#4ca2ff !important;">Cortex AI</span></h1>
                 <p class="sub">Ask questions and get instant insights across your {_hero_module.lower()} data.</p>
             </div>
-            <div class="dily-hero-graphic"><div class="bubble">💬</div><div class="dot dot1">🔍</div><div class="dot dot2">📁</div><div class="dot dot3">📊</div></div>
+            <div class="dily-hero-graphic-wrap">
+                <span class="dily-hero-badge">DILYTICS</span>
+                <div class="dily-hero-graphic"><div class="bubble">💬</div><div class="dot dot1">🔍</div><div class="dot dot2">📁</div><div class="dot dot3">📊</div></div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
     st.write("")
