@@ -720,6 +720,7 @@ def get_snowflake_config():
 MODULE_SEMANTIC_VIEW_KEYS = {
     "Supply Chain": "semantic_view_supply_chain",
     "Inventory": "semantic_view_inventory",
+    "Sales": "semantic_view_sales",
 }
 
 def call_cortex_analyst(prompt, module="Supply Chain", semantic_model_yaml=None):
@@ -1963,13 +1964,15 @@ GREETING_PHRASES = ["hi", "hello", "hey", "good morning", "good afternoon", "goo
 MODULE_GREETING_SUGGESTIONS = {
     "Supply Chain": ["What is the total purchase order count?", "How many shipments are currently in transit?", "Which suppliers are high risk?", "What are the top products by ordered value?", "What is the supplier on-time delivery percentage?"],
     "Inventory": ["What is the total available inventory as of the latest snapshot?", "What is the total quantity of inventory currently on hand?", "How many products and warehouses are out of stock?", "What is the total inventory value by product category?", "How many products need to be reordered?"],
+    "Sales": ["What is the total sales revenue by month?", "Which products have the highest sales volume?", "What is the total sales by region?", "Who are the top performing sales reps?", "What is the year-over-year sales growth?"],
     "None": [],
 }
 
 MODULE_HELP_TEXT = {
     "Supply Chain": "You can ask me questions about **Supply Chain data**.\nAsk a question in your own words — Cortex Analyst will turn it into a query against the supply chain semantic view.",
     "Inventory": "You can ask me questions about **Inventory data**.\nAsk a question in your own words — Cortex Analyst will turn it into a query against the inventory semantic view.",
-    "None": "No module is selected yet, and no file is active.\nTo ask about **Supply Chain** or **Inventory** data, click **🧩 Module** in the sidebar and pick one.\nTo ask about your own data, click **📁 Upload Files** and attach a file.",
+    "Sales": "You can ask me questions about **Sales data**.\nAsk a question in your own words — Cortex Analyst will turn it into a query against the sales semantic view.",
+    "None": "No module is selected yet, and no file is active.\nTo ask about **Supply Chain**, **Inventory**, or **Sales** data, click **🧩 Module** in the sidebar and pick one.\nTo ask about your own data, click **📁 Upload Files** and attach a file.",
 }
 
 def _is_question_suggestion_request(p):
@@ -1996,7 +1999,7 @@ def generate_sql_from_prompt(prompt):
     if _is_question_suggestion_request(p):
         if active_file: return (f"Here are some questions you could ask about **{active_file}**:", None, None, generate_file_question_suggestions(active_file))
         if module != "None": return (f"Here are some questions you could ask about your **{module}** data:", None, None, MODULE_GREETING_SUGGESTIONS.get(module, []))
-        return ("Select a module (**Supply Chain** or **Inventory**) from the **🧩 Module** menu, or upload a file first — then I can suggest specific questions for that data.", None, None, None)
+        return ("Select a module (**Supply Chain**, **Inventory**, or **Sales**) from the **🧩 Module** menu, or upload a file first — then I can suggest specific questions for that data.", None, None, None)
 
     if any(k in p for k in ["what can i ask", "what questions", "what can you do", "examples", "help"]):
         if active_file: return (f"You can ask me questions about your uploaded file **{active_file}** — here are a few to try:", None, None, generate_file_question_suggestions(active_file))
@@ -2019,7 +2022,7 @@ def generate_sql_from_prompt(prompt):
         return explanation, sql_query, result_df, None
 
     if module == "None":
-        return ("Please select a module (**Supply Chain** or **Inventory**) from the **🧩 Module** menu in the sidebar, or upload a file, before asking a data question.", None, None, None)
+        return ("Please select a module (**Supply Chain**, **Inventory**, or **Sales**) from the **🧩 Module** menu in the sidebar, or upload a file, before asking a data question.", None, None, None)
 
     explanation, sql_query = call_cortex_analyst(prompt, module)
     return explanation, sql_query, None, None
@@ -2058,7 +2061,7 @@ if st.session_state.sidebar_open:
                 st.session_state.show_module_selector = not st.session_state.show_module_selector
         
         if st.session_state.show_module_selector:
-            module_options = ["None", "Supply Chain", "Inventory"]
+            module_options = ["None", "Supply Chain", "Inventory", "Sales"]
             current_index = module_options.index(st.session_state.selected_module) if st.session_state.selected_module in module_options else 0
             new_module = st.selectbox("Select module", module_options, index=current_index, key="module_selectbox", label_visibility="collapsed")
             if new_module != st.session_state.selected_module:
