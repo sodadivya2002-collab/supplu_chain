@@ -185,7 +185,7 @@ st.markdown(
         top: 0;
         left: 0;
         right: 0;
-        height: 88px;
+        height: 65px;
         background: #05122b;
         border-bottom: none;
         display: flex;
