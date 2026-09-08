@@ -101,44 +101,6 @@ st.markdown(
         background: transparent;
     }
 
-    /* ---------- Chat suggestion chips: Apple-style hover popover ----------
-       Applies ONLY to the suggestion buttons rendered inside the chat
-       stream (keys start with "sugg_"). Sidebar suggestions keep their
-       normal look because their keys start with "sidebar_sugg_" and are
-       not matched by the "st-key-sugg_" prefix below. */
-    div[class*="st-key-sugg_"] div[data-testid="stButton"] {
-        position: relative;
-    }
-    div[class*="st-key-sugg_"] div[data-testid="stButton"] > button {
-        width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        text-align: left;
-    }
-    div[class*="st-key-sugg_"] div[data-testid="stButton"] > button:hover,
-    div[class*="st-key-sugg_"] div[data-testid="stButton"] > button:focus {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: max-content;
-        max-width: 320px;
-        min-width: 100%;
-        white-space: normal;
-        overflow: visible;
-        word-wrap: break-word;
-        z-index: 999;
-        background: #10294a;
-        color: #eef5ff;
-        border: 1px solid #4ca2ff;
-        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
-        padding: 16px 18px;
-        line-height: 1.5;
-        font-size: 0.95rem;
-        border-radius: 16px;
-    }
-
     /* ---------- Sidebar: main nav-style buttons (secondary look) ---------- */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button {
         background: transparent;
@@ -1980,75 +1942,6 @@ def display_chart_tab(df, key_prefix=""):
     elif chart_type == "Area Chart": st.area_chart(chart_df.set_index(x_col)[y_col])
     elif chart_type == "Scatter Plot": st.scatter_chart(chart_df, x=x_col, y=y_col)
 
-def _format_metric_value(value):
-    """Render a result value as a nicely formatted number when possible."""
-    if value is None:
-        return "—"
-    try:
-        f = float(value)
-    except (TypeError, ValueError):
-        return str(value)
-    if pd.isna(f):
-        return "—"
-    if f == int(f):
-        return f"{int(f):,}"
-    return f"{f:,.2f}"
-
-def _humanize_column_name(col):
-    return str(col).replace("_", " ").replace("-", " ").strip().title()
-
-def build_detailed_analysis(prompt, explanation, df):
-    """Turn a raw one-line explanation + result dataframe into a richer,
-    structured answer: an 'Interpretation' block followed by a 'Detailed
-    Answer' block that actually surfaces the numbers, instead of a single
-    plain sentence."""
-    explanation = (explanation or "").strip()
-
-    interp_marker = "This is our interpretation of your question:"
-    if explanation.lower().startswith(interp_marker.lower()):
-        interpretation_text = explanation[len(interp_marker):].strip()
-    else:
-        interpretation_text = explanation
-
-    parts = ["**🔎 Interpretation**", f"> {interpretation_text or prompt.strip()}"]
-
-    if df is not None and not df.empty:
-        parts.append("**📊 Detailed Answer**")
-        try:
-            if df.shape[0] == 1 and df.shape[1] == 1:
-                col = df.columns[0]
-                parts.append(f"- **{_humanize_column_name(col)}:** {_format_metric_value(df.iloc[0, 0])}")
-
-            elif df.shape[0] == 1:
-                for col in df.columns:
-                    parts.append(f"- **{_humanize_column_name(col)}:** {_format_metric_value(df.iloc[0][col])}")
-
-            else:
-                numeric_cols = df.select_dtypes(include="number").columns.tolist()
-                parts.append(f"- **Records returned:** {len(df):,}")
-                if numeric_cols:
-                    lead_metric = numeric_cols[0]
-                    parts.append(f"- **Total {_humanize_column_name(lead_metric)}:** {_format_metric_value(df[lead_metric].sum())}")
-                    parts.append(f"- **Average {_humanize_column_name(lead_metric)}:** {_format_metric_value(df[lead_metric].mean())}")
-                    label_col = next((c for c in df.columns if c != lead_metric), None)
-                    sorted_df = df.sort_values(lead_metric, ascending=False)
-                    top_row = sorted_df.iloc[0]
-                    if label_col is not None:
-                        parts.append(f"- **Highest {_humanize_column_name(lead_metric)}:** {top_row[label_col]} ({_format_metric_value(top_row[lead_metric])})")
-                        if len(sorted_df) > 1:
-                            bottom_row = sorted_df.iloc[-1]
-                            parts.append(f"- **Lowest {_humanize_column_name(lead_metric)}:** {bottom_row[label_col]} ({_format_metric_value(bottom_row[lead_metric])})")
-                parts.append("\n*Full breakdown available in the Data / Chart tabs below.*")
-        except Exception:
-            # If anything about the shape is unexpected, fall back gracefully
-            # rather than breaking the whole answer.
-            parts.append(f"- **Records returned:** {len(df):,}")
-    elif df is not None and df.empty:
-        parts.append("**📊 Detailed Answer**")
-        parts.append("- No matching records were found for this question.")
-
-    return "\n\n".join(parts)
-
 def show_query_result(sql_query, df, key_prefix):
     if sql_query:
         is_sql = sql_query.strip().lower().startswith(("select", "with"))
@@ -2369,39 +2262,24 @@ if user_prompt:
     
     with st.chat_message("assistant"):
         explanation, sql_query, file_df, suggestions = generate_sql_from_prompt(user_prompt)
+        st.markdown(explanation)
         df = None
-        sql_error = None
-
         if file_df is not None:
             df = file_df
-        elif sql_query:
-            try:
-                df = session.sql(sql_query).to_pandas()
-            except Exception as e:
-                sql_error = str(e)
-
-        # Turn plain one-line answers into a fuller, structured
-        # interpretation + detailed-answer response whenever this was an
-        # actual data question (i.e. a query was produced).
-        if sql_query:
-            explanation = build_detailed_analysis(user_prompt, explanation, df)
-
-        st.markdown(explanation)
-
-        if file_df is not None:
             show_query_result(sql_query, df, key_prefix=f"live_{current_id}")
         elif sql_query:
             with st.expander("Generated SQL", expanded=False): st.code(sql_query, language="sql")
-            if sql_error:
-                st.error(f"SQL Execution Error: {sql_error}")
-            elif df is not None:
+            try:
+                df = session.sql(sql_query).to_pandas()
                 if df.empty:
                     st.info("The query executed successfully, but no records were returned.")
                 else:
                     tab1, tab2 = st.tabs(["Data 📄", "Chart 📈"])
                     with tab1: st.dataframe(df, use_container_width=True)
                     with tab2: display_chart_tab(df, key_prefix=f"live_{current_id}")
-
+            except Exception as e:
+                st.error(f"SQL Execution Error: {str(e)}")
+                
     messages.append({"role": "assistant", "content": explanation, "sql": sql_query, "data": df, "suggestions": suggestions})
     enforce_conversation_history_limit(10)
     st.rerun()
