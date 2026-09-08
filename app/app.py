@@ -1554,12 +1554,28 @@ if not st.session_state.authenticated:
 
         html,
         body {
+            width: 100% !important;
+            height: 100% !important;
+            min-height: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
             background: #08090e !important;
+            overflow: hidden !important;
+        }
+
+        body {
+            overscroll-behavior: none !important;
         }
 
         /* Main dark background */
-        .stApp {
+        .stApp,
+        [data-testid="stAppViewContainer"],
+        [data-testid="stMain"],
+        main {
+            width: 100% !important;
+            height: 100vh !important;
             min-height: 100vh !important;
+            max-height: 100vh !important;
             background:
                 radial-gradient(
                     720px 520px at 2% 94%,
@@ -1580,10 +1596,23 @@ if not st.session_state.authenticated:
             overflow: hidden !important;
         }
 
+        [data-testid="stAppViewContainer"] > .main,
+        [data-testid="stAppViewContainer"] > .main > div,
+        [data-testid="stMainBlockContainer"] {
+            height: 100vh !important;
+            max-height: 100vh !important;
+            overflow: hidden !important;
+        }
+
         .block-container {
+            width: 100% !important;
             max-width: none !important;
+            height: 100vh !important;
+            min-height: 100vh !important;
+            max-height: 100vh !important;
             padding: 0 !important;
             margin: 0 !important;
+            overflow: hidden !important;
         }
 
         /* Subtle technical grid */
@@ -1694,15 +1723,15 @@ if not st.session_state.authenticated:
 
         /* Right-side card */
         .st-key-dily_login_card {
-            position: relative;
-            z-index: 5;
+            position: fixed !important;
+            z-index: 50 !important;
+            top: 16vh !important;
+            right: 31vw !important;
             width: 390px !important;
             min-width: 390px !important;
             max-width: 390px !important;
             min-height: 545px;
-            margin-left: auto !important;
-            margin-right: 20vw !important;
-            margin-top: 13vh;
+            margin: 0 !important;
             padding: 33px 36px 28px 36px;
             box-sizing: border-box;
             overflow: visible;
@@ -1883,16 +1912,32 @@ if not st.session_state.authenticated:
         }
 
         /* Mobile */
-        @media (max-width: 850px) {
+        @media (max-width: 1100px) {
             .st-key-dily_login_card {
-                margin: 9vh auto 0 auto;
+                right: 8vw !important;
+                top: 16vh !important;
             }
         }
 
-        @media (max-width: 500px) {
+        @media (max-width: 700px) {
+            html,
+            body,
+            .stApp,
+            [data-testid="stAppViewContainer"],
+            [data-testid="stMain"],
+            main,
+            .block-container {
+                overflow: auto !important;
+            }
+
             .st-key-dily_login_card {
-                width: calc(100vw - 40px);
-                margin: 5vh 20px 0 20px;
+                position: relative !important;
+                top: auto !important;
+                right: auto !important;
+                width: calc(100vw - 40px) !important;
+                min-width: 0 !important;
+                max-width: none !important;
+                margin: 7vh 20px 30px 20px !important;
                 padding: 29px 26px 25px 26px;
             }
         }
