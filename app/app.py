@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import re
@@ -278,205 +279,205 @@ st.markdown(
     }
 
     /* ============================================================
-       PREMIUM LOGIN PAGE
+       PREMIUM DILYTICS LOGIN PAGE
        ============================================================ */
 
     .dily-login-page {
         position: relative;
-        min-height: calc(100vh - 92px);
-        margin: -20px -4vw -60px -4vw;
-        padding: 26px 4vw 48px;
+        min-height: calc(100vh - 90px);
         overflow: hidden;
-        background:
-            radial-gradient(900px 520px at 30% 88%, rgba(0, 92, 255, .15), transparent 68%),
-            radial-gradient(620px 420px at 92% 24%, rgba(220, 24, 48, .12), transparent 70%),
-            linear-gradient(135deg, #061126 0%, #07162d 42%, #081a36 72%, #050d1d 100%);
+        padding: 0;
     }
 
     .dily-login-page::before {
         content: "";
-        position: absolute;
-        inset: 0;
+        position: fixed;
+        width: 760px;
+        height: 760px;
+        left: -360px;
+        bottom: -430px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(0,95,255,.20) 0%, rgba(0,45,130,.08) 42%, transparent 72%);
         pointer-events: none;
-        background:
-            linear-gradient(rgba(63, 119, 202, .045) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(63, 119, 202, .045) 1px, transparent 1px);
-        background-size: 64px 64px;
-        mask-image: linear-gradient(to bottom, rgba(0,0,0,.05), #000 26%, #000 78%, rgba(0,0,0,.04));
     }
 
     .dily-login-page::after {
         content: "";
-        position: absolute;
-        width: 760px;
-        height: 420px;
-        right: -170px;
-        bottom: -190px;
+        position: fixed;
+        width: 720px;
+        height: 720px;
+        right: -360px;
+        bottom: -410px;
         border-radius: 50%;
-        border: 1px solid rgba(30, 128, 255, .24);
-        box-shadow:
-            0 0 90px rgba(0, 90, 255, .12),
-            0 0 0 28px rgba(220, 20, 45, .035),
-            0 0 0 56px rgba(0, 100, 255, .03);
-        transform: rotate(-11deg);
+        background: radial-gradient(circle, rgba(235,18,50,.18) 0%, rgba(150,15,45,.07) 42%, transparent 72%);
         pointer-events: none;
     }
 
-    .dily-login-layout {
-        position: relative;
-        z-index: 3;
-        max-width: 1240px;
-        margin: 0 auto;
+    .dily-login-grid {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: .18;
+        background-image:
+            linear-gradient(rgba(50,110,190,.12) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(50,110,190,.12) 1px, transparent 1px);
+        background-size: 68px 68px;
+        mask-image: linear-gradient(to bottom, transparent 0%, black 22%, black 78%, transparent 100%);
     }
 
-    .dily-login-topbar {
+    .dily-login-shell {
+        position: relative;
+        z-index: 2;
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 24px 18px 20px;
+    }
+
+    .dily-login-header {
         display: flex;
-        justify-content: space-between;
         align-items: center;
-        margin-bottom: 46px;
+        justify-content: space-between;
+        margin-bottom: 42px;
     }
 
     .dily-login-brand {
         display: flex;
         align-items: center;
-        gap: 17px;
+        gap: 16px;
     }
 
     .dily-login-logo {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 9px 16px;
-        background: linear-gradient(135deg, #ff182b, #d90e20);
+        background: linear-gradient(135deg, #ff1829, #d90820);
         color: #fff;
-        font-size: 1rem;
-        line-height: 1;
+        font-size: 1.02rem;
         font-weight: 900;
-        letter-spacing: .05em;
-        border-radius: 3px;
-        box-shadow: 0 14px 35px rgba(220, 20, 45, .18);
+        padding: 8px 14px;
+        border-radius: 2px;
+        letter-spacing: .02em;
+        box-shadow: 0 8px 28px rgba(230,20,40,.22);
+    }
+
+    .dily-login-divider {
+        width: 1px;
+        height: 25px;
+        background: rgba(100,145,210,.35);
     }
 
     .dily-login-workspace {
-        padding-left: 17px;
-        border-left: 1px solid rgba(105, 146, 205, .35);
-        color: #98afd4;
-        font-size: .76rem;
+        color: #8ea8d2;
+        font-size: .72rem;
         letter-spacing: .02em;
     }
 
     .dily-login-tagline {
-        color: #6f87ad;
+        color: #7892ba;
         font-size: .63rem;
-        letter-spacing: .04em;
     }
 
-    .dily-login-tagline .dash {
+    .dily-login-tagline span {
         display: inline-block;
-        width: 31px;
+        width: 30px;
         height: 2px;
         margin-left: 9px;
         vertical-align: middle;
-        background: #e61930;
-        box-shadow: 0 0 12px rgba(230, 25, 48, .4);
+        background: #e51b31;
+        box-shadow: 0 0 10px rgba(229,27,49,.35);
     }
 
     .dily-login-columns {
         display: grid;
-        grid-template-columns: minmax(0, 1.15fr) minmax(350px, .85fr);
-        gap: 64px;
+        grid-template-columns: 1.16fr .84fr;
+        gap: 68px;
         align-items: center;
     }
 
     .dily-login-left {
-        padding: 10px 0 0 4px;
+        min-width: 0;
+        padding: 8px 0;
     }
 
     .dily-login-eyebrow {
-        color: #72a7ef;
+        color: #6da6ec;
         font-size: .64rem;
-        font-weight: 800;
-        letter-spacing: .17em;
-        margin-bottom: 17px;
+        font-weight: 700;
+        letter-spacing: .16em;
+        margin-bottom: 13px;
     }
 
     .dily-login-title {
-        margin: 0 0 17px 0;
-        color: #f4f8ff;
-        font-size: clamp(2.35rem, 4vw, 3.55rem);
-        line-height: 1.06;
+        font-size: 2.85rem;
+        line-height: 1.08;
         font-weight: 800;
+        color: #f4f7ff;
+        margin: 0 0 16px;
         letter-spacing: -.045em;
     }
 
-    .dily-login-title .red {
-        color: #ff1b33;
-    }
-
-    .dily-login-title .blue {
-        color: #5d84ff;
-    }
+    .dily-login-title .red { color: #ff1832; }
+    .dily-login-title .blue { color: #6287ff; }
 
     .dily-login-description {
-        max-width: 610px;
-        margin: 0 0 28px 0;
-        color: #8fa7ca;
-        font-size: .86rem;
-        line-height: 1.66;
+        max-width: 570px;
+        color: #8fa6c9;
+        font-size: .78rem;
+        line-height: 1.6;
+        margin-bottom: 25px;
     }
 
     .dily-login-modules {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        max-width: 645px;
-        margin-bottom: 25px;
+        grid-template-columns: repeat(4, 1fr);
+        max-width: 610px;
+        margin-bottom: 18px;
     }
 
     .dily-login-module {
-        padding: 0 16px;
-        border-left: 1px solid rgba(55, 102, 166, .18);
+        min-width: 0;
+        padding: 3px 15px;
+        border-left: 1px solid rgba(48,102,180,.18);
     }
 
     .dily-login-module:first-child {
+        border-left: 0;
         padding-left: 0;
-        border-left: none;
     }
 
     .dily-login-module-icon {
-        width: 37px;
-        height: 37px;
-        margin-bottom: 9px;
-        border-radius: 9px;
+        width: 32px;
+        height: 32px;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: linear-gradient(145deg, rgba(12, 55, 116, .78), rgba(5, 25, 56, .94));
-        border: 1px solid rgba(50, 130, 235, .4);
-        box-shadow: inset 0 0 20px rgba(0, 80, 255, .08), 0 0 22px rgba(0, 90, 255, .07);
-        font-size: 17px;
+        border-radius: 8px;
+        background: linear-gradient(145deg, rgba(12,58,125,.75), rgba(4,25,62,.9));
+        border: 1px solid rgba(55,120,230,.30);
+        font-size: 15px;
+        margin-bottom: 7px;
+        box-shadow: 0 6px 18px rgba(0,60,150,.16);
     }
 
     .dily-login-module-title {
-        color: #e2ebfb;
-        font-size: .72rem;
+        color: #e5edfc;
+        font-size: .67rem;
         font-weight: 700;
-        margin-bottom: 4px;
+        margin-bottom: 3px;
     }
 
     .dily-login-module-text {
-        color: #6f88ac;
-        font-size: .59rem;
-        line-height: 1.42;
+        color: #7189aa;
+        font-size: .57rem;
+        line-height: 1.35;
     }
 
     .dily-supply-chain {
         position: relative;
         height: 190px;
-        max-width: 690px;
+        max-width: 650px;
         margin-top: 3px;
         overflow: hidden;
+        border-radius: 16px;
         background:
-            radial-gradient(ellipse at 47% 75%, rgba(0, 107, 255, .18), transparent 55%);
+            radial-gradient(ellipse at 50% 100%, rgba(0,91,255,.13), transparent 65%);
     }
 
     .dily-supply-chain::before {
@@ -484,214 +485,203 @@ st.markdown(
         position: absolute;
         left: 5%;
         right: 5%;
-        bottom: 42px;
-        height: 2px;
-        background: linear-gradient(90deg, transparent, #087cff 12%, #03c6ff 50%, #087cff 88%, transparent);
-        box-shadow: 0 0 20px rgba(0, 126, 255, .65);
+        bottom: 49px;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, #0878ff, #08c8ff, #0878ff, transparent);
+        box-shadow: 0 0 15px rgba(0,130,255,.75);
     }
 
     .dily-supply-chain::after {
         content: "";
         position: absolute;
-        left: 4%;
-        right: 4%;
-        bottom: 20px;
-        height: 94px;
+        left: 5%;
+        right: 5%;
+        bottom: 48px;
+        height: 70px;
+        border-top: 1px dashed rgba(40,130,255,.15);
         border-radius: 50%;
-        background: radial-gradient(ellipse at center, rgba(15, 93, 196, .17), transparent 68%);
-        filter: blur(2px);
     }
 
     .dily-chain-items {
         position: relative;
-        z-index: 2;
+        z-index: 3;
         display: flex;
-        justify-content: space-between;
         align-items: flex-end;
-        height: 153px;
-        padding: 0 8px;
+        justify-content: space-between;
+        height: 155px;
+        padding: 0 5px;
     }
 
     .dily-chain-item {
-        width: 140px;
+        width: 23%;
         text-align: center;
     }
 
     .dily-chain-icon {
-        height: 76px;
+        height: 73px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 46px;
-        filter: drop-shadow(0 0 16px rgba(15, 133, 255, .58));
+        font-size: 43px;
+        filter: drop-shadow(0 0 13px rgba(0,130,255,.55));
     }
 
     .dily-chain-label {
-        color: #d9e7fc;
-        font-size: .62rem;
-        font-weight: 700;
+        color: #d7e5fb;
+        font-size: .59rem;
+        font-weight: 600;
+        margin-top: 3px;
     }
 
     .dily-chain-dot {
-        width: 6px;
-        height: 6px;
-        margin: 8px auto 0;
-        background: #ff1e36;
+        width: 5px;
+        height: 5px;
+        margin: 7px auto 0;
         border-radius: 50%;
-        box-shadow: 0 0 11px rgba(255, 30, 55, .88);
+        background: #ff1d35;
+        box-shadow: 0 0 9px rgba(255,30,50,.8);
     }
 
-    .dily-login-footer {
-        margin-top: 9px;
-        color: #6f87aa;
-        font-size: .61rem;
+    .dily-login-curves {
+        position: fixed;
+        right: -120px;
+        bottom: -60px;
+        width: 620px;
+        height: 250px;
+        pointer-events: none;
+        z-index: 1;
+        opacity: .75;
     }
 
-    .dily-snowflake {
-        color: #35c1ff;
-        font-size: .85rem;
-        margin-right: 5px;
+    .dily-login-curve-blue,
+    .dily-login-curve-red {
+        position: absolute;
+        width: 700px;
+        height: 190px;
+        border-radius: 50%;
+        transform: rotate(-10deg);
     }
 
-    /* ---------- Right-side native Streamlit login card ---------- */
+    .dily-login-curve-blue {
+        border-top: 2px solid rgba(0,105,255,.72);
+        box-shadow: 0 -4px 26px rgba(0,105,255,.20);
+    }
 
-    .dily-login-right-spacer { height: 0; }
+    .dily-login-curve-red {
+        top: 28px;
+        left: 42px;
+        border-top: 2px solid rgba(242,25,50,.82);
+        box-shadow: 0 -4px 26px rgba(242,25,50,.20);
+    }
 
+    /* Streamlit login card container */
     .st-key-login_card {
         position: relative;
-        background:
-            linear-gradient(145deg, rgba(12, 38, 79, .96), rgba(7, 22, 49, .98));
-        border: 1px solid rgba(69, 121, 201, .34);
-        border-radius: 15px;
-        padding: 32px 34px 28px !important;
-        box-shadow:
-            0 35px 90px rgba(0, 0, 0, .42),
-            inset 0 1px 0 rgba(255,255,255,.035);
+        z-index: 5;
+        background: linear-gradient(145deg, rgba(13,36,76,.96), rgba(6,21,48,.97));
+        border: 1px solid rgba(78,128,204,.28);
+        border-radius: 14px;
+        padding: 30px 34px 26px;
+        box-shadow: 0 28px 75px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.035);
         backdrop-filter: blur(18px);
     }
 
-    .st-key-login_card::before {
-        content: "";
-        position: absolute;
-        top: -1px;
-        left: 18px;
-        right: 18px;
-        height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(45, 128, 255, .8), transparent);
-        opacity: .7;
-    }
-
-    .st-key-login_card .login-card-title {
-        margin: 0 0 7px;
-        color: #f5f8ff;
-        font-size: 1.55rem;
+    .dily-card-title {
+        color: #f4f7ff;
+        font-size: 1.45rem;
         font-weight: 800;
-        letter-spacing: -.02em;
+        margin: 0 0 6px;
     }
 
-    .st-key-login_card .login-card-subtitle {
-        color: #8ca6cb;
-        font-size: .72rem;
+    .dily-card-subtitle {
+        color: #8ea7cd;
+        font-size: .69rem;
         line-height: 1.5;
-        margin-bottom: 24px;
-    }
-
-    .st-key-login_card div[data-testid="stTextInput"] {
-        margin-bottom: 12px;
-    }
-
-    .st-key-login_card div[data-testid="stTextInput"] label {
-        color: #d8e3f6 !important;
-        font-size: .72rem !important;
-        font-weight: 600 !important;
+        margin-bottom: 19px;
     }
 
     .st-key-login_card div[data-testid="stTextInput"] input {
-        height: 44px !important;
-        background: rgba(16, 47, 90, .82) !important;
-        color: #f4f8ff !important;
-        border: 1px solid rgba(86, 137, 210, .4) !important;
-        border-radius: 8px !important;
-        box-shadow: inset 0 0 22px rgba(0, 85, 190, .05);
+        background: rgba(18,51,99,.82) !important;
+        color: #f5f8ff !important;
+        border: 1px solid rgba(80,133,213,.35) !important;
+        border-radius: 7px !important;
+        height: 42px !important;
     }
 
     .st-key-login_card div[data-testid="stTextInput"] input:focus {
-        border-color: #3586ff !important;
-        box-shadow: 0 0 0 2px rgba(53, 134, 255, .12) !important;
+        border-color: #3782ff !important;
+        box-shadow: 0 0 0 2px rgba(55,130,255,.12) !important;
+    }
+
+    .st-key-login_card div[data-testid="stTextInput"] label {
+        color: #dbe6f8 !important;
+        font-size: .70rem !important;
+        font-weight: 600 !important;
     }
 
     .st-key-login_card div[data-testid="stButton"] > button {
-        min-height: 44px;
-        margin-top: 5px;
-        border: none !important;
-        border-radius: 8px !important;
-        background: linear-gradient(90deg, #e30e26, #f22136) !important;
+        height: 43px;
+        margin-top: 7px;
+        background: linear-gradient(90deg, #e10d26, #f21c35) !important;
         color: #fff !important;
-        font-size: .82rem !important;
-        font-weight: 800 !important;
-        box-shadow: 0 13px 28px rgba(228, 19, 45, .18);
+        border: 0 !important;
+        border-radius: 7px !important;
+        font-weight: 700 !important;
+        box-shadow: 0 10px 25px rgba(230,15,40,.20);
     }
 
     .st-key-login_card div[data-testid="stButton"] > button:hover {
-        background: linear-gradient(90deg, #f01831, #ff2d43) !important;
+        background: linear-gradient(90deg, #ef142d, #ff3047) !important;
         transform: translateY(-1px);
-        box-shadow: 0 15px 32px rgba(228, 19, 45, .28);
     }
 
-    .dily-login-or {
+    .dily-secure-divider {
         display: flex;
         align-items: center;
         gap: 10px;
-        color: #6682aa;
-        font-size: .61rem;
-        margin: 18px 0 13px;
+        margin: 13px 0 10px;
+        color: #587399;
+        font-size: .57rem;
     }
 
-    .dily-login-or::before,
-    .dily-login-or::after {
+    .dily-secure-divider::before,
+    .dily-secure-divider::after {
         content: "";
-        flex: 1;
         height: 1px;
-        background: rgba(88, 127, 181, .2);
+        flex: 1;
+        background: rgba(76,125,195,.16);
     }
 
     .dily-secure-box {
-        height: 42px;
-        border: 1px solid rgba(72, 130, 220, .36);
-        border-radius: 8px;
+        height: 40px;
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #8ca9d0;
-        font-size: .66rem;
-        background: rgba(13, 43, 82, .28);
+        border: 1px solid rgba(72,130,220,.32);
+        border-radius: 7px;
+        background: rgba(15,42,80,.34);
+        color: #8da9d1;
+        font-size: .62rem;
     }
 
-    .dily-secure-box .secure-icon {
-        color: #43c1ff;
-        margin-right: 8px;
-        font-size: .9rem;
+    .dily-secure-icon {
+        color: #49bfff;
+        margin-right: 7px;
     }
 
-    .dily-secure-note {
-        text-align: center;
-        color: #587294;
+    .dily-login-footer {
+        color: #60799e;
         font-size: .58rem;
-        margin-top: 14px;
+        margin-top: 22px;
     }
 
-    @media (max-width: 950px) {
-        .dily-login-columns {
-            grid-template-columns: 1fr;
-            gap: 35px;
-        }
-        .st-key-login_card {
-            max-width: 560px;
-            margin: 0 auto;
-        }
-        .dily-login-tagline {
-            display: none;
-        }
+    .dily-snowflake { color: #48c8ff; margin-right: 5px; }
+
+    @media (max-width: 900px) {
+        .dily-login-columns { grid-template-columns: 1fr; gap: 30px; }
+        .dily-login-title { font-size: 2.35rem; }
+        .st-key-login_card { max-width: 520px; margin: 0 auto; }
+        .dily-login-tagline { display: none; }
     }
 
     /* ---------- Chat input ---------- */
@@ -1845,159 +1835,179 @@ if "snowpark_session" not in st.session_state:
     st.session_state.snowpark_session = None
 
 if not st.session_state.authenticated:
-    st.markdown("""
-    <div class="dily-login-page">
-        <div class="dily-login-layout">
+    st.markdown(
+        """
+        <div class="dily-login-page">
+            <div class="dily-login-grid"></div>
+            <div class="dily-login-curves">
+                <div class="dily-login-curve-blue"></div>
+                <div class="dily-login-curve-red"></div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-            <div class="dily-login-topbar">
+    st.markdown(
+        """
+        <div class="dily-login-shell">
+            <div class="dily-login-header">
                 <div class="dily-login-brand">
                     <div class="dily-login-logo">DILYTICS</div>
+                    <div class="dily-login-divider"></div>
                     <div class="dily-login-workspace">Enterprise Intelligence Workspace</div>
                 </div>
                 <div class="dily-login-tagline">
-                    Better Insights. A Smarter Tomorrow.<span class="dash"></span>
+                    Better Insights. A Smarter Tomorrow.<span></span>
                 </div>
             </div>
 
             <div class="dily-login-columns">
-                <div>
-                    <div class="dily-login-left">
-                        <div class="dily-login-eyebrow">
-                            AI POWERED &nbsp;•&nbsp; DATA DRIVEN &nbsp;•&nbsp; SUPPLY CHAIN FOCUSED
+                <div class="dily-login-left">
+                    <div class="dily-login-eyebrow">
+                        AI POWERED &nbsp;•&nbsp; DATA DRIVEN &nbsp;•&nbsp; SUPPLY CHAIN FOCUSED
+                    </div>
+
+                    <h1 class="dily-login-title">
+                        Turn your data into<br>
+                        <span class="red">smarter</span><span class="blue"> decisions.</span>
+                    </h1>
+
+                    <p class="dily-login-description">
+                        Dilytics helps you ask questions, get instant insights and make
+                        data-driven decisions across Inventory, Supply Chain, Sales and
+                        Documents — powered by Snowflake and AI.
+                    </p>
+
+                    <div class="dily-login-modules">
+                        <div class="dily-login-module">
+                            <div class="dily-login-module-icon">📦</div>
+                            <div class="dily-login-module-title">Inventory</div>
+                            <div class="dily-login-module-text">Track stock &amp; optimize levels</div>
                         </div>
-
-                        <h1 class="dily-login-title">
-                            Turn your data into<br>
-                            <span class="red">smarter</span><span class="blue"> decisions.</span>
-                        </h1>
-
-                        <p class="dily-login-description">
-                            Dilytics helps you ask questions, get instant insights and make
-                            data-driven decisions across Inventory, Supply Chain, Sales and
-                            Documents — powered by Snowflake and AI.
-                        </p>
-
-                        <div class="dily-login-modules">
-                            <div class="dily-login-module">
-                                <div class="dily-login-module-icon">📦</div>
-                                <div class="dily-login-module-title">Inventory</div>
-                                <div class="dily-login-module-text">Track stock &amp; optimize levels</div>
-                            </div>
-                            <div class="dily-login-module">
-                                <div class="dily-login-module-icon">🚚</div>
-                                <div class="dily-login-module-title">Supply Chain</div>
-                                <div class="dily-login-module-text">Monitor flow &amp; reduce delays</div>
-                            </div>
-                            <div class="dily-login-module">
-                                <div class="dily-login-module-icon">📊</div>
-                                <div class="dily-login-module-title">Sales</div>
-                                <div class="dily-login-module-text">Analyze trends &amp; opportunities</div>
-                            </div>
-                            <div class="dily-login-module">
-                                <div class="dily-login-module-icon">📄</div>
-                                <div class="dily-login-module-title">Documents</div>
-                                <div class="dily-login-module-text">Search &amp; get instant answers</div>
-                            </div>
+                        <div class="dily-login-module">
+                            <div class="dily-login-module-icon">🚚</div>
+                            <div class="dily-login-module-title">Supply Chain</div>
+                            <div class="dily-login-module-text">Monitor flow &amp; reduce delays</div>
                         </div>
+                        <div class="dily-login-module">
+                            <div class="dily-login-module-icon">📊</div>
+                            <div class="dily-login-module-title">Sales</div>
+                            <div class="dily-login-module-text">Analyze trends &amp; opportunities</div>
+                        </div>
+                        <div class="dily-login-module">
+                            <div class="dily-login-module-icon">📄</div>
+                            <div class="dily-login-module-title">Documents</div>
+                            <div class="dily-login-module-text">Search &amp; get instant answers</div>
+                        </div>
+                    </div>
 
-                        <div class="dily-supply-chain">
-                            <div class="dily-chain-items">
-                                <div class="dily-chain-item">
-                                    <div class="dily-chain-icon">🏭</div>
-                                    <div class="dily-chain-label">Manufacturing</div>
-                                    <div class="dily-chain-dot"></div>
-                                </div>
-                                <div class="dily-chain-item">
-                                    <div class="dily-chain-icon">🏢</div>
-                                    <div class="dily-chain-label">Warehouse</div>
-                                    <div class="dily-chain-dot"></div>
-                                </div>
-                                <div class="dily-chain-item">
-                                    <div class="dily-chain-icon">🚢</div>
-                                    <div class="dily-chain-label">Logistics</div>
-                                    <div class="dily-chain-dot"></div>
-                                </div>
-                                <div class="dily-chain-item">
-                                    <div class="dily-chain-icon">📈</div>
-                                    <div class="dily-chain-label">Analytics</div>
-                                    <div class="dily-chain-dot"></div>
-                                </div>
+                    <div class="dily-supply-chain">
+                        <div class="dily-chain-items">
+                            <div class="dily-chain-item">
+                                <div class="dily-chain-icon">🏭</div>
+                                <div class="dily-chain-label">Manufacturing</div>
+                                <div class="dily-chain-dot"></div>
+                            </div>
+                            <div class="dily-chain-item">
+                                <div class="dily-chain-icon">🏢</div>
+                                <div class="dily-chain-label">Warehouse</div>
+                                <div class="dily-chain-dot"></div>
+                            </div>
+                            <div class="dily-chain-item">
+                                <div class="dily-chain-icon">🚢</div>
+                                <div class="dily-chain-label">Logistics</div>
+                                <div class="dily-chain-dot"></div>
+                            </div>
+                            <div class="dily-chain-item">
+                                <div class="dily-chain-icon">📈</div>
+                                <div class="dily-chain-label">Analytics</div>
+                                <div class="dily-chain-dot"></div>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="dily-login-footer">
-                            <span class="dily-snowflake">❄</span>
-                            Powered by Snowflake &nbsp;&nbsp; | &nbsp;&nbsp; Secure. Scalable. Intelligent.
-                        </div>
+                    <div class="dily-login-footer">
+                        <span class="dily-snowflake">❄</span>
+                        Powered by Snowflake &nbsp;&nbsp; | &nbsp;&nbsp; Secure. Scalable. Intelligent.
                     </div>
                 </div>
 
-                <div>
-                    <!-- Right card is created below with native Streamlit widgets. -->
-                </div>
+                <div></div>
             </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True
+    )
 
-    # Keep the existing authentication flow and use a native Streamlit card.
-    # The card is positioned over the right side of the login design.
-    st.markdown("""
-    <style>
-        .dily-login-page + div .st-key-login_card {
-            position: absolute !important;
-            top: 132px !important;
-            right: max(4vw, calc((100vw - 1240px) / 2)) !important;
-            width: min(390px, 32vw) !important;
-            z-index: 20 !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
+    # The login card is a real Streamlit container so the existing
+    # username/password widgets and Snowflake authentication remain intact.
+    left_spacer, login_card_col = st.columns([1.16, .84], gap="large")
+    with login_card_col:
+        with st.container(key="login_card"):
+            st.markdown(
+                """
+                <div class="dily-login-logo" style="display:inline-block;margin-bottom:18px;">DILYTICS</div>
+                <div class="dily-card-title">Welcome back 👋</div>
+                <div class="dily-card-subtitle">
+                    Log in to your Dilytics account to access enterprise data and AI insights.
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
-    with st.container(key="login_card"):
-        st.markdown('<div class="dily-login-logo">DILYTICS</div>', unsafe_allow_html=True)
-        st.markdown('<div class="login-card-title">Welcome back 👋</div>', unsafe_allow_html=True)
-        st.markdown('<div class="login-card-subtitle">Log in to your Dilytics account to access enterprise data and AI insights.</div>', unsafe_allow_html=True)
+            st.session_state.username = st.text_input(
+                "Username",
+                value=st.session_state.username,
+                key="login_username"
+            )
 
-        st.session_state.username = st.text_input(
-            "Snowflake Username",
-            value=st.session_state.username
-        )
-        st.session_state.password = st.text_input(
-            "Password",
-            type="password"
-        )
+            st.session_state.password = st.text_input(
+                "Password",
+                type="password",
+                key="login_password"
+            )
 
-        if st.button("Sign in to Dilytics  →", use_container_width=True, type="primary"):
-            if not st.session_state.username:
-                st.error("Please enter your Snowflake username.")
-                st.stop()
-            if not st.session_state.password:
-                st.error("Please enter your Snowflake password.")
-                st.stop()
-            try:
-                with st.spinner("Connecting to Snowflake..."):
-                    config = get_snowflake_config()
-                    connection_parameters = {
-                        "account": config["account"],
-                        "user": st.session_state.username,
-                        "password": st.session_state.password,
-                        "role": config["role"],
-                        "warehouse": config["warehouse"],
-                        "database": config["database"],
-                        "schema": config["schema"]
-                    }
-                    conn = snowflake.connector.connect(**connection_parameters)
-                    conn.close()
-                    st.session_state.snowpark_session = Session.builder.configs(connection_parameters).create()
-                    st.session_state.authenticated = True
-                    st.rerun()
-            except Exception as e:
-                st.error(f"Authentication failed: {str(e)}")
+            if st.button("Sign in to Dilytics  →", use_container_width=True, type="primary", key="login_button"):
+                if not st.session_state.username:
+                    st.error("Please enter your Snowflake username.")
+                    st.stop()
+                if not st.session_state.password:
+                    st.error("Please enter your Snowflake password.")
+                    st.stop()
+                try:
+                    with st.spinner("Connecting to Snowflake..."):
+                        config = get_snowflake_config()
+                        connection_parameters = {
+                            "account": config["account"],
+                            "user": st.session_state.username,
+                            "password": st.session_state.password,
+                            "role": config["role"],
+                            "warehouse": config["warehouse"],
+                            "database": config["database"],
+                            "schema": config["schema"]
+                        }
+                        conn = snowflake.connector.connect(**connection_parameters)
+                        conn.close()
+                        st.session_state.snowpark_session = Session.builder.configs(connection_parameters).create()
+                        st.session_state.authenticated = True
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Authentication failed: {str(e)}")
 
-        st.markdown('<div class="dily-login-or">OR</div>', unsafe_allow_html=True)
-        st.markdown('<div class="dily-secure-box"><span class="secure-icon">❄</span>Secure Snowflake Connection</div>', unsafe_allow_html=True)
-        st.markdown('<div class="dily-secure-note">🔒 Your data is secure and encrypted</div>', unsafe_allow_html=True)
+            st.markdown(
+                """
+                <div class="dily-secure-divider"><span>OR</span></div>
+                <div class="dily-secure-box">
+                    <span class="dily-secure-icon">❄</span>
+                    Secure Snowflake Connection
+                </div>
+                <div style="text-align:center;color:#627da4;font-size:.56rem;margin-top:17px;">
+                    🔒 Your data is secure and encrypted
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
     st.stop()
 
