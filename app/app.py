@@ -1896,6 +1896,25 @@ if "current_session_id" not in st.session_state:
         "messages": []
     }
 
+def enforce_conversation_history_limit(max_conversations=10):
+    """Keep only the most recent `max_conversations` conversations that the
+    user has actually asked something in. Empty/unused sessions (e.g. a
+    freshly opened 'New Chat' with no messages yet) don't count against the
+    limit and are left untouched, and the currently active session is never
+    removed even if it happens to still be empty."""
+    sessions = st.session_state.chat_sessions
+    current_id = st.session_state.current_session_id
+
+    # Session ids are timestamp-based and inserted in chronological order,
+    # so dict order already reflects oldest -> newest.
+    conversed_ids = [sid for sid, sdata in sessions.items() if sdata.get("messages")]
+
+    excess = len(conversed_ids) - max_conversations
+    if excess > 0:
+        for sid in conversed_ids[:excess]:
+            if sid != current_id:
+                sessions.pop(sid, None)
+
 current_id = st.session_state.current_session_id
 messages = st.session_state.chat_sessions[current_id]["messages"]
 
@@ -2026,12 +2045,10 @@ if st.session_state.sidebar_open:
             new_id = datetime.now().strftime("%Y%m%d_%H%M%S")
             st.session_state.current_session_id = new_id
             st.session_state.chat_sessions[new_id] = {"title": "New Conversation", "messages": []}
-            
-            # KEEP ONLY THE 10 MOST RECENT SESSIONS IN MEMORY
-            while len(st.session_state.chat_sessions) > 10:
-                oldest_key = list(st.session_state.chat_sessions.keys())[0]
-                del st.session_state.chat_sessions[oldest_key]
-                
+
+            # KEEP ONLY THE 10 MOST RECENT CONVERSATIONS THE USER HAS ACTUALLY ASKED SOMETHING IN
+            enforce_conversation_history_limit(10)
+
             st.rerun()
         st.write("")
 
@@ -2233,6 +2250,7 @@ if uploaded_chat_files:
             st.markdown(explanation)
             show_query_result(sql_query, preview_df, key_prefix=f"overview_{current_id}")
         messages.append({"role": "assistant", "content": explanation, "sql": sql_query, "data": preview_df, "suggestions": None})
+        enforce_conversation_history_limit(10)
         user_prompt = None
 
 if user_prompt:
@@ -2263,4 +2281,5 @@ if user_prompt:
                 st.error(f"SQL Execution Error: {str(e)}")
                 
     messages.append({"role": "assistant", "content": explanation, "sql": sql_query, "data": df, "suggestions": suggestions})
+    enforce_conversation_history_limit(10)
     st.rerun()
