@@ -2111,7 +2111,7 @@ if st.session_state.sidebar_open:
                 sidebar_suggestions = []
                 st.caption("Select a module or upload a file first to see suggested questions here.")
             for sq_i, sq in enumerate(sidebar_suggestions):
-                if st.button(sq, key=f"sidebar_sugg_{sq_i}", use_container_width=True, help=sq):
+                if st.button(sq, key=f"sidebar_sugg_{sq_i}", use_container_width=True):
                     pending_prompt_from_click = sq
         st.write("")
 
@@ -2186,7 +2186,7 @@ for idx, msg in enumerate(messages):
             sugg_cols = st.columns(len(msg["suggestions"]))
             for s_i, (scol, sugg_q) in enumerate(zip(sugg_cols, msg["suggestions"])):
                 with scol:
-                    if st.button(sugg_q, key=f"sugg_{current_id}_{idx}_{s_i}", use_container_width=True, help=sugg_q):
+                    if st.button(sugg_q, key=f"sugg_{current_id}_{idx}_{s_i}", use_container_width=True):
                         suggestion_click_prompt = sugg_q
 
 if st.session_state.active_file:
