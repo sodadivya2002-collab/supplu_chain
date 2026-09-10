@@ -9,19 +9,13 @@ from snowflake.snowpark import Session
 import io
 import zipfile
 import xml.etree.ElementTree as ET
-
-# ============================================================
-# PAGE CONFIG
-# ============================================================
-
+# ====page configuration==================
 st.set_page_config(
     page_title="Dilytics Supply Chain AI",
     page_icon="📦",
     layout="wide"
 )
 
-
-# ============================================================
 # CUSTOM CSS  (dark, commercial "AI assistant" theme)
 # ============================================================
 
@@ -712,7 +706,6 @@ def get_snowflake_config():
         "schema": st.secrets["snowflake"]["schema"]
     }
 
-
 # ============================================================
 # CORTEX ANALYST (Structured DB Querying)
 # ============================================================
@@ -880,8 +873,6 @@ def call_cortex_analyst(prompt, module="Supply Chain", semantic_model_yaml=None)
     except Exception as e:
         return (f"Cortex Analyst error.\n\n**Error:** {str(e)}", None)
 
-
-# ============================================================
 # CORTEX ANALYST FOR UPLOADED FILES
 # ============================================================
 
@@ -1073,8 +1064,6 @@ def answer_file_question_with_cortex_analyst(session, prompt, fname):
         return None, None
     return call_cortex_analyst(prompt, semantic_model_yaml=semantic_model_yaml)
 
-
-# ============================================================
 # FILE UPLOAD HELPERS (Native Zip parsing for DOCX)
 # ============================================================
 
@@ -1214,8 +1203,6 @@ def extract_data_from_upload(uploaded_file):
     except Exception as e:
         return f"[Could not read '{name}': {e}]", {}
 
-
-# ------------------------------------------------------------
 # DETERMINISTIC QUERY ENGINE (pandas only — no LLM anywhere)
 # ------------------------------------------------------------
 
@@ -1512,8 +1499,6 @@ def answer_question_from_dataframe(prompt, df):
     computation = f"df['{metric_col}'].{aggregation}()"
     return explanation, computation, _scalar_result_df(aggregation, result_value, metric_col)
 
-
-# ============================================================
 # SMART LOCAL DOCUMENT FALLBACK (No Snowflake AI Functions)
 # ============================================================
 
@@ -1785,8 +1770,6 @@ def generate_file_overview(fname):
 
     return "\n".join(lines), None, df.head(10)
 
-
-# ============================================================
 # SESSION STATE & LOGIN
 # ============================================================
 
@@ -1892,8 +1875,6 @@ if not st.session_state.authenticated:
 
 session = st.session_state.snowpark_session
 
-
-# ============================================================
 # CUSTOM SIDEBAR & CHAT STATE
 # ============================================================
 
@@ -1955,8 +1936,6 @@ def enforce_conversation_history_limit(max_conversations=10):
 current_id = st.session_state.current_session_id
 messages = st.session_state.chat_sessions[current_id]["messages"]
 
-
-# ============================================================
 # CHARTING & ROUTING
 # ============================================================
 
@@ -2063,8 +2042,6 @@ def generate_sql_from_prompt(prompt):
     explanation, sql_query = call_cortex_analyst(prompt, module)
     return explanation, sql_query, None, None
 
-
-# ============================================================
 # TOP NAVBAR & UI RENDERING
 # ============================================================
 
