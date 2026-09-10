@@ -9,13 +9,19 @@ from snowflake.snowpark import Session
 import io
 import zipfile
 import xml.etree.ElementTree as ET
-# ====page configuration==================
+
+# ============================================================
+# PAGE CONFIG
+# ============================================================
+
 st.set_page_config(
     page_title="Dilytics Supply Chain AI",
     page_icon="📦",
     layout="wide"
 )
 
+
+# ============================================================
 # CUSTOM CSS  (dark, commercial "AI assistant" theme)
 # ============================================================
 
@@ -706,6 +712,7 @@ def get_snowflake_config():
         "schema": st.secrets["snowflake"]["schema"]
     }
 
+
 # ============================================================
 # CORTEX ANALYST (Structured DB Querying)
 # ============================================================
@@ -792,30 +799,9 @@ def call_cortex_analyst(prompt, module="Supply Chain", semantic_model_yaml=None)
             except Exception:
                 error_message = response.text
 
-            # Give a more actionable message when the semantic view itself
-            # is the problem, rather than just echoing Snowflake's raw error.
-            lowered = str(error_message).lower()
-            hint = ""
-            if ("does not exist" in lowered or "not authorized" in lowered) and not semantic_model_yaml and semantic_view:
-                db_name = semantic_view.split(".")[0]
-                secret_key_used = MODULE_SEMANTIC_VIEW_KEYS.get(module, "semantic_view")
-                hint = (
-                    f"\n\nThe **{module}** module is configured to use the semantic view "
-                    f"`{semantic_view}`, but Snowflake reports it doesn't exist or isn't "
-                    f"accessible with the current role/warehouse.\n\n"
-                    f"To fix this, check in Snowflake:\n"
-                    f"- `SHOW SEMANTIC VIEWS IN DATABASE {db_name};` to confirm the exact "
-                    f"name and schema\n"
-                    f"- That the role in your secrets (`role` under `[snowflake]`) has "
-                    f"access to it\n\n"
-                    f"Then update `{secret_key_used}` in your Streamlit secrets if the "
-                    f"name or path differs."
-                )
-
             return (
                 "Cortex Analyst could not process the question.\n\n"
-                f"**Error:** {error_message}"
-                f"{hint}",
+                f"**Error:** {error_message}",
                 None
             )
 
@@ -873,6 +859,8 @@ def call_cortex_analyst(prompt, module="Supply Chain", semantic_model_yaml=None)
     except Exception as e:
         return (f"Cortex Analyst error.\n\n**Error:** {str(e)}", None)
 
+
+# ============================================================
 # CORTEX ANALYST FOR UPLOADED FILES
 # ============================================================
 
@@ -1064,6 +1052,8 @@ def answer_file_question_with_cortex_analyst(session, prompt, fname):
         return None, None
     return call_cortex_analyst(prompt, semantic_model_yaml=semantic_model_yaml)
 
+
+# ============================================================
 # FILE UPLOAD HELPERS (Native Zip parsing for DOCX)
 # ============================================================
 
@@ -1203,6 +1193,8 @@ def extract_data_from_upload(uploaded_file):
     except Exception as e:
         return f"[Could not read '{name}': {e}]", {}
 
+
+# ------------------------------------------------------------
 # DETERMINISTIC QUERY ENGINE (pandas only — no LLM anywhere)
 # ------------------------------------------------------------
 
@@ -1499,6 +1491,8 @@ def answer_question_from_dataframe(prompt, df):
     computation = f"df['{metric_col}'].{aggregation}()"
     return explanation, computation, _scalar_result_df(aggregation, result_value, metric_col)
 
+
+# ============================================================
 # SMART LOCAL DOCUMENT FALLBACK (No Snowflake AI Functions)
 # ============================================================
 
@@ -1770,6 +1764,8 @@ def generate_file_overview(fname):
 
     return "\n".join(lines), None, df.head(10)
 
+
+# ============================================================
 # SESSION STATE & LOGIN
 # ============================================================
 
@@ -1875,6 +1871,8 @@ if not st.session_state.authenticated:
 
 session = st.session_state.snowpark_session
 
+
+# ============================================================
 # CUSTOM SIDEBAR & CHAT STATE
 # ============================================================
 
@@ -1936,6 +1934,8 @@ def enforce_conversation_history_limit(max_conversations=10):
 current_id = st.session_state.current_session_id
 messages = st.session_state.chat_sessions[current_id]["messages"]
 
+
+# ============================================================
 # CHARTING & ROUTING
 # ============================================================
 
@@ -1979,7 +1979,7 @@ GREETING_PHRASES = ["hi", "hello", "hey", "good morning", "good afternoon", "goo
 MODULE_GREETING_SUGGESTIONS = {
     "Supply Chain": ["What is the total purchase order count?", "How many shipments are currently in transit?", "Which suppliers are high risk?", "What are the top products by ordered value?", "What is the supplier on-time delivery percentage?"],
     "Inventory": ["What is the total available inventory as of the latest snapshot?", "What is the total quantity of inventory currently on hand?", "How many products and warehouses are out of stock?", "What is the total inventory value by product category?", "How many products need to be reordered?"],
-    "Sales": ["What is the total sales revenue by month?", "Which products have the highest sales volume?", "What is the total sales by region?", "Who are the top performing sales reps?", "What is the year-over-year sales growth?", "What is the total purchase order count?"],
+    "Sales": ["What is the total sales revenue by month?", "Which products have the highest sales volume?", "What is the total sales by region?", "Who are the top performing sales reps?", "What is the year-over-year sales growth?"],
     "None": [],
 }
 
@@ -2042,6 +2042,8 @@ def generate_sql_from_prompt(prompt):
     explanation, sql_query = call_cortex_analyst(prompt, module)
     return explanation, sql_query, None, None
 
+
+# ============================================================
 # TOP NAVBAR & UI RENDERING
 # ============================================================
 
