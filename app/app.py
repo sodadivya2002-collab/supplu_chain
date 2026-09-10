@@ -799,9 +799,30 @@ def call_cortex_analyst(prompt, module="Supply Chain", semantic_model_yaml=None)
             except Exception:
                 error_message = response.text
 
+            # Give a more actionable message when the semantic view itself
+            # is the problem, rather than just echoing Snowflake's raw error.
+            lowered = str(error_message).lower()
+            hint = ""
+            if ("does not exist" in lowered or "not authorized" in lowered) and not semantic_model_yaml and semantic_view:
+                db_name = semantic_view.split(".")[0]
+                secret_key_used = MODULE_SEMANTIC_VIEW_KEYS.get(module, "semantic_view")
+                hint = (
+                    f"\n\nThe **{module}** module is configured to use the semantic view "
+                    f"`{semantic_view}`, but Snowflake reports it doesn't exist or isn't "
+                    f"accessible with the current role/warehouse.\n\n"
+                    f"To fix this, check in Snowflake:\n"
+                    f"- `SHOW SEMANTIC VIEWS IN DATABASE {db_name};` to confirm the exact "
+                    f"name and schema\n"
+                    f"- That the role in your secrets (`role` under `[snowflake]`) has "
+                    f"access to it\n\n"
+                    f"Then update `{secret_key_used}` in your Streamlit secrets if the "
+                    f"name or path differs."
+                )
+
             return (
                 "Cortex Analyst could not process the question.\n\n"
-                f"**Error:** {error_message}",
+                f"**Error:** {error_message}"
+                f"{hint}",
                 None
             )
 
