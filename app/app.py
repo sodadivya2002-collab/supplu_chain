@@ -1979,7 +1979,7 @@ GREETING_PHRASES = ["hi", "hello", "hey", "good morning", "good afternoon", "goo
 MODULE_GREETING_SUGGESTIONS = {
     "Supply Chain": ["What is the total purchase order count?", "How many shipments are currently in transit?", "Which suppliers are high risk?", "What are the top products by ordered value?", "What is the supplier on-time delivery percentage?"],
     "Inventory": ["What is the total available inventory as of the latest snapshot?", "What is the total quantity of inventory currently on hand?", "How many products and warehouses are out of stock?", "What is the total inventory value by product category?", "How many products need to be reordered?"],
-    "Sales": ["What is the total sales amount?", "How many orders are there?", "What is the total discount given?", "What is the total sales amount by order channel?", "How many orders are there for each order status?", "What is the total sales amount by customer?", "What are the top 5 products by quantity sold?"],
+    "Sales": ["What is the total sales amount?", "How many orders are there?", "What is the total discount given?", "What is the total sales amount by order channel?", "How many orders are there for each order status?"],
     "None": [],
 }
 
